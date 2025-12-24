@@ -132,14 +132,16 @@
                 </div>
             </div>
 
-            <!-- Login Modal -->
+            <!-- Login/Register Modal -->
             <div class="modal-layer" x-show="activeModal === 'login'" style="z-index:999;" x-transition.opacity>
                 <div class="glass-panel" style="max-width:400px;">
                     <div class="panel-header">
-                        <h2><i class="fas fa-sign-in-alt"></i> 登入系統</h2>
+                        <h2 x-show="authMode === 'login'"><i class="fas fa-sign-in-alt"></i> 登入系統</h2>
+                        <h2 x-show="authMode === 'register'"><i class="fas fa-user-plus"></i> 創建帳號</h2>
                     </div>
                     <div class="panel-content">
-                        <form @submit.prevent="login()">
+                        <!-- Login Form -->
+                        <form x-show="authMode === 'login'" @submit.prevent="login()">
                             <div class="setting-item">
                                 <label>帳號</label>
                                 <input type="text" x-model="loginForm.username" required class="auth-input">
@@ -151,9 +153,31 @@
                             <div style="text-align:right; margin-top:20px;">
                                 <button type="submit" class="action-btn" style="padding:10px 30px;">登入</button>
                             </div>
+                            <p style="text-align:center; margin-top:20px; font-size:0.9rem;">
+                                沒有帳號？ <span @click="authMode = 'register'"
+                                    style="color:var(--primary-gold); cursor:pointer; text-decoration:underline;">立即註冊</span>
+                            </p>
                         </form>
-                        <p style="text-align:center; margin-top:15px; font-size:0.8rem; color:var(--text-muted);">預設帳號:
-                            admin / admin123</p>
+
+                        <!-- Register Form -->
+                        <form x-show="authMode === 'register'" @submit.prevent="register()">
+                            <div class="setting-item">
+                                <label>用戶名</label>
+                                <input type="text" x-model="registerForm.username" required class="auth-input">
+                            </div>
+                            <div class="setting-item">
+                                <label>密碼 (至少6字)</label>
+                                <input type="password" x-model="registerForm.password" required minlength="6"
+                                    class="auth-input">
+                            </div>
+                            <div style="text-align:right; margin-top:20px;">
+                                <button type="submit" class="action-btn" style="padding:10px 30px;">註冊並登入</button>
+                            </div>
+                            <p style="text-align:center; margin-top:20px; font-size:0.9rem;">
+                                已有帳號？ <span @click="authMode = 'login'"
+                                    style="color:var(--primary-gold); cursor:pointer; text-decoration:underline;">返回登入</span>
+                            </p>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -193,12 +217,13 @@
             </div>
 
             <!-- Tutorial Modal -->
-            <div class="modal-layer" x-show="activeModal === 'tutorial'" @click.self="activeModal = null"
-                x-transition.opacity>
+            <div class="modal-layer" x-show="activeModal === 'tutorial'"
+                @click.self="tutorialSeen ? activeModal = null : null" x-transition.opacity>
                 <div class="glass-panel" style="max-width:700px;">
                     <div class="panel-header">
                         <h2><i class="fas fa-graduation-cap"></i> 六爻占卜教學</h2>
-                        <button class="panel-close" @click="activeModal = null"><i class="fas fa-times"></i></button>
+                        <button x-show="tutorialSeen" class="panel-close" @click="activeModal = null"><i
+                                class="fas fa-times"></i></button>
                     </div>
                     <div class="panel-content markdown-content">
                         <h3>🎯 什麼是六爻？</h3>
@@ -223,6 +248,15 @@
                         <h3>🙏 問卦心法</h3>
                         <p><strong>心誠則靈</strong> - 占卜之法，首重其誠。無事不占，不動不占。</p>
                         <p><strong>一事一占</strong> - 一事只可一占，反覆問之則為褻瀆。</p>
+
+                        <div x-show="!tutorialSeen"
+                            style="text-align:center; margin-top:30px; border-top:1px solid rgba(255,255,255,0.1); padding-top:20px;">
+                            <p style="margin-bottom:15px; color:var(--primary-gold);">您已閱讀並了解問卦規則了嗎？</p>
+                            <button class="action-btn" @click="tutorialSeen = true; activeModal = null"
+                                style="padding:10px 40px;">
+                                我已了解，開始問卦
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -397,8 +431,10 @@
                 currentUser: null,
                 loginForm: { username: '', password: '' },
                 registerForm: { username: '', password: '', role: 'user' },
+                authMode: 'login', // 'login' or 'register'
                 newPassword: '',
                 geminiApiKey: '',
+                tutorialSeen: false,
 
                 // Admin
                 allUsers: [],
@@ -426,11 +462,52 @@
                         const res = await fetch('/api/current-user');
                         if (res.ok) {
                             this.currentUser = await res.json();
+                            await this.checkFirstTimeUser();
                         } else {
                             this.activeModal = 'login';
                         }
                     } catch (e) {
                         this.activeModal = 'login';
+                    }
+                },
+
+                async checkFirstTimeUser() {
+                    if (!this.currentUser) return;
+                    try {
+                        const res = await fetch('/api/history');
+                        if (res.ok) {
+                            const history = await res.json();
+                            if (history.length === 0) {
+                                this.activeModal = 'tutorial';
+                                this.tutorialSeen = false;
+                            } else {
+                                this.tutorialSeen = true;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Failed to check history', e);
+                    }
+                },
+
+                async register() {
+                    try {
+                        const res = await fetch('/api/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.registerForm)
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.currentUser = data.user;
+                            this.activeModal = 'tutorial';
+                            this.tutorialSeen = false;
+                            this.registerForm = { username: '', password: '', role: 'user' };
+                        } else {
+                            const err = await res.json();
+                            alert(err.error || '註冊失敗');
+                        }
+                    } catch (e) {
+                        alert('註冊錯誤');
                     }
                 },
 
@@ -446,6 +523,7 @@
                             this.currentUser = data.user;
                             this.activeModal = null;
                             this.loginForm = { username: '', password: '' };
+                            await this.checkFirstTimeUser();
                         } else {
                             const err = await res.json();
                             alert(err.error || '登入失敗');

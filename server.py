@@ -148,6 +148,36 @@ def get_current_user():
         })
     return jsonify({"error": "Not logged in"}), 401
 
+# ============= Public Registration =============
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    if not username or not password:
+        return jsonify({"error": "Username and password required"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    if len(username) < 2:
+        return jsonify({"error": "Username must be at least 2 characters"}), 400
+    
+    try:
+        user_id = auth.create_user(username, password, 'user')
+        # Auto login after registration
+        session['user_id'] = user_id
+        session['username'] = username
+        session['role'] = 'user'
+        session.permanent = True
+        return jsonify({
+            "success": True,
+            "user": {"id": user_id, "username": username, "role": "user"}
+        })
+    except Exception as e:
+        if "UNIQUE constraint" in str(e):
+            return jsonify({"error": "用戶名已存在"}), 400
+        return jsonify({"error": str(e)}), 400
+
 # ============= User Management (Admin) =============
 @app.route('/api/admin/users', methods=['GET'])
 @auth.admin_required
