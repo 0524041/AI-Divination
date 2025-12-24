@@ -48,7 +48,7 @@
                     <p class="sub-title">天機不可洩露，唯誠者可得之</p>
 
                     <div class="input-card">
-                        <textarea class="elegant-input" x-model="question" placeholder="請在此輸入您心中的疑惑..."
+                        <textarea class="elegant-input" x-model="question" :placeholder="placeholderText"
                             @input="$el.style.height = ''; $el.style.height = Math.min($el.scrollHeight, 200) + 'px'"></textarea>
                     </div>
 
@@ -107,11 +107,17 @@
                                         x-text="item.question"></div>
                                     <div class="row-date" x-text="item.created_at"></div>
                                 </div>
-                                <button @click="toggleFavorite(item)"
-                                    style="background:none; border:none; cursor:pointer; font-size:1.2rem;">
-                                    <i :class="item.is_favorite ? 'fas fa-heart' : 'far fa-heart'"
-                                        :style="item.is_favorite ? 'color: #c0392b' : 'color:var(--text-muted)'"></i>
-                                </button>
+                                <div style="display:flex; gap:10px;">
+                                    <button @click="toggleFavorite(item)"
+                                        style="background:none; border:none; cursor:pointer; font-size:1.2rem;">
+                                        <i :class="item.is_favorite ? 'fas fa-heart' : 'far fa-heart'"
+                                            :style="item.is_favorite ? 'color: #c0392b' : 'color:var(--text-muted)'"></i>
+                                    </button>
+                                    <button @click="deleteHistory(item)"
+                                        style="background:none; border:none; cursor:pointer; font-size:1.2rem; color:var(--text-muted);">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -174,6 +180,52 @@
                 historyList: [],
                 settings: { daily_limit: '5' },
 
+                // Typewriter Placeholder
+                placeholderText: '',
+                phPhrases: [
+                    "請在此輸入您心中的疑惑...",
+                    "我想知道我這週財運如何？",
+                    "這段感情會有結果嗎？",
+                    "最近工作上有什麼要注意的？",
+                    "心誠則靈，請輸入您的問題..."
+                ],
+                phIndex: 0,
+                phCharIndex: 0,
+                isDeleting: false,
+
+                init() {
+                    this.typeWriter();
+                },
+
+                typeWriter() {
+                    const currentPhrase = this.phPhrases[this.phIndex];
+
+                    if (this.isDeleting) {
+                        this.placeholderText = currentPhrase.substring(0, this.phCharIndex - 1);
+                        this.phCharIndex--;
+                    } else {
+                        this.placeholderText = currentPhrase.substring(0, this.phCharIndex + 1);
+                        this.phCharIndex++;
+                    }
+
+                    let typeSpeed = 100;
+
+                    if (this.isDeleting) {
+                        typeSpeed /= 2; // Faster deletion
+                    }
+
+                    if (!this.isDeleting && this.phCharIndex === currentPhrase.length) {
+                        typeSpeed = 2000; // Pause at end
+                        this.isDeleting = true;
+                    } else if (this.isDeleting && this.phCharIndex === 0) {
+                        this.isDeleting = false;
+                        this.phIndex = (this.phIndex + 1) % this.phPhrases.length;
+                        typeSpeed = 500;
+                    }
+
+                    setTimeout(() => this.typeWriter(), typeSpeed);
+                },
+
                 goHome() {
                     this.resultMode = false;
                     this.activeModal = null;
@@ -234,6 +286,18 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ is_favorite: item.is_favorite })
                     });
+                },
+
+                async deleteHistory(item) {
+                    if (!confirm("確定要刪除這條紀錄嗎？此操作無法復原。")) return;
+
+                    try {
+                        await fetch(`/api/history/${item.id}`, { method: 'DELETE' });
+                        // Remove from local list
+                        this.historyList = this.historyList.filter(h => h.id !== item.id);
+                    } catch (e) {
+                        alert("刪除失敗");
+                    }
                 },
 
                 async fetchSettings() {

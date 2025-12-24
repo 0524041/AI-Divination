@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory
-from database import init_db, add_history, get_history, toggle_favorite, get_daily_usage_count, get_setting, set_setting
+from database import init_db, add_history, get_history, delete_history, toggle_favorite, get_daily_usage_count, get_setting, set_setting
 from tools import get_current_time, get_divination_tool
 from google import genai
 from google.genai import types
@@ -143,6 +143,13 @@ def history():
 def favorite(id):
     data = request.json
     toggle_favorite(id, data.get('is_favorite'))
+    return jsonify({"success": True})
+
+    return jsonify({"success": True})
+
+@app.route('/api/history/<int:id>', methods=['DELETE'])
+def delete_history_item(id):
+    delete_history(id)
     return jsonify({"success": True})
 
 @app.route('/api/settings', methods=['GET', 'POST'])

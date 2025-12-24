@@ -58,6 +58,13 @@ def get_history():
     conn.close()
     return history
 
+def delete_history(record_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('DELETE FROM history WHERE id = ?', (record_id,))
+    conn.commit()
+    conn.close()
+
 def toggle_favorite(record_id, is_favorite):
     conn = get_db_connection()
     c = conn.cursor()
