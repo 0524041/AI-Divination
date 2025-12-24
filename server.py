@@ -82,126 +82,80 @@ def divinate():
             if count >= limit:
                 return jsonify({"error": f"Daily limit of {limit} divinations reached."}), 403
         except ValueError:
-            pass # Treat as unlimited if invalid? Or default to 5. Let's assume safe.
+            pass 
     
-    # Prepend prefix or use System Prompt
-    # We will use the system prompt from settings
+    # 2. Pre-execute Tools (Python Side)
+    tool_status = {
+        "get_divination_tool": "unused", 
+        "get_current_time": "unused"
+    }
+    
+    # Execution: Time
+    try:
+        current_time = get_current_time()
+        tool_status["get_current_time"] = "success"
+    except Exception as e:
+        current_time = f"Error getting time: {e}"
+        tool_status["get_current_time"] = "error"
+
+    # Execution: Divination (Hexagram)
+    try:
+        # We call the python function directly which handles MCP
+        divination_result = get_divination_tool()
+        
+        # Check for dict error returned by tool wrapper
+        if isinstance(divination_result, dict) and "error" in divination_result:
+             tool_status["get_divination_tool"] = "error"
+             divination_result_str = json.dumps(divination_result, ensure_ascii=False)
+        else:
+             tool_status["get_divination_tool"] = "success"
+             divination_result_str = json.dumps(divination_result, ensure_ascii=False, indent=2)
+
+    except Exception as e:
+        divination_result_str = f"Error performing divination: {e}"
+        tool_status["get_divination_tool"] = "error"
+
+    # 3. Construct Prompt (Single Shot)
     system_prompt_tmpl = get_setting('system_prompt', DEFAULT_PROMPT)
-    # If the user messed up and the prompt doesn't have {question}, we append it.
     if "{question}" not in system_prompt_tmpl:
-         full_prompt = system_prompt_tmpl + "\n\n<問題>\n" + question
+         # Fallback if template is broken
+         main_prompt = system_prompt_tmpl + "\n\n<問題>\n" + question
     else:
-         full_prompt = system_prompt_tmpl.replace("{question}", question)
+         main_prompt = system_prompt_tmpl.replace("{question}", question)
+         
+    # Inject Context
+    full_payload = f"""{main_prompt}
 
-    # 2. Call Gemini
-    # We use a chat session or just generate_content with tools
-    # Since we need a back-and-forth for tools, we manage the history manually or let the client handle it.
-    
-    # Construct initial prompt
-    # We want the model to use the tools to answer.
-    
-    
-    # Configure tool use. 
-    # Config for first turn: FORCE tool use (ANY)
-    config_any = types.GenerateContentConfig(
-        tools=[get_current_time, get_divination_tool],
-        tool_config=types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(
-                mode=types.FunctionCallingConfigMode.ANY
-            )
-        )
-    )
+<系統已自動執行的工具結果>
+為了節省您的思考時間，系統已經預先為您執行了必要的工具。請根據以下資訊直接進行解盤：
 
-    # Config for subsequent turns: Force NONE to prevent loops.
-    # We want the model to ONLY generate text after getting tool outputs.
-    config_none = types.GenerateContentConfig(
-        tools=[get_current_time, get_divination_tool], # Tools must be present to validate the response? Actually no, usually valid to have tools but forbid using them.
-        tool_config=types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(
-                mode=types.FunctionCallingConfigMode.NONE
-            )
-        ),
+【當前時間】
+{current_time}
+
+【六爻排盤結果】
+{divination_result_str}
+
+請直接根據以上排盤結果與時間進行分析與回答。不用再要求使用工具。
+"""
+
+    # 4. Call Gemini (One Shot)
+    config = types.GenerateContentConfig(
         thinking_config=types.ThinkingConfig(thinking_level="high")
     )
     
-    tool_status = {
-        "get_divination_tool": "unused", # unused, success, error
-        "get_current_time": "unused"
-    }
-
-    # First turn: User Question
     try:
-        # We start a chat. Note: client.chats.create doesn't take 'config' for the session itself in this SDK version usually,
-        # or if it does, it's default. We pass config per message. 
-        chat = client.chats.create(model=MODEL_ID)
+        # Use models.generate_content instead of chat
+        response = retry_gemini_call(
+            client.models.generate_content, 
+            model=MODEL_ID, 
+            contents=[full_payload],
+            config=config
+        )
         
-        # 1. Send Question -> Expect Tool Call (ANY)
-        # We retry this call because it's the entry point
-        print("Sending initial prompt (Expecting Tool Calls)...")
-        response = retry_gemini_call(chat.send_message, full_prompt, config=config_any)
-        
-        # Loop for tool calls
-        while response.function_calls:
-            parts = []
-            for fc in response.function_calls:
-                tool_name = fc.name
-                tool_args = fc.args
-                
-                print(f"Calling tool: {tool_name} with args: {tool_args}")
-                
-                if tool_name in tools_map:
-                    tool_func = tools_map[tool_name]
-                    # Execute
-                    try:
-                        # Arguments from Gemini are usually dict-like or object
-                        # We convert to dict if needed, but tool_args should be kwargs
-                        result = tool_func(**tool_args)
-                        
-                        # Check result for errors (our tools return {"error": "..."} on exception)
-                        if isinstance(result, dict) and "error" in result:
-                             tool_status[tool_name] = "error"
-                             print(f"Tool Error {tool_name}: {result['error']}")
-                        else:
-                             tool_status[tool_name] = "success"
-                             print(f"Tool Success {tool_name}")
-
-                    except Exception as e:
-                        result = {"error": str(e)}
-                        tool_status[tool_name] = "error"
-                    
-                    parts.append(types.Part.from_function_response(
-                        name=tool_name,
-                        response={"result": result}
-                    ))
-            
-            # Send tool outputs back -> Expect Interpretation (Force NONE)
-            # IMPORTANT: We switch to config_none here to forcing text generation and STOP the loop
-            print("Sending tool outputs (Expecting Interpretation)...")
-            response = retry_gemini_call(chat.send_message, parts, config=config_none)
-
-
-        # Final response text
         interpretation = response.text
         
-        # We want to save the "raw" divination result if possible.
-        # We can extract it from the chat history if we really want to save the hexagram details.
-        # For now, we search history for the tool response from 'get_divination_tool'
-        # This is a bit complex to dig out from the chat object properties without more digging.
-        # Simplified: We just save the interpretation. 
-        # But user wants "Result place" and "Collection".
-        # Let's try to extract the last tool response from chat history if available.
-        
-        divination_json = {}
-        # Iterate history to find tool response
-        # history is verify specific in this SDK
-        # Let's just trust the interpretation contains everything for now due to complexity.
-        # OR: we can capture it in the loop above.
-        
-        # Refined Loop with capture:
-        # (The loop above is good, but we lost the result pointer)
-        # Let's just save the interpretation. The model should include the hexagram info in the text.
-        
-        history_id = add_history(question, {"raw": "See interpretation"}, interpretation)
+        # Save History
+        history_id = add_history(question, {"raw": divination_result_str}, interpretation)
         
         return jsonify({
             "id": history_id,
@@ -210,8 +164,10 @@ def divinate():
         })
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Gemini Error: {e}")
         return jsonify({"error": str(e)}), 500
+
+
 
 @app.route('/api/history', methods=['GET'])
 def history():
