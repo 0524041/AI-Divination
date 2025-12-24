@@ -60,11 +60,11 @@ FROM history;
 DROP TABLE history;
 ALTER TABLE history_new RENAME TO history;
 
--- Create default admin user
--- Password: admin123 (hashed with bcrypt)
--- $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5eedRCciWzRiC
+-- Create default admin user (password: admin123)
+-- Note: You may need to regenerate the hash using: python3 -c "from auth import hash_password; print(hash_password('admin123'))"
+-- Then update the password_hash value below
 INSERT OR IGNORE INTO users (id, username, password_hash, role) 
-VALUES (1, 'admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5eedRCciWzRiC', 'admin');
+VALUES (1, 'admin', '$2b$12$mR1eEN36P6k.oLcCDB4JzebsLaCgn3ZauMj5j8WgdBDscCeN9F7lu', 'admin');
 
 -- Create indices for performance
 CREATE INDEX IF NOT EXISTS idx_history_user_id ON history(user_id);
