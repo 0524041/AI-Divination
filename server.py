@@ -7,8 +7,6 @@ import os
 import json
 import time
 import random
-from google.api_core import exceptions
-
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -30,23 +28,23 @@ def retry_gemini_call(func, *args, **kwargs):
     for attempt in range(max_retries):
         try:
             return func(*args, **kwargs)
-        except exceptions.ResourceExhausted as e:
-            # 429 Quota Exceeded
-            if attempt == max_retries - 1:
-                raise e
-            sleep_time = base_delay * (2 ** attempt) + random.uniform(0, 1)
-            print(f"Quota exceeded. Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
-            time.sleep(sleep_time)
-        except exceptions.ServiceUnavailable as e:
-            # 503 Service Unavailable
-            if attempt == max_retries - 1:
-                raise e
-            sleep_time = base_delay * (2 ** attempt) + random.uniform(0, 1)
-            print(f"Service unavailable. Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
-            time.sleep(sleep_time)
         except Exception as e:
-            # Other errors, re-raise immediately
-            raise e
+            error_str = str(e)
+            # Check for 429 (Resource Exhausted) or 503 (Service Unavailable)
+            # The error message usually contains these codes or strings.
+            is_429 = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+            is_503 = "503" in error_str or "Service Unavailable" in error_str
+            
+            if not (is_429 or is_503):
+                raise e
+            
+            if attempt == max_retries - 1:
+                print(f"Max retries reached for error: {error_str}")
+                raise e
+            
+            sleep_time = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            print(f"API Limit/Error ({'429' if is_429 else '503'}). Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
+            time.sleep(sleep_time)
 
 DEFAULT_PROMPT = """<角色>
 你現在是一個算命老師 正在使用六爻算命
