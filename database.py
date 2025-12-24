@@ -89,13 +89,23 @@ def init_settings():
     # Let's insert the default prompt here to be safe.
     default_prompt = """<角色>
 你現在是一個算命老師 正在使用六爻算命
+<背景>
+為了協助你解盤，系統已經預先執行了「六爻排盤」與「時間查詢」工具，並會將結果提供給你。
 <要求>
-使用六爻工具 使用即時時間工具
-要說明 搖到了哪六個卦 以及結合出什麼卦象 
-根據卦象 結合問題 給我明確的解盤 不要模稜兩可
+請根據提供的【卦象結果】與【當前時間】，結合【使用者的問題】進行解卦。
+1. 說明起卦時間(干支)。
+2. 說明本卦、變卦及其卦象含義。
+3. 根據卦象與爻辭，直接回答使用者的問題。
+4. 給予明確的指引，不要模稜兩可。
 <問題>
 {question}"""
     c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('system_prompt', default_prompt))
+    
+    # New Settings for Local AI
+    c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ai_provider', 'gemini'))
+    c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_api_url', 'http://localhost:1234/v1'))
+    c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_model_name', 'qwen/qwen3-8b'))
+    
     conn.commit()
     conn.close()
 

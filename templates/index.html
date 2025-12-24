@@ -177,6 +177,27 @@
                         </div>
 
                         <div class="setting-item">
+                            <label>AI 模型來源</label>
+                            <select x-model="settings.ai_provider" class="elegant-select" @change="saveSettings()">
+                                <option value="gemini">Google Gemini (雲端)</option>
+                                <option value="local">Local AI (本地) - OpenAI 兼容</option>
+                            </select>
+                        </div>
+
+                        <div x-show="settings.ai_provider === 'local'" x-transition.opacity>
+                            <div class="setting-item">
+                                <label>Local API URL (e.g., http://localhost:1234/v1)</label>
+                                <input type="text" class="elegant-input" x-model="settings.local_api_url"
+                                    style="width:100%; padding:8px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.2); border-radius:5px;">
+                            </div>
+                            <div class="setting-item">
+                                <label>Model Name (e.g., qwen/qwen3-8b)</label>
+                                <input type="text" class="elegant-input" x-model="settings.local_model_name"
+                                    style="width:100%; padding:8px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.2); border-radius:5px;">
+                            </div>
+                        </div>
+
+                        <div class="setting-item">
                             <label>AI 人設與指令 (System Prompt)</label>
                             <div
                                 style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
@@ -210,7 +231,13 @@
                 parsedResult: '',
                 errorMessage: '',
                 historyList: [],
-                settings: { daily_limit: '5', system_prompt: '' },
+                settings: {
+                    daily_limit: '5',
+                    system_prompt: '',
+                    ai_provider: 'gemini',
+                    local_api_url: 'http://localhost:1234/v1',
+                    local_model_name: 'qwen/qwen3-8b'
+                },
                 defaultPrompt: '',
                 toolStatus: { get_divination_tool: 'unused', get_current_time: 'unused' },
 
@@ -350,6 +377,9 @@
                     this.settings.daily_limit = data.daily_limit;
                     this.settings.system_prompt = data.system_prompt;
                     this.defaultPrompt = data.default_prompt;
+                    this.settings.ai_provider = data.ai_provider || 'gemini';
+                    this.settings.local_api_url = data.local_api_url || 'http://localhost:1234/v1';
+                    this.settings.local_model_name = data.local_model_name || 'qwen/qwen3-8b';
                 },
 
                 async saveSettings() {

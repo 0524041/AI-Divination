@@ -7,6 +7,9 @@ import os
 import json
 import time
 import random
+import urllib.request
+import urllib.error
+
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -48,12 +51,50 @@ def retry_gemini_call(func, *args, **kwargs):
 
 DEFAULT_PROMPT = """<角色>
 你現在是一個算命老師 正在使用六爻算命
+<背景>
+為了協助你解盤，系統已經預先執行了「六爻排盤」與「時間查詢」工具，並會將結果提供給你。
 <要求>
-使用六爻工具 使用即時時間工具
-要說明 搖到了哪六個卦 以及結合出什麼卦象 
-根據卦象 結合問題 給我明確的解盤 不要模稜兩可
+請根據提供的【卦象結果】與【當前時間】，結合【使用者的問題】進行解卦。
+1. 說明起卦時間(干支)。
+2. 說明本卦、變卦及其卦象含義。
+3. 根據卦象與爻辭，直接回答使用者的問題。
+4. 給予明確的指引，不要模稜兩可。
 <問題>
 {question}"""
+
+def call_local_ai(prompt, api_url, model_name):
+    """
+    Calls a local OpenAI-compatible API using standard library.
+    """
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    # Ensure URL ends with /chat/completions if using standardized endpoint, 
+    # but user might just provide base URL. Let's handle generic v1 base.
+    url = api_url.rstrip('/')
+    if not url.endswith('/chat/completions'):
+        url = f"{url}/chat/completions"
+        
+    payload = {
+        "model": model_name,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7
+    }
+    
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(url, data=data, headers=headers)
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            # OpenAI format: choices[0].message.content
+            return result['choices'][0]['message']['content']
+    except Exception as e:
+        raise Exception(f"Local AI Error: {e}")
+
 
 # Map tools
 tools_map = {
@@ -138,21 +179,32 @@ def divinate():
 請直接根據以上排盤結果與時間進行分析與回答。不用再要求使用工具。
 """
 
-    # 4. Call Gemini (One Shot)
-    config = types.GenerateContentConfig(
-        thinking_config=types.ThinkingConfig(thinking_level="high")
-    )
+    # 4. Call AI (Switch Logic)
+    ai_provider = get_setting('ai_provider', 'gemini')
     
     try:
-        # Use models.generate_content instead of chat
-        response = retry_gemini_call(
-            client.models.generate_content, 
-            model=MODEL_ID, 
-            contents=[full_payload],
-            config=config
-        )
+        if ai_provider == 'gemini':
+            config = types.GenerateContentConfig(
+                thinking_config=types.ThinkingConfig(thinking_level="high")
+            )
+            # Use models.generate_content instead of chat
+            response = retry_gemini_call(
+                client.models.generate_content, 
+                model=MODEL_ID, 
+                contents=[full_payload],
+                config=config
+            )
+            interpretation = response.text
         
-        interpretation = response.text
+        elif ai_provider == 'local':
+            local_url = get_setting('local_api_url', 'http://localhost:1234/v1')
+            local_model = get_setting('local_model_name', 'qwen/qwen3-8b')
+            print(f"Calling Local AI: {local_model} at {local_url}")
+            interpretation = call_local_ai(full_payload, local_url, local_model)
+            
+        else:
+             return jsonify({"error": "Unknown AI provider"}), 400
+
         
         # Save History
         history_id = add_history(question, {"raw": divination_result_str}, interpretation)
@@ -192,7 +244,10 @@ def handle_settings():
         return jsonify({
             "daily_limit": get_setting('daily_limit', '5'),
             "system_prompt": get_setting('system_prompt', DEFAULT_PROMPT),
-            "default_prompt": DEFAULT_PROMPT
+            "default_prompt": DEFAULT_PROMPT,
+            "ai_provider": get_setting('ai_provider', 'gemini'),
+            "local_api_url": get_setting('local_api_url', 'http://localhost:1234/v1'),
+            "local_model_name": get_setting('local_model_name', 'qwen/qwen3-8b')
         })
     else:
         data = request.json
@@ -200,6 +255,14 @@ def handle_settings():
             set_setting('daily_limit', data['daily_limit'])
         if 'system_prompt' in data:
             set_setting('system_prompt', data['system_prompt'])
+            
+        # Local AI Settings
+        if 'ai_provider' in data:
+            set_setting('ai_provider', data['ai_provider'])
+        if 'local_api_url' in data:
+            set_setting('local_api_url', data['local_api_url'])
+        if 'local_model_name' in data:
+             set_setting('local_model_name', data['local_model_name'])
         return jsonify({"success": True})
 
 if __name__ == '__main__':
