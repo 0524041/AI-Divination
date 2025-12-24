@@ -5,10 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>靈機一動 - 易經占卜</title>
-    <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Fonts -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;700&family=Zen+Maru+Gothic:wght@500;700&display=swap"
@@ -18,49 +16,55 @@
 
 <body>
     <div x-data="app()">
-        <!-- Background Orbs -->
         <div class="bg-orb orb-1"></div>
         <div class="bg-orb orb-2"></div>
 
-        <!-- Header -->
         <header>
             <div class="brand" @click="goHome()">
                 <i class="fas fa-yin-yang fa-spin" style="animation-duration: 10s;"></i> 靈機一動
             </div>
             <nav class="nav-menu">
+                <template x-if="currentUser">
+                    <div class="nav-item" style="color:var(--primary-gold); cursor:default;">
+                        <i class="fas fa-user"></i> <span x-text="currentUser.username"></span>
+                    </div>
+                </template>
+                <template x-if="currentUser && currentUser.role === 'admin'">
+                    <div class="nav-item" @click="fetchUsers(); activeModal = 'admin'">
+                        <i class="fas fa-users-cog"></i> <span>管理</span>
+                    </div>
+                </template>
                 <div class="nav-item" @click="fetchHistory(); activeModal = 'history'">
-                    <i class="fas fa-history"></i> <span>歷史紀錄</span>
+                    <i class="fas fa-history"></i> <span>歷史</span>
                 </div>
-                <div class="nav-item" @click="activeModal = 'intro'">
-                    <i class="fas fa-book-open"></i> <span>算卦規則</span>
+                <div class="nav-item" @click="activeModal = 'tutorial'">
+                    <i class="fas fa-book-open"></i> <span>教學</span>
                 </div>
                 <div class="nav-item" @click="fetchSettings(); activeModal = 'settings'">
                     <i class="fas fa-cog"></i> <span>設定</span>
                 </div>
+                <template x-if="currentUser">
+                    <div class="nav-item" @click="logout()">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </div>
+                </template>
             </nav>
         </header>
 
-        <!-- Main Content -->
         <main>
-            <div class="content-wrapper" x-show="!resultMode">
+            <!-- Main Content -->
+            <div class="content-wrapper" x-show="!resultMode && currentUser">
                 <div class="divine-container">
                     <h1 class="main-title">誠心占卜</h1>
                     <p class="sub-title">天機不可洩露，唯誠者可得之</p>
-
                     <div class="input-card">
                         <textarea class="elegant-input" x-model="question" :placeholder="placeholderText"
                             @input="$el.style.height = ''; $el.style.height = Math.min($el.scrollHeight, 200) + 'px'"></textarea>
                     </div>
-
                     <button class="action-btn" @click="performDivination()" :disabled="loading">
-                        <template x-if="!loading">
-                            <span>開始起卦</span>
-                        </template>
-                        <template x-if="loading">
-                            <span><i class="fas fa-circle-notch fa-spin"></i> 演算中</span>
-                        </template>
+                        <template x-if="!loading"><span>開始起卦</span></template>
+                        <template x-if="loading"><span><i class="fas fa-circle-notch fa-spin"></i> 演算中</span></template>
                     </button>
-
                     <div style="margin-top:20px;">
                         <span @click="randomQuestion()"
                             style="color:var(--text-muted); font-size:0.9rem; cursor:pointer; border-bottom:1px dashed var(--text-muted);">
@@ -72,32 +76,84 @@
                 </div>
             </div>
 
-            <!-- Result View / Modal-like Overlay -->
+            <!-- Result View -->
             <div class="modal-layer" x-show="resultMode" x-transition.opacity>
                 <div class="glass-panel">
                     <div class="panel-header">
-                        <h2><i class="fas fa-star" style="font-size:0.8em; margin-right:8px;"></i> 卦象解析</h2>
+                        <h2><i class="fas fa-star"></i> 卦象解析</h2>
                         <div style="flex-grow:1;"></div>
-                        <!-- Status Indicators -->
-                        <div class="status-indicator" title="六爻工具狀態">
+                        <div class="status-indicator" title="排盤">
                             <div class="status-dot"
                                 :class="toolStatus.get_divination_tool == 'success' ? 'success' : (toolStatus.get_divination_tool == 'error' ? 'error' : '')">
-                            </div>
-                            <span>排盤</span>
+                            </div><span>排盤</span>
                         </div>
-                        <div class="status-indicator" title="時間工具狀態">
+                        <div class="status-indicator" title="天時">
                             <div class="status-dot"
                                 :class="toolStatus.get_current_time == 'success' ? 'success' : (toolStatus.get_current_time == 'error' ? 'error' : '')">
-                            </div>
-                            <span>天時</span>
+                            </div><span>天時</span>
                         </div>
                         <button class="panel-close" @click="resultMode = false; goHome()"><i
                                 class="fas fa-times"></i></button>
                     </div>
-                    <div class="panel-content markdown-content" x-html="parsedResult"></div>
+                    <div class="panel-content">
+                        <div
+                            style="background:rgba(255,255,255,0.05); padding:15px; border-radius:8px; margin-bottom:20px;">
+                            <strong style="color:var(--primary-gold);">問題：</strong>
+                            <span x-text="lastQuestion"></span>
+                        </div>
+                        <div class="markdown-content" x-html="parsedResult"></div>
+                    </div>
                     <div style="padding:20px 30px; text-align:right; border-top:1px solid rgba(255,255,255,0.05);">
                         <button class="action-btn" style="padding: 8px 24px; font-size:1rem;"
                             @click="copyResult()">複製結果</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tossing Modal -->
+            <div class="modal-layer" x-show="tossingMode" style="background: rgba(0,0,0,0.9);" x-transition.opacity>
+                <div class="glass-panel" style="text-align:center; max-width:400px;">
+                    <h2 class="animate-pulse" style="margin-bottom:20px; color:var(--primary-gold);"><i
+                            class="fas fa-dice-d6 fa-spin"></i> 誠心搖卦中...</h2>
+                    <div
+                        style="display:flex; flex-direction:column-reverse; gap:10px; margin:20px 0; align-items:center;">
+                        <template x-for="(coin, index) in currentCoins" :key="index">
+                            <div class="coin-row" x-transition>
+                                <span style="font-size:0.8rem; color:var(--text-muted); margin-right:10px;"
+                                    x-text="'第 ' + (index+1) + ' 爻'"></span>
+                                <div class="coin-visual" :class="getCoinClass(coin)"><span
+                                        x-text="getCoinLabel(coin)"></span></div>
+                            </div>
+                        </template>
+                    </div>
+                    <div x-show="currentCoins.length === 6" style="margin-top:20px;">
+                        <p class="fade-in">卦象已定，正在解盤...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login Modal -->
+            <div class="modal-layer" x-show="activeModal === 'login'" style="z-index:999;" x-transition.opacity>
+                <div class="glass-panel" style="max-width:400px;">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-sign-in-alt"></i> 登入系統</h2>
+                    </div>
+                    <div class="panel-content">
+                        <form @submit.prevent="login()">
+                            <div class="setting-item">
+                                <label>帳號</label>
+                                <input type="text" x-model="loginForm.username" required class="auth-input">
+                            </div>
+                            <div class="setting-item">
+                                <label>密碼</label>
+                                <input type="password" x-model="loginForm.password" required class="auth-input">
+                            </div>
+                            <div style="text-align:right; margin-top:20px;">
+                                <button type="submit" class="action-btn" style="padding:10px 30px;">登入</button>
+                            </div>
+                        </form>
+                        <p style="text-align:center; margin-top:15px; font-size:0.8rem; color:var(--text-muted);">預設帳號:
+                            admin / admin123</p>
                     </div>
                 </div>
             </div>
@@ -107,31 +163,28 @@
                 x-transition.opacity>
                 <div class="glass-panel">
                     <div class="panel-header">
-                        <h2>過往紀錄</h2>
+                        <h2>歷史紀錄</h2>
                         <button class="panel-close" @click="activeModal = null"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="panel-content" style="padding:0;">
                         <div x-show="historyList.length === 0"
-                            style="padding:40px; text-align:center; color:var(--text-muted);">
-                            暫無歷史紀錄
-                        </div>
+                            style="padding:40px; text-align:center; color:var(--text-muted);">暫無歷史紀錄</div>
                         <template x-for="item in historyList" :key="item.id">
                             <div class="history-row">
                                 <div @click="showResult(item); activeModal = null" style="flex-grow:1;">
                                     <div style="color:var(--text-main); font-size:1.1rem; margin-bottom:4px;"
-                                        x-text="item.question"></div>
+                                        x-text="item.question || '(無題)'"></div>
                                     <div class="row-date" x-text="item.created_at"></div>
                                 </div>
                                 <div style="display:flex; gap:10px;">
                                     <button @click="toggleFavorite(item)"
                                         style="background:none; border:none; cursor:pointer; font-size:1.2rem;">
                                         <i :class="item.is_favorite ? 'fas fa-heart' : 'far fa-heart'"
-                                            :style="item.is_favorite ? 'color: #c0392b' : 'color:var(--text-muted)'"></i>
+                                            :style="item.is_favorite ? 'color:#c0392b' : 'color:var(--text-muted)'"></i>
                                     </button>
                                     <button @click="deleteHistory(item)"
-                                        style="background:none; border:none; cursor:pointer; font-size:1.2rem; color:var(--text-muted);">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
+                                        style="background:none; border:none; cursor:pointer; font-size:1.2rem; color:var(--text-muted);"><i
+                                            class="fas fa-trash-alt"></i></button>
                                 </div>
                             </div>
                         </template>
@@ -139,46 +192,37 @@
                 </div>
             </div>
 
-            <!-- Intro Modal -->
-            <div class="modal-layer" x-show="activeModal === 'intro'" @click.self="activeModal = null"
+            <!-- Tutorial Modal -->
+            <div class="modal-layer" x-show="activeModal === 'tutorial'" @click.self="activeModal = null"
                 x-transition.opacity>
-                <div class="glass-panel">
+                <div class="glass-panel" style="max-width:700px;">
                     <div class="panel-header">
-                        <h2>六爻占卜</h2>
+                        <h2><i class="fas fa-graduation-cap"></i> 六爻占卜教學</h2>
                         <button class="panel-close" @click="activeModal = null"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="panel-content markdown-content">
-                        <p><strong>心誠則靈</strong><br>占卜之法，首重其誠。無事不占，不動不占。心中有疑，方可問天。</p>
-                        <p><strong>一事一占</strong><br>凡欲問卜，一事只可一占。若心存疑慮，反覆問之，則為褻瀆，其卦必不驗。</p>
-                        <p><strong>外應之說</strong><br>除起卦之外，若見奇異徵兆，或靈機一動，皆可為占卜之機，此即梅花易數之理。</p>
-                    </div>
-                </div>
-            </div>
+                        <h3>🎯 什麼是六爻？</h3>
+                        <p>六爻是中國古老的占卜方法，通過擲三枚銅錢六次，形成六個爻，組成卦象來預測吉凶。</p>
 
-            <!-- Tossing Modal -->
-            <div class="modal-layer" x-show="tossingMode" style="background: rgba(0,0,0,0.85);" x-transition.opacity>
-                <div class="glass-panel" style="text-align:center; max-width:400px;">
-                    <h2 class="animate-pulse" style="margin-bottom:20px; color:var(--accent-gold);">
-                        <i class="fas fa-dice-d6 fa-spin"></i> 誠心搖卦中...
-                    </h2>
+                        <h3>✅ 正確的問卦方式</h3>
+                        <ul>
+                            <li><strong>問具體事情</strong>：這次投資會順利嗎？</li>
+                            <li><strong>問走勢趨勢</strong>：最近三個月的財運如何？</li>
+                            <li><strong>問一件事</strong>：這份工作適合我嗎？</li>
+                            <li><strong>問方向建議</strong>：向東還是向西發展更好？</li>
+                        </ul>
 
-                    <div class="coins-container"
-                        style="display:flex; flex-direction:column-reverse; gap:10px; margin:20px 0; align-items:center;">
-                        <template x-for="(coin, index) in currentCoins" :key="index">
-                            <div class="coin-row" x-show="true" x-transition:enter="transition ease-out duration-300"
-                                x-transition:enter-start="opacity-0 transform scale-90"
-                                x-transition:enter-end="opacity-100 transform scale-100">
-                                <span style="font-size:0.8rem; color:var(--text-muted); margin-right:10px;"
-                                    x-text="'第 ' + (index+1) + ' 爻'"></span>
-                                <div class="coin-visual" :class="getCoinClass(coin)">
-                                    <span x-text="getCoinLabel(coin)"></span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
+                        <h3>❌ 錯誤的問卦方式</h3>
+                        <ul>
+                            <li><span style="color:var(--accent-red);">✘</span> BTC什麼時候會ATH？（問具體時間點）</li>
+                            <li><span style="color:var(--accent-red);">✘</span> 我未來會不會中樂透？（問必然事件）</li>
+                            <li><span style="color:var(--accent-red);">✘</span> 我會活到幾歲？（問壽命）</li>
+                            <li><span style="color:var(--accent-red);">✘</span> 同時問多件事情</li>
+                        </ul>
 
-                    <div x-show="currentCoins.length === 6" style="margin-top:20px;">
-                        <p class="fade-in">卦象已定，正在解盤...</p>
+                        <h3>🙏 問卦心法</h3>
+                        <p><strong>心誠則靈</strong> - 占卜之法，首重其誠。無事不占，不動不占。</p>
+                        <p><strong>一事一占</strong> - 一事只可一占，反覆問之則為褻瀆。</p>
                     </div>
                 </div>
             </div>
@@ -186,50 +230,147 @@
             <!-- Settings Modal -->
             <div class="modal-layer" x-show="activeModal === 'settings'" @click.self="activeModal = null"
                 x-transition.opacity>
-                <div class="glass-panel" style="max-width:500px;">
+                <div class="glass-panel" style="max-width:550px;">
                     <div class="panel-header">
                         <h2>系統設定</h2>
                         <button class="panel-close" @click="activeModal = null"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="panel-content">
+                        <h3 style="color:var(--primary-gold); margin-bottom:15px;"><i class="fas fa-user-circle"></i>
+                            帳戶設定</h3>
                         <div class="setting-item">
-                            <label>每日卦數限制</label>
-                            <select x-model="settings.daily_limit" class="elegant-select" @change="saveSettings()">
-                                <option value="1">每日 1 卦</option>
-                                <option value="3">每日 3 卦</option>
-                                <option value="5">每日 5 卦 (預設)</option>
-                                <option value="10">每日 10 卦</option>
-                                <option value="unlimited">誠心無上限</option>
-                            </select>
-                            <p style="font-size:0.9rem; color:var(--text-muted); margin-top:8px;">設定限制有助於保持占卜的嚴肅性。</p>
+                            <label>修改密碼</label>
+                            <input type="password" x-model="newPassword" placeholder="輸入新密碼 (至少6字)" class="auth-input">
+                            <button class="action-btn" style="margin-top:10px; padding:8px 20px;"
+                                @click="changePassword()">更新密碼</button>
                         </div>
 
+                        <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:25px 0;">
+
+                        <h3 style="color:var(--primary-gold); margin-bottom:15px;"><i class="fas fa-robot"></i> AI 設定
+                        </h3>
                         <div class="setting-item">
                             <label>AI 模型來源</label>
-                            <select x-model="settings.ai_provider" class="elegant-select" @change="saveSettings()">
+                            <select x-model="settings.ai_provider" class="elegant-select">
+                                <option value="local">Local AI (本地) - 預設</option>
                                 <option value="gemini">Google Gemini (雲端)</option>
-                                <option value="local">Local AI (本地) - OpenAI 兼容</option>
+                            </select>
+                        </div>
+                        <div x-show="settings.ai_provider === 'local'">
+                            <div class="setting-item">
+                                <label>Local API URL</label>
+                                <input type="text" x-model="settings.local_api_url" class="auth-input">
+                            </div>
+                            <div class="setting-item">
+                                <label>Model Name</label>
+                                <input type="text" x-model="settings.local_model_name" class="auth-input">
+                            </div>
+                        </div>
+                        <div x-show="settings.ai_provider === 'gemini'">
+                            <div class="setting-item">
+                                <label>Gemini API Key</label>
+                                <input type="password" x-model="geminiApiKey" placeholder="輸入你的 API Key"
+                                    class="auth-input">
+                                <button class="action-btn" style="margin-top:10px; padding:8px 20px;"
+                                    @click="saveApiKey('gemini')">儲存 Key</button>
+                            </div>
+                        </div>
+
+                        <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:25px 0;">
+
+                        <div class="setting-item">
+                            <label>每日卦數限制</label>
+                            <select x-model="settings.daily_limit" class="elegant-select">
+                                <option value="3">每日 3 卦</option>
+                                <option value="5">每日 5 卦</option>
+                                <option value="10">每日 10 卦</option>
+                                <option value="unlimited">無限制</option>
                             </select>
                         </div>
 
-                        <div x-show="settings.ai_provider === 'local'" x-transition.opacity>
+                        <div style="text-align:right; margin-top:20px;">
+                            <button class="action-btn" @click="saveSettings()">儲存設定</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Modal -->
+            <div class="modal-layer" x-show="activeModal === 'admin'" @click.self="activeModal = null"
+                x-transition.opacity>
+                <div class="glass-panel" style="max-width:800px;">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-users-cog"></i> 管理面板</h2>
+                        <button class="panel-close" @click="activeModal = null"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="panel-content">
+                        <div
+                            style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                            <h3 style="color:var(--primary-gold); margin:0;">用戶列表</h3>
+                            <button class="action-btn" style="padding:8px 15px;" @click="activeModal = 'register'"><i
+                                    class="fas fa-user-plus"></i> 新增</button>
+                        </div>
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.2);">
+                                    <th style="text-align:left; padding:10px;">ID</th>
+                                    <th style="text-align:left; padding:10px;">用戶名</th>
+                                    <th style="text-align:left; padding:10px;">角色</th>
+                                    <th style="text-align:center; padding:10px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="user in allUsers" :key="user.id">
+                                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                        <td style="padding:10px;" x-text="user.id"></td>
+                                        <td style="padding:10px;" x-text="user.username"></td>
+                                        <td style="padding:10px;"
+                                            :style="user.role==='admin'?'color:var(--accent-red)':''"
+                                            x-text="user.role"></td>
+                                        <td style="padding:10px; text-align:center;">
+                                            <button @click="deleteUser(user.id)" :disabled="user.id===1"
+                                                style="background:none; border:none; color:var(--accent-red); cursor:pointer;"
+                                                :style="user.id===1?'opacity:0.3':''"><i
+                                                    class="fas fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Register Modal -->
+            <div class="modal-layer" x-show="activeModal === 'register'" @click.self="activeModal = 'admin'"
+                x-transition.opacity>
+                <div class="glass-panel" style="max-width:400px;">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-user-plus"></i> 新增用戶</h2>
+                        <button class="panel-close" @click="activeModal = 'admin'"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="panel-content">
+                        <form @submit.prevent="createUser()">
                             <div class="setting-item">
-                                <label>Local API URL (e.g., http://localhost:1234/v1)</label>
-                                <input type="text" class="elegant-input" x-model="settings.local_api_url"
-                                    style="width:100%; padding:8px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.2); border-radius:5px;">
+                                <label>用戶名</label>
+                                <input type="text" x-model="registerForm.username" required class="auth-input">
                             </div>
                             <div class="setting-item">
-                                <label>Model Name (e.g., qwen/qwen3-8b)</label>
-                                <input type="text" class="elegant-input" x-model="settings.local_model_name"
-                                    style="width:100%; padding:8px; background:rgba(255,255,255,0.05); color:white; border:1px solid rgba(255,255,255,0.2); border-radius:5px;">
+                                <label>密碼 (至少6字)</label>
+                                <input type="password" x-model="registerForm.password" required minlength="6"
+                                    class="auth-input">
                             </div>
-                        </div>
-
-
-                        <div style="text-align:right; margin-top:10px;">
-                            <button class="action-btn" style="padding: 8px 20px; font-size:0.9rem;"
-                                @click="saveSettings()">儲存設定</button>
-                        </div>
+                            <div class="setting-item">
+                                <label>角色</label>
+                                <select x-model="registerForm.role" class="elegant-select">
+                                    <option value="user">一般用戶</option>
+                                    <option value="admin">管理員</option>
+                                </select>
+                            </div>
+                            <div style="text-align:right; margin-top:20px;">
+                                <button type="submit" class="action-btn">創建用戶</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -245,83 +386,99 @@
                 tossingMode: false,
                 currentCoins: [],
                 question: '',
+                lastQuestion: '',
                 loading: false,
                 result: '',
                 parsedResult: '',
                 errorMessage: '',
                 historyList: [],
+
+                // Auth
+                currentUser: null,
+                loginForm: { username: '', password: '' },
+                registerForm: { username: '', password: '', role: 'user' },
+                newPassword: '',
+                geminiApiKey: '',
+
+                // Admin
+                allUsers: [],
+
+                // Settings
                 settings: {
                     daily_limit: '5',
-                    ai_provider: 'gemini',
+                    ai_provider: 'local',
                     local_api_url: 'http://localhost:1234/v1',
                     local_model_name: 'qwen/qwen3-8b'
                 },
                 toolStatus: { get_divination_tool: 'unused', get_current_time: 'unused' },
 
-                // Typewriter Placeholder
-                placeholderText: '',
-                phPhrases: [
-                    "請在此輸入您心中的疑惑...",
-                    "我想知道我這週財運如何？",
-                    "這段感情會有結果嗎？",
-                    "最近工作上有什麼要注意的？",
-                    "心誠則靈，請輸入您的問題..."
-                ],
-                phIndex: 0,
-                phCharIndex: 0,
-                isDeleting: false,
+                placeholderText: '請輸入您心中的疑惑...',
+                phPhrases: ["請輸入您心中的疑惑...", "我想知道我這週財運如何？", "這段感情會有結果嗎？", "最近工作上有什麼要注意的？"],
+                phIndex: 0, phCharIndex: 0, isDeleting: false,
 
                 init() {
                     this.typeWriter();
+                    this.checkAuth();
+                },
+
+                async checkAuth() {
+                    try {
+                        const res = await fetch('/api/current-user');
+                        if (res.ok) {
+                            this.currentUser = await res.json();
+                        } else {
+                            this.activeModal = 'login';
+                        }
+                    } catch (e) {
+                        this.activeModal = 'login';
+                    }
+                },
+
+                async login() {
+                    try {
+                        const res = await fetch('/api/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.currentUser = data.user;
+                            this.activeModal = null;
+                            this.loginForm = { username: '', password: '' };
+                        } else {
+                            const err = await res.json();
+                            alert(err.error || '登入失敗');
+                        }
+                    } catch (e) {
+                        alert('登入錯誤');
+                    }
+                },
+
+                async logout() {
+                    await fetch('/api/logout', { method: 'POST' });
+                    this.currentUser = null;
+                    this.activeModal = 'login';
                 },
 
                 typeWriter() {
-                    const currentPhrase = this.phPhrases[this.phIndex];
-
+                    const phrase = this.phPhrases[this.phIndex];
                     if (this.isDeleting) {
-                        this.placeholderText = currentPhrase.substring(0, this.phCharIndex - 1);
+                        this.placeholderText = phrase.substring(0, this.phCharIndex - 1);
                         this.phCharIndex--;
                     } else {
-                        this.placeholderText = currentPhrase.substring(0, this.phCharIndex + 1);
+                        this.placeholderText = phrase.substring(0, this.phCharIndex + 1);
                         this.phCharIndex++;
                     }
-
-                    let typeSpeed = 100;
-
-                    if (this.isDeleting) {
-                        typeSpeed /= 2; // Faster deletion
-                    }
-
-                    if (!this.isDeleting && this.phCharIndex === currentPhrase.length) {
-                        typeSpeed = 2000; // Pause at end
-                        this.isDeleting = true;
+                    let speed = this.isDeleting ? 50 : 100;
+                    if (!this.isDeleting && this.phCharIndex === phrase.length) {
+                        speed = 2000; this.isDeleting = true;
                     } else if (this.isDeleting && this.phCharIndex === 0) {
                         this.isDeleting = false;
                         this.phIndex = (this.phIndex + 1) % this.phPhrases.length;
-                        typeSpeed = 500;
+                        speed = 500;
                     }
-
-                    setTimeout(() => this.typeWriter(), typeSpeed);
-                },
-
-                getCoinLabel(coin) {
-                    // 0: 老阴, 1: 阳, 2: 阴, 3: 老阳
-                    const labels = {
-                        0: '老陰',
-                        1: '陽',
-                        2: '陰',
-                        3: '老陽'
-                    };
-                    return labels[coin] || '?';
-                },
-
-                getCoinClass(coin) {
-                    // 0: 老阴, 1: 阳, 2: 阴, 3: 老阳
-                    if (coin === 0) return 'coin-old-yin';
-                    if (coin === 1) return 'coin-yang';
-                    if (coin === 2) return 'coin-yin';
-                    if (coin === 3) return 'coin-old-yang';
-                    return '';
+                    setTimeout(() => this.typeWriter(), speed);
                 },
 
                 goHome() {
@@ -330,56 +487,36 @@
                     this.errorMessage = '';
                 },
 
-                async performDivination() {
-                    if (!this.question.trim()) {
-                        this.errorMessage = "請輸入您心中的疑惑";
-                        return;
-                    }
+                getCoinLabel(c) { return { 0: '老陰', 1: '陽', 2: '陰', 3: '老陽' }[c] || '?'; },
+                getCoinClass(c) { return ['coin-old-yin', 'coin-yang', 'coin-yin', 'coin-old-yang'][c] || ''; },
 
-                    // Start tossing animation
+                async performDivination() {
+                    if (!this.question.trim()) { this.errorMessage = "請輸入問題"; return; }
                     this.tossingMode = true;
                     this.currentCoins = [];
                     this.loading = true;
                     this.errorMessage = '';
+                    this.lastQuestion = this.question;
 
-                    // Generate 6 coins (each 0-3, representing number of tails in 3 coin tosses)
-                    // 顯示每一爻的生成過程
                     for (let i = 0; i < 6; i++) {
-                        await new Promise(resolve => setTimeout(resolve, 300)); // 每爻間隔300ms
-                        const coinValue = Math.floor(Math.random() * 4); // 0, 1, 2, or 3
-                        this.currentCoins.push(coinValue);
+                        await new Promise(r => setTimeout(r, 300));
+                        this.currentCoins.push(Math.floor(Math.random() * 4));
                     }
-
-                    // 卦象已定，等待1秒後發送請求
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise(r => setTimeout(r, 1000));
 
                     try {
-                        const response = await fetch('/api/divinate', {
+                        const res = await fetch('/api/divinate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                question: this.question,
-                                coins: this.currentCoins
-                            })
+                            body: JSON.stringify({ question: this.question, coins: this.currentCoins })
                         });
-                        const data = await response.json();
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || '請求失敗');
 
-                        if (!response.ok) {
-                            if (response.status === 403) {
-                                throw new Error("今日卦數已達上限，請明日請早。");
-                            } else if (response.status === 429) {
-                                throw new Error("天機繁忙，請稍候片刻再試 (API 限流)。");
-                            } else {
-                                throw new Error(data.error || '天機未現，請稍後再試');
-                            }
-                        }
-
-                        // 關閉搖卦畫面
                         this.tossingMode = false;
-
                         this.result = data.result;
                         this.parsedResult = marked.parse(data.result);
-                        this.toolStatus = data.tool_status || { get_divination_tool: 'unused', get_current_time: 'unused' };
+                        this.toolStatus = data.tool_status || {};
                         this.resultMode = true;
                     } catch (e) {
                         this.tossingMode = false;
@@ -390,24 +527,26 @@
                 },
 
                 randomQuestion() {
-                    const samples = ["此行運勢如何？", "近期財運走勢", "心中所想之事可成否？", "工作變動之吉凶"];
-                    this.question = samples[Math.floor(Math.random() * samples.length)];
+                    const qs = ["此行運勢如何？", "近期財運走勢", "心中所想之事可成否？", "工作變動之吉凶"];
+                    this.question = qs[Math.floor(Math.random() * qs.length)];
                 },
 
                 showResult(item) {
+                    this.lastQuestion = item.question || '';
                     this.result = item.interpretation;
-                    this.parsedResult = marked.parse(this.result);
+                    this.parsedResult = marked.parse(item.interpretation);
                     this.resultMode = true;
                 },
 
                 copyResult() {
-                    navigator.clipboard.writeText(this.result);
-                    alert('已複製卦象');
+                    const text = `問題：${this.lastQuestion}\n\n${this.result}`;
+                    navigator.clipboard.writeText(text);
+                    alert('已複製');
                 },
 
                 async fetchHistory() {
                     const res = await fetch('/api/history');
-                    this.historyList = await res.json();
+                    if (res.ok) this.historyList = await res.json();
                 },
 
                 async toggleFavorite(item) {
@@ -420,26 +559,17 @@
                 },
 
                 async deleteHistory(item) {
-                    if (!confirm("確定要刪除這條紀錄嗎？此操作無法復原。")) return;
-
-                    try {
-                        await fetch(`/api/history/${item.id}`, { method: 'DELETE' });
-                        // Remove from local list
-                        this.historyList = this.historyList.filter(h => h.id !== item.id);
-                    } catch (e) {
-                        alert("刪除失敗");
-                    }
+                    if (!confirm("確定刪除？")) return;
+                    await fetch(`/api/history/${item.id}`, { method: 'DELETE' });
+                    this.historyList = this.historyList.filter(h => h.id !== item.id);
                 },
 
                 async fetchSettings() {
                     const res = await fetch('/api/settings');
-                    const data = await res.json();
-                    this.settings.daily_limit = data.daily_limit;
-                    this.settings.system_prompt = data.system_prompt;
-                    this.defaultPrompt = data.default_prompt;
-                    this.settings.ai_provider = data.ai_provider || 'gemini';
-                    this.settings.local_api_url = data.local_api_url || 'http://localhost:1234/v1';
-                    this.settings.local_model_name = data.local_model_name || 'qwen/qwen3-8b';
+                    if (res.ok) {
+                        const data = await res.json();
+                        Object.assign(this.settings, data);
+                    }
                 },
 
                 async saveSettings() {
@@ -452,9 +582,60 @@
                     this.activeModal = null;
                 },
 
-                restoreDefaultPrompt() {
-                    if (confirm("確定要恢復預設的 AI 指令嗎？")) {
-                        this.settings.system_prompt = this.defaultPrompt;
+                async changePassword() {
+                    if (!this.newPassword || this.newPassword.length < 6) {
+                        alert("密碼至少6個字符"); return;
+                    }
+                    const res = await fetch('/api/user/password', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ new_password: this.newPassword })
+                    });
+                    if (res.ok) {
+                        alert("密碼已更新");
+                        this.newPassword = '';
+                    } else {
+                        alert("更新失敗");
+                    }
+                },
+
+                async saveApiKey(provider) {
+                    const key = provider === 'gemini' ? this.geminiApiKey : '';
+                    await fetch('/api/user/api-keys', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ provider, api_key: key })
+                    });
+                    alert("API Key 已儲存");
+                },
+
+                async fetchUsers() {
+                    const res = await fetch('/api/admin/users');
+                    if (res.ok) this.allUsers = await res.json();
+                },
+
+                async createUser() {
+                    const res = await fetch('/api/admin/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.registerForm)
+                    });
+                    if (res.ok) {
+                        alert("用戶已創建");
+                        this.registerForm = { username: '', password: '', role: 'user' };
+                        this.fetchUsers();
+                        this.activeModal = 'admin';
+                    } else {
+                        const err = await res.json();
+                        alert(err.error || "創建失敗");
+                    }
+                },
+
+                async deleteUser(userId) {
+                    if (!confirm("確定刪除此用戶？")) return;
+                    const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+                    if (res.ok) {
+                        this.allUsers = this.allUsers.filter(u => u.id !== userId);
                     }
                 }
             }

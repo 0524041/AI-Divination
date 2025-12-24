@@ -547,3 +547,19 @@ textarea.prompt-editor:focus {
     border: 3px solid #ff6b35;
     box-shadow: 0 0 15px rgba(255, 107, 53, 0.5);
 }
+
+/* Auth Input */
+.auth-input {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255,255,255,0.05);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 5px;
+    font-size: 1rem;
+    outline: none;
+}
+
+.auth-input:focus {
+    border-color: var(--primary-gold);
+}

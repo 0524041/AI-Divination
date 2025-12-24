@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from database import init_db, add_history, get_history, delete_history, toggle_favorite, get_daily_usage_count, get_setting, set_setting
-from database import add_to_queue, get_queue_status, get_next_pending_request, update_queue_status, get_queue_position
+# Queue imports will be added when implementing queue feature
 from tools import get_current_time, get_divination_tool
 from google import genai
 from google.genai import types
