@@ -83,6 +83,19 @@ def init_settings():
     ''')
     # Default settings
     c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('daily_limit', '5'))
+    # Default System Prompt (will be populated by server if missing, or here. Let's put a placeholder or basic one here to ensure key exists)
+    # Actually server.py will have the full text. Let's just ensure the key is there if needed, 
+    # but init_settings is called on import. 
+    # Let's insert the default prompt here to be safe.
+    default_prompt = """<角色>
+你現在是一個算命老師 正在使用六爻算命
+<要求>
+使用六爻工具 使用即時時間工具
+要說明 搖到了哪六個卦 以及結合出什麼卦象 
+根據卦象 結合問題 給我明確的解盤 不要模稜兩可
+<問題>
+{question}"""
+    c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('system_prompt', default_prompt))
     conn.commit()
     conn.close()
 

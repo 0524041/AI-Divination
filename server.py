@@ -14,7 +14,18 @@ init_db()
 # Gemini Setup
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 # user wants gemini-3-flash
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# user wants gemini-3-flash
 MODEL_ID = "gemini-3-flash-preview"
+
+DEFAULT_PROMPT = """<角色>
+你現在是一個算命老師 正在使用六爻算命
+<要求>
+使用六爻工具 使用即時時間工具
+要說明 搖到了哪六個卦 以及結合出什麼卦象 
+根據卦象 結合問題 給我明確的解盤 不要模稜兩可
+<問題>
+{question}"""
 
 # Map tools
 tools_map = {
@@ -45,8 +56,14 @@ def divinate():
         except ValueError:
             pass # Treat as unlimited if invalid? Or default to 5. Let's assume safe.
     
-    # Prepend prefix
-    full_question = "幫我算一掛 " + question
+    # Prepend prefix or use System Prompt
+    # We will use the system prompt from settings
+    system_prompt_tmpl = get_setting('system_prompt', DEFAULT_PROMPT)
+    # If the user messed up and the prompt doesn't have {question}, we append it.
+    if "{question}" not in system_prompt_tmpl:
+         full_prompt = system_prompt_tmpl + "\n\n<問題>\n" + question
+    else:
+         full_prompt = system_prompt_tmpl.replace("{question}", question)
 
     # 2. Call Gemini
     # We use a chat session or just generate_content with tools
@@ -59,13 +76,17 @@ def divinate():
         tools=[get_current_time, get_divination_tool],
         thinking_config=types.ThinkingConfig(thinking_level="high")
     )
+    
+    tool_status = {
+        "get_divination_tool": "unused", # unused, success, error
+        "get_current_time": "unused"
+    }
 
     # First turn: User Question
     try:
         # We start a chat to maintain context of tool calls
         chat = client.chats.create(model=MODEL_ID, config=config)
-        chat = client.chats.create(model=MODEL_ID, config=config)
-        response = chat.send_message(full_question)
+        response = chat.send_message(full_prompt)
         
         # Loop for tool calls
         # The SDK usually executes tools automatically if configured? 
@@ -92,8 +113,10 @@ def divinate():
                         # Arguments from Gemini are usually dict-like or object
                         # We convert to dict if needed, but tool_args should be kwargs
                         result = tool_func(**tool_args)
+                        tool_status[tool_name] = "success"
                     except Exception as e:
                         result = {"error": str(e)}
+                        tool_status[tool_name] = "error"
                     
                     parts.append(types.Part.from_function_response(
                         name=tool_name,
@@ -102,6 +125,7 @@ def divinate():
             
             # Send tool outputs back
             response = chat.send_message(parts)
+
 
         # Final response text
         interpretation = response.text
@@ -128,7 +152,8 @@ def divinate():
         
         return jsonify({
             "id": history_id,
-            "result": interpretation
+            "result": interpretation,
+            "tool_status": tool_status
         })
 
     except Exception as e:
@@ -156,12 +181,16 @@ def delete_history_item(id):
 def handle_settings():
     if request.method == 'GET':
         return jsonify({
-            "daily_limit": get_setting('daily_limit', '5')
+            "daily_limit": get_setting('daily_limit', '5'),
+            "system_prompt": get_setting('system_prompt', DEFAULT_PROMPT),
+            "default_prompt": DEFAULT_PROMPT
         })
     else:
         data = request.json
         if 'daily_limit' in data:
             set_setting('daily_limit', data['daily_limit'])
+        if 'system_prompt' in data:
+            set_setting('system_prompt', data['system_prompt'])
         return jsonify({"success": True})
 
 if __name__ == '__main__':

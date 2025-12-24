@@ -77,7 +77,22 @@
                 <div class="glass-panel">
                     <div class="panel-header">
                         <h2><i class="fas fa-star" style="font-size:0.8em; margin-right:8px;"></i> 卦象解析</h2>
-                        <button class="panel-close" @click="resultMode = false"><i class="fas fa-times"></i></button>
+                        <div style="flex-grow:1;"></div>
+                        <!-- Status Indicators -->
+                        <div class="status-indicator" title="六爻工具狀態">
+                            <div class="status-dot"
+                                :class="toolStatus.get_divination_tool == 'success' ? 'success' : (toolStatus.get_divination_tool == 'error' ? 'error' : '')">
+                            </div>
+                            <span>排盤</span>
+                        </div>
+                        <div class="status-indicator" title="時間工具狀態">
+                            <div class="status-dot"
+                                :class="toolStatus.get_current_time == 'success' ? 'success' : (toolStatus.get_current_time == 'error' ? 'error' : '')">
+                            </div>
+                            <span>天時</span>
+                        </div>
+                        <button class="panel-close" @click="resultMode = false; goHome()"><i
+                                class="fas fa-times"></i></button>
                     </div>
                     <div class="panel-content markdown-content" x-html="parsedResult"></div>
                     <div style="padding:20px 30px; text-align:right; border-top:1px solid rgba(255,255,255,0.05);">
@@ -160,6 +175,23 @@
                             </select>
                             <p style="font-size:0.9rem; color:var(--text-muted); margin-top:8px;">設定限制有助於保持占卜的嚴肅性。</p>
                         </div>
+
+                        <div class="setting-item">
+                            <label>AI 人設與指令 (System Prompt)</label>
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                <span style="font-size:0.8rem; color:var(--text-muted);">可用 {question} 代表使用者問題</span>
+                                <button @click="restoreDefaultPrompt()"
+                                    style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:0.8rem; text-decoration:underline;">
+                                    恢復預設值
+                                </button>
+                            </div>
+                            <textarea class="prompt-editor" x-model="settings.system_prompt"></textarea>
+                            <div style="text-align:right; margin-top:10px;">
+                                <button class="action-btn" style="padding: 8px 20px; font-size:0.9rem;"
+                                    @click="saveSettings()">儲存設定</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -178,7 +210,9 @@
                 parsedResult: '',
                 errorMessage: '',
                 historyList: [],
-                settings: { daily_limit: '5' },
+                settings: { daily_limit: '5', system_prompt: '' },
+                defaultPrompt: '',
+                toolStatus: { get_divination_tool: 'unused', get_current_time: 'unused' },
 
                 // Typewriter Placeholder
                 placeholderText: '',
@@ -250,6 +284,7 @@
 
                         this.result = data.result;
                         this.parsedResult = marked.parse(data.result);
+                        this.toolStatus = data.tool_status || { get_divination_tool: 'unused', get_current_time: 'unused' };
                         this.resultMode = true;
                     } catch (e) {
                         this.errorMessage = e.message;
@@ -304,6 +339,8 @@
                     const res = await fetch('/api/settings');
                     const data = await res.json();
                     this.settings.daily_limit = data.daily_limit;
+                    this.settings.system_prompt = data.system_prompt;
+                    this.defaultPrompt = data.default_prompt;
                 },
 
                 async saveSettings() {
@@ -312,6 +349,14 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.settings)
                     });
+                    alert("設定已儲存");
+                    this.activeModal = null;
+                },
+
+                restoreDefaultPrompt() {
+                    if (confirm("確定要恢復預設的 AI 指令嗎？")) {
+                        this.settings.system_prompt = this.defaultPrompt;
+                    }
                 }
             }
         }
