@@ -5,6 +5,10 @@ from google import genai
 from google.genai import types
 import os
 import json
+import time
+import random
+from google.api_core import exceptions
+
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -15,6 +19,34 @@ init_db()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 # user wants gemini-3-flash
 MODEL_ID = "gemini-3-flash-preview"
+
+def retry_gemini_call(func, *args, **kwargs):
+    """
+    Retries a Gemini API call with exponential backoff for 429 and 503 errors.
+    """
+    max_retries = 3
+    base_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            return func(*args, **kwargs)
+        except exceptions.ResourceExhausted as e:
+            # 429 Quota Exceeded
+            if attempt == max_retries - 1:
+                raise e
+            sleep_time = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            print(f"Quota exceeded. Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
+            time.sleep(sleep_time)
+        except exceptions.ServiceUnavailable as e:
+            # 503 Service Unavailable
+            if attempt == max_retries - 1:
+                raise e
+            sleep_time = base_delay * (2 ** attempt) + random.uniform(0, 1)
+            print(f"Service unavailable. Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
+            time.sleep(sleep_time)
+        except Exception as e:
+            # Other errors, re-raise immediately
+            raise e
 
 DEFAULT_PROMPT = """<角色>
 你現在是一個算命老師 正在使用六爻算命
@@ -71,16 +103,21 @@ def divinate():
     # We want the model to use the tools to answer.
     
     
-    # Configure tool use. We FORCE the model to use tools if this is a divination request.
-    tool_config = types.ToolConfig(
-        function_calling_config=types.FunctionCallingConfig(
-            mode=types.FunctionCallingConfigMode.ANY
+    # Configure tool use. 
+    # Config for first turn: FORCE tool use (ANY)
+    config_any = types.GenerateContentConfig(
+        tools=[get_current_time, get_divination_tool],
+        tool_config=types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(
+                mode=types.FunctionCallingConfigMode.ANY
+            )
         )
     )
 
-    config = types.GenerateContentConfig(
+    # Config for subsequent turns: AUTO tool use (or NONE implied if we want text)
+    # Default is AUTO, which is fine for interpretation.
+    config_auto = types.GenerateContentConfig(
         tools=[get_current_time, get_divination_tool],
-        tool_config=tool_config,
         thinking_config=types.ThinkingConfig(thinking_level="high")
     )
     
@@ -91,20 +128,16 @@ def divinate():
 
     # First turn: User Question
     try:
-        # We start a chat to maintain context of tool calls
-        chat = client.chats.create(model=MODEL_ID, config=config)
-        response = chat.send_message(full_prompt)
+        # We start a chat. Note: client.chats.create doesn't take 'config' for the session itself in this SDK version usually,
+        # or if it does, it's default. We pass config per message. 
+        chat = client.chats.create(model=MODEL_ID)
+        
+        # 1. Send Question -> Expect Tool Call (ANY)
+        # We retry this call because it's the entry point
+        print("Sending initial prompt (Expecting Tool Calls)...")
+        response = retry_gemini_call(chat.send_message, full_prompt, config=config_any)
         
         # Loop for tool calls
-        # The SDK usually executes tools automatically if configured? 
-        # The generic `google-genai` might NOT auto-execute.
-        # Let's inspect response for function calls.
-        
-        # Simple loop for handling function calls
-        # If response has function calls, execute them and send back.
-        # Note: Depending on SDK, response might be a generator or object.
-        
-        # Handle potential multiple turns of tool use
         while response.function_calls:
             parts = []
             for fc in response.function_calls:
@@ -138,8 +171,10 @@ def divinate():
                         response={"result": result}
                     ))
             
-            # Send tool outputs back
-            response = chat.send_message(parts)
+            # Send tool outputs back -> Expect Interpretation (AUTO)
+            # IMPORTANT: We switched to config_auto here to allow text generation
+            print("Sending tool outputs (Expecting Interpretation)...")
+            response = retry_gemini_call(chat.send_message, parts, config=config_auto)
 
 
         # Final response text

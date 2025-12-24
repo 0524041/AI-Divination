@@ -280,7 +280,16 @@
                             body: JSON.stringify({ question: this.question })
                         });
                         const data = await response.json();
-                        if (!response.ok) throw new Error(data.error || '天機未現，請稍後再試');
+
+                        if (!response.ok) {
+                            if (response.status === 403) {
+                                throw new Error("今日卦數已達上限，請明日請早。");
+                            } else if (response.status === 429) {
+                                throw new Error("天機繁忙，請稍候片刻再試 (API 限流)。");
+                            } else {
+                                throw new Error(data.error || '天機未現，請稍後再試');
+                            }
+                        }
 
                         this.result = data.result;
                         this.parsedResult = marked.parse(data.result);
