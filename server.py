@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory
-from database import init_db, add_history, get_history, toggle_favorite, get_daily_usage_count
+from database import init_db, add_history, get_history, toggle_favorite, get_daily_usage_count, get_setting, set_setting
 from tools import get_current_time, get_divination_tool
 from google import genai
 from google.genai import types
@@ -35,9 +35,18 @@ def divinate():
         return jsonify({"error": "Question is required"}), 400
 
     # 1. Check Limits
-    count = get_daily_usage_count()
-    if count >= 5:
-        return jsonify({"error": "Daily limit of 5 divinations reached."}), 403
+    limit_str = get_setting('daily_limit', '5')
+    if limit_str != 'unlimited':
+        try:
+            limit = int(limit_str)
+            count = get_daily_usage_count()
+            if count >= limit:
+                return jsonify({"error": f"Daily limit of {limit} divinations reached."}), 403
+        except ValueError:
+            pass # Treat as unlimited if invalid? Or default to 5. Let's assume safe.
+    
+    # Prepend prefix
+    full_question = "幫我算一掛 " + question
 
     # 2. Call Gemini
     # We use a chat session or just generate_content with tools
@@ -55,7 +64,8 @@ def divinate():
     try:
         # We start a chat to maintain context of tool calls
         chat = client.chats.create(model=MODEL_ID, config=config)
-        response = chat.send_message(question)
+        chat = client.chats.create(model=MODEL_ID, config=config)
+        response = chat.send_message(full_question)
         
         # Loop for tool calls
         # The SDK usually executes tools automatically if configured? 
@@ -134,6 +144,18 @@ def favorite(id):
     data = request.json
     toggle_favorite(id, data.get('is_favorite'))
     return jsonify({"success": True})
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def handle_settings():
+    if request.method == 'GET':
+        return jsonify({
+            "daily_limit": get_setting('daily_limit', '5')
+        })
+    else:
+        data = request.json
+        if 'daily_limit' in data:
+            set_setting('daily_limit', data['daily_limit'])
+        return jsonify({"success": True})
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)

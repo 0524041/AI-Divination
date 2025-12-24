@@ -1,74 +1,225 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>靈機一動 - AI 易經算卦</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="/static/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Zen+Maru+Gothic:wght@700&display=swap"
+        rel="stylesheet">
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
+
 <body>
-    <div class="app-container">
+    <div class="app-container" x-data="app()">
         <header>
-            <div class="logo">
-                <i class="fas fa-yin-yang"></i>
-                <h1>靈機一動</h1>
-            </div>
-            <nav>
-                <button id="nav-divine" class="active" onclick="showSection('divine')">問卦</button>
-                <button id="nav-history" onclick="showSection('history')">歷史紀錄</button>
-            </nav>
+            <button class="back-btn" x-show="currentView !== 'home'" @click="goHome()" x-transition.opacity>
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1 @click="goHome()">靈機一動</h1>
         </header>
 
         <main>
-            <!-- 1. Divination Section -->
-            <section id="section-divine" class="active-section">
-                <div class="input-container">
-                    <h2>誠心起卦</h2>
-                    <p class="subtitle">心中默念所求之事，輸入您的問題。</p>
-                    <textarea id="question-input" placeholder="例如：這週末去台北旅遊運勢如何？"></textarea>
-                    <div class="controls">
-                        <button id="divine-btn" onclick="performDivination()">
-                            <span class="btn-text">占卜</span>
-                            <span class="btn-icon"><i class="fas fa-sparkles"></i></span>
-                        </button>
+            <!-- HOME VIEW -->
+            <div class="view" :class="{ 'active': currentView === 'home' }">
+                <div class="menu-grid">
+                    <div class="menu-item" @click="currentView = 'divine'">
+                        <i class="fas fa-yin-yang"></i>
+                        <h3>誠心問卦</h3>
+                    </div>
+                    <div class="menu-item" @click="fetchHistory(); currentView = 'history'">
+                        <i class="fas fa-history"></i>
+                        <h3>歷史紀錄</h3>
+                    </div>
+                    <div class="menu-item" @click="currentView = 'intro'">
+                        <i class="fas fa-book-open"></i>
+                        <h3>六爻說明</h3>
+                    </div>
+                    <div class="menu-item" @click="fetchSettings(); currentView = 'settings'">
+                        <i class="fas fa-cog"></i>
+                        <h3>系統設定</h3>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- 2. Result Section (Overlay or dedicated view) -->
-            <section id="section-result" class="hidden">
-                 <div class="result-card">
-                    <div class="result-header">
-                        <h2>卦象解析</h2>
-                        <button class="close-btn" onclick="showSection('divine')"><i class="fas fa-times"></i></button>
-                    </div>
-                    <div id="loading-indicator" class="hidden">
-                        <div class="spinner"></div>
-                        <p>天機運算中...</p>
-                    </div>
-                    <div id="result-content">
-                        <!-- Content injected by JS -->
-                    </div>
-                    <div class="result-actions">
-                        <button onclick="copyToMarkdown()"><i class="fas fa-copy"></i> 複製 MD</button>
-                        <button onclick="saveCurrentResult()"><i class="fas fa-save"></i> 收藏</button>
-                    </div>
-                 </div>
-            </section>
+            <!-- DIVINE VIEW -->
+            <div class="view" :class="{ 'active': currentView === 'divine' }">
+                <div class="input-group">
+                    <textarea x-model="question" placeholder="心中默念所求之事，例如：這週末去台北旅遊運勢如何？"></textarea>
 
-            <!-- 3. History Section -->
-            <section id="section-history" class="hidden">
-                <h2>歷史紀錄</h2>
-                <div id="history-list">
-                    <!-- List items injected by JS -->
+                    <button class="primary-btn" @click="performDivination()" :disabled="loading">
+                        <template x-if="!loading">
+                            <span><i class="fas fa-sparkles"></i> 開始占卜</span>
+                        </template>
+                        <template x-if="loading">
+                            <div class="spinner"></div>
+                        </template>
+                    </button>
                 </div>
-            </section>
+                <p x-show="errorMessage" x-text="errorMessage"
+                    style="color: #e74c3c; margin-top: 15px; text-align: center;"></p>
+            </div>
+
+            <!-- RESULT VIEW (Separate view for result) -->
+            <div class="view" :class="{ 'active': currentView === 'result' }">
+                <div class="markdown-body" x-html="parsedResult"></div>
+
+                <div style="margin-top: 30px; display: flex; gap: 10px;">
+                    <button class="primary-btn" style="flex: 1; background: #95a5a6;" @click="copyResult()">
+                        <i class="fas fa-copy"></i> 複製
+                    </button>
+                    <!-- Favorite Logic could remain in history for simplicity, or add here -->
+                    <button class="primary-btn" style="flex: 1;" @click="goHome()">
+                        <i class="fas fa-check"></i> 完成
+                    </button>
+                </div>
+            </div>
+
+            <!-- HISTORY VIEW -->
+            <div class="view" :class="{ 'active': currentView === 'history' }">
+                <div x-show="historyList.length === 0" style="text-align: center; color: #999; margin-top: 50px;">
+                    暫無紀錄
+                </div>
+                <template x-for="item in historyList" :key="item.id">
+                    <div class="history-item">
+                        <div class="history-info" @click="showResult(item)">
+                            <div class="history-question" x-text="item.question"></div>
+                            <div class="history-date" x-text="item.created_at"></div>
+                        </div>
+                        <div class="history-actions">
+                            <button @click="toggleFavorite(item)" :class="{ 'active': item.is_favorite }">
+                                <i :class="item.is_favorite ? 'fas fa-heart' : 'far fa-heart'"></i>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- INTRO VIEW -->
+            <div class="view" :class="{ 'active': currentView === 'intro' }">
+                <div class="intro-text">
+                    <h2>六爻占卜規則</h2>
+                    <p><strong>心誠則靈</strong>：占卜最重要的是誠心。所謂「無事不占」，心中有疑慮、有決斷不下的事情時，是最好的占卜時機。</p>
+                    <p><strong>一事一占</strong>：同一件事情，如果不滿意結果而反覆占卜，稱為「褻瀆」，結果往往不準。一段時間內（通常是一個月或事件發生變化前）對同一件事只占一次。</p>
+                    <p><strong>問法明確</strong>：問題越具體越好。避免問「我的命運如何」這種太空泛的問題，而應問「我下個月換工作是否吉利」。</p>
+                    <p><strong>靈機一動</strong>：除了正式搖卦，如果在路上看到奇特的現象，或者心中突然有所感應，也可以隨時起卦，這就是所謂的「梅花易數」或「外應」。</p>
+                </div>
+            </div>
+
+            <!-- SETTINGS VIEW -->
+            <div class="view" :class="{ 'active': currentView === 'settings' }">
+                <div class="form-group">
+                    <label>每日算卦上限</label>
+                    <select x-model="settings.daily_limit" @change="saveSettings()">
+                        <option value="1">1 次</option>
+                        <option value="3">3 次</option>
+                        <option value="5">5 次 (預設)</option>
+                        <option value="10">10 次</option>
+                        <option value="unlimited">無上限</option>
+                    </select>
+                    <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">設定每天可以請求 AI 算卦的次數，避免過度依賴。</p>
+                </div>
+            </div>
+
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="/static/script.js"></script>
+    <script>
+        function app() {
+            return {
+                currentView: 'home',
+                question: '',
+                loading: false,
+                result: '', // raw markdown
+                parsedResult: '',
+                errorMessage: '',
+                historyList: [],
+                settings: {
+                    daily_limit: '5'
+                },
+
+                goHome() {
+                    this.currentView = 'home';
+                    this.errorMessage = '';
+                    this.question = '';
+                },
+
+                async performDivination() {
+                    if (!this.question.trim()) {
+                        this.errorMessage = "請輸入問題";
+                        return;
+                    }
+
+                    this.loading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch('/api/divinate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ question: this.question })
+                        });
+                        const data = await response.json();
+
+                        if (!response.ok) throw new Error(data.error || 'Server Error');
+
+                        this.result = data.result;
+                        this.parsedResult = marked.parse(data.result);
+                        this.currentView = 'result';
+                    } catch (e) {
+                        this.errorMessage = e.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                showResult(item) {
+                    this.result = item.interpretation;
+                    this.parsedResult = marked.parse(this.result);
+                    this.currentView = 'result';
+                },
+
+                async fetchHistory() {
+                    const res = await fetch('/api/history');
+                    this.historyList = await res.json();
+                },
+
+                async toggleFavorite(item) {
+                    const newState = !item.is_favorite;
+                    item.is_favorite = newState; // Optimistic update
+                    await fetch(`/api/history/${item.id}/favorite`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ is_favorite: newState })
+                    });
+                },
+
+                copyResult() {
+                    navigator.clipboard.writeText(this.result);
+                    alert('已複製到剪貼簿');
+                },
+
+                async fetchSettings() {
+                    const res = await fetch('/api/settings');
+                    const data = await res.json();
+                    this.settings.daily_limit = data.daily_limit;
+                },
+
+                async saveSettings() {
+                    await fetch('/api/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.settings)
+                    });
+                }
+            }
+        }
+    </script>
 </body>
+
 </html>

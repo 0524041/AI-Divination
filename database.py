@@ -58,9 +58,38 @@ def get_history():
     conn.close()
     return history
 
-def toggle_favorite(record_id, is_favorite):
-    conn = get_db_connection()
-    c = conn.cursor()
     c.execute('UPDATE history SET is_favorite = ? WHERE id = ?', (is_favorite, record_id))
     conn.commit()
     conn.close()
+
+def init_settings():
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    ''')
+    # Default settings
+    c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('daily_limit', '5'))
+    conn.commit()
+    conn.close()
+
+def get_setting(key, default=None):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT value FROM settings WHERE key = ?', (key,))
+    row = c.fetchone()
+    conn.close()
+    return row['value'] if row else default
+
+def set_setting(key, value):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
+    conn.commit()
+    conn.close()
+
+# Call init_settings when this module is imported/initialized
+init_settings()
