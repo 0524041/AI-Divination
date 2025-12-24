@@ -274,7 +274,9 @@
                             帳戶設定</h3>
                         <div class="setting-item">
                             <label>修改密碼</label>
-                            <input type="password" x-model="newPassword" placeholder="輸入新密碼 (至少6字)" class="auth-input">
+                            <input type="password" x-model="newPassword" placeholder="輸入新密碼 (至少6字)" class="auth-input"
+                                style="margin-bottom:10px;">
+                            <input type="password" x-model="confirmPassword" placeholder="確認新密碼" class="auth-input">
                             <button class="action-btn" style="margin-top:10px; padding:8px 20px;"
                                 @click="changePassword()">更新密碼</button>
                         </div>
@@ -433,6 +435,7 @@
                 registerForm: { username: '', password: '', role: 'user' },
                 authMode: 'login', // 'login' or 'register'
                 newPassword: '',
+                confirmPassword: '',
                 geminiApiKey: '',
                 tutorialSeen: false,
 
@@ -664,6 +667,9 @@
                     if (!this.newPassword || this.newPassword.length < 6) {
                         alert("密碼至少6個字符"); return;
                     }
+                    if (this.newPassword !== this.confirmPassword) {
+                        alert("兩次輸入的密碼不一致"); return;
+                    }
                     const res = await fetch('/api/user/password', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
@@ -672,6 +678,7 @@
                     if (res.ok) {
                         alert("密碼已更新");
                         this.newPassword = '';
+                        this.confirmPassword = '';
                     } else {
                         alert("更新失敗");
                     }
