@@ -155,6 +155,34 @@
                 </div>
             </div>
 
+            <!-- Tossing Modal -->
+            <div class="modal-layer" x-show="tossingMode" style="background: rgba(0,0,0,0.85);" x-transition.opacity>
+                <div class="glass-panel" style="text-align:center; max-width:400px;">
+                    <h2 class="animate-pulse" style="margin-bottom:20px; color:var(--accent-gold);">
+                        <i class="fas fa-dice-d6 fa-spin"></i> 誠心搖卦中...
+                    </h2>
+
+                    <div class="coins-container"
+                        style="display:flex; flex-direction:column-reverse; gap:10px; margin:20px 0; align-items:center;">
+                        <template x-for="(coin, index) in currentCoins" :key="index">
+                            <div class="coin-row" x-show="true" x-transition:enter="transition ease-out duration-300"
+                                x-transition:enter-start="opacity-0 transform scale-90"
+                                x-transition:enter-end="opacity-100 transform scale-100">
+                                <span style="font-size:0.8rem; color:var(--text-muted); margin-right:10px;"
+                                    x-text="'第 ' + (index+1) + ' 爻'"></span>
+                                <div class="coin-visual" :class="coin === 1 ? 'coin-yang' : 'coin-yin'">
+                                    <span x-text="coin === 1 ? '陽' : '陰'"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="currentCoins.length === 6" style="margin-top:20px;">
+                        <p class="fade-in">卦象已定，正在解盤...</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Settings Modal -->
             <div class="modal-layer" x-show="activeModal === 'settings'" @click.self="activeModal = null"
                 x-transition.opacity>
@@ -197,21 +225,10 @@
                             </div>
                         </div>
 
-                        <div class="setting-item">
-                            <label>AI 人設與指令 (System Prompt)</label>
-                            <div
-                                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                                <span style="font-size:0.8rem; color:var(--text-muted);">可用 {question} 代表使用者問題</span>
-                                <button @click="restoreDefaultPrompt()"
-                                    style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:0.8rem; text-decoration:underline;">
-                                    恢復預設值
-                                </button>
-                            </div>
-                            <textarea class="prompt-editor" x-model="settings.system_prompt"></textarea>
-                            <div style="text-align:right; margin-top:10px;">
-                                <button class="action-btn" style="padding: 8px 20px; font-size:0.9rem;"
-                                    @click="saveSettings()">儲存設定</button>
-                            </div>
+
+                        <div style="text-align:right; margin-top:10px;">
+                            <button class="action-btn" style="padding: 8px 20px; font-size:0.9rem;"
+                                @click="saveSettings()">儲存設定</button>
                         </div>
                     </div>
                 </div>
@@ -225,6 +242,8 @@
             return {
                 activeModal: null,
                 resultMode: false,
+                tossingMode: false,
+                currentCoins: [],
                 question: '',
                 loading: false,
                 result: '',
@@ -233,12 +252,10 @@
                 historyList: [],
                 settings: {
                     daily_limit: '5',
-                    system_prompt: '',
                     ai_provider: 'gemini',
                     local_api_url: 'http://localhost:1234/v1',
                     local_model_name: 'qwen/qwen3-8b'
                 },
-                defaultPrompt: '',
                 toolStatus: { get_divination_tool: 'unused', get_current_time: 'unused' },
 
                 // Typewriter Placeholder
@@ -298,13 +315,32 @@
                         this.errorMessage = "請輸入您心中的疑惑";
                         return;
                     }
+
+                    // Start tossing animation
+                    this.tossingMode = true;
+                    this.currentCoins = [];
                     this.loading = true;
                     this.errorMessage = '';
+
+                    // Generate 6 coins (each 0-3, representing number of tails in 3 coin tosses)
+                    // 顯示每一爻的生成過程
+                    for (let i = 0; i < 6; i++) {
+                        await new Promise(resolve => setTimeout(resolve, 300)); // 每爻間隔300ms
+                        const coinValue = Math.floor(Math.random() * 4); // 0, 1, 2, or 3
+                        this.currentCoins.push(coinValue);
+                    }
+
+                    // 卦象已定，等待1秒後發送請求
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
                     try {
                         const response = await fetch('/api/divinate', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ question: this.question })
+                            body: JSON.stringify({
+                                question: this.question,
+                                coins: this.currentCoins
+                            })
                         });
                         const data = await response.json();
 
@@ -318,11 +354,15 @@
                             }
                         }
 
+                        // 關閉搖卦畫面
+                        this.tossingMode = false;
+
                         this.result = data.result;
                         this.parsedResult = marked.parse(data.result);
                         this.toolStatus = data.tool_status || { get_divination_tool: 'unused', get_current_time: 'unused' };
                         this.resultMode = true;
                     } catch (e) {
+                        this.tossingMode = false;
                         this.errorMessage = e.message;
                     } finally {
                         this.loading = false;

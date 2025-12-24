@@ -94,15 +94,17 @@ class DivinationClient:
         response = self.read_response(request_id=10)
         return response['result']['tools']
 
-    def call_liu_yao(self):
+    def call_liu_yao(self, **kwargs):
         """
         Calls the liu_yao tool on the MCP server.
+        Accepts kwargs to override input_data (e.g. yaogua, time).
         """
         if not self.process:
             self.start_server()
 
         # Construct the tool call
         now = datetime.now()
+        # Default input data
         input_data = {
             "year": now.year,
             "month": now.month,
@@ -110,6 +112,8 @@ class DivinationClient:
             "hour": now.hour,
             "minute": now.minute
         }
+        # Update with manual inputs (e.g. yaogua)
+        input_data.update(kwargs)
         
         req = {
             "jsonrpc": "2.0",
@@ -121,7 +125,9 @@ class DivinationClient:
             }
         }
         self.send_request(req)
-        self.send_request(req)
+        # self.send_request(req) # Duplicate send removed? Previously there was a duplicate send in lines 123-124
+        # Wait, previous code had two sends. Likely a copy paste error.
+        
         response = self.read_response(request_id=2)
         
         if "error" in response:
@@ -133,18 +139,17 @@ class DivinationClient:
         if self.process:
             self.process.terminate()
 
-def get_divination_tool():
+def get_divination_tool(**kwargs):
     """
-    Wrapper function to be used by Gemini.
+    Wrapper function to be used by Gemini or Server.
     Triggers a real divination using the MCP server.
+    Accepts kwargs (e.g. coins, yaogua)
     """
     client = DivinationClient()
     try:
-        result_json_str = client.call_liu_yao()
+        result_json_str = client.call_liu_yao(**kwargs)
         client.close()
-        # Parse it back to json object to return clean data if possible, 
-        # but Gemini usually expects a dict or string.
-        # The tool returns a JSON string, let's load it and return dict.
+        # Parse it back to json object
         return json.loads(result_json_str)
     except Exception as e:
         client.close()

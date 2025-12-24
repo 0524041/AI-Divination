@@ -81,7 +81,7 @@ def call_local_ai(prompt, api_url, model_name):
         "messages": [
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7
+        "temperature": 1.0
     }
     
     data = json.dumps(payload).encode('utf-8')
@@ -107,12 +107,22 @@ def index():
     return render_template('index.html')
 
 @app.route('/api/divinate', methods=['POST'])
+@app.route('/api/divinate', methods=['POST'])
 def divinate():
     data = request.json
     question = data.get('question')
+    coins = data.get('coins') # Expected list of 6 ints, e.g. [1, 2, 1, 2, 1, 2]
     
     if not question:
         return jsonify({"error": "Question is required"}), 400
+        
+    if not coins or len(coins) != 6:
+        # Fallback or Error? User said frontend generates it.
+        # Ideally we require it. But for testing, let's allow backend random if missing? 
+        # User said "前端要先隨機產生... 給了後端". So we should expect it.
+        # But to be safe, if missing, we auto-gen here (MCP does it) or return error?
+        # Let's auto-gen if missing to keep it robust, but usually frontend sends it.
+        pass 
 
     # 1. Check Limits
     limit_str = get_setting('daily_limit', '5')
@@ -133,50 +143,64 @@ def divinate():
     
     # Execution: Time
     try:
-        current_time = get_current_time()
+        current_time_str = get_current_time()
         tool_status["get_current_time"] = "success"
     except Exception as e:
-        current_time = f"Error getting time: {e}"
+        current_time_str = f"Error getting time: {e}"
         tool_status["get_current_time"] = "error"
 
     # Execution: Divination (Hexagram)
     try:
         # We call the python function directly which handles MCP
-        divination_result = get_divination_tool()
+        # Pass manual coins (yaogua) if present
+        if coins:
+            divination_result = get_divination_tool(yaogua=coins)
+        else:
+            divination_result = get_divination_tool()
         
         # Check for dict error returned by tool wrapper
         if isinstance(divination_result, dict) and "error" in divination_result:
              tool_status["get_divination_tool"] = "error"
+             # Error case
              divination_result_str = json.dumps(divination_result, ensure_ascii=False)
+             raw_result_for_ai = divination_result_str
         else:
              tool_status["get_divination_tool"] = "success"
+             # Remove 'yaogua' from result as requested: "已除掉 yaohua 的內容"
+             if 'yaogua' in divination_result:
+                 del divination_result['yaogua']
+                 
              divination_result_str = json.dumps(divination_result, ensure_ascii=False, indent=2)
+             raw_result_for_ai = divination_result_str
+             
+             # Also inject time manually into result if MCP didn't (it usually does) or just rely on 'time' field in json.
+             # The user asked: "{mcp 工具回傳的內容 ... 包含time}"
 
     except Exception as e:
         divination_result_str = f"Error performing divination: {e}"
+        raw_result_for_ai = divination_result_str
         tool_status["get_divination_tool"] = "error"
 
-    # 3. Construct Prompt (Single Shot)
-    system_prompt_tmpl = get_setting('system_prompt', DEFAULT_PROMPT)
-    if "{question}" not in system_prompt_tmpl:
-         # Fallback if template is broken
-         main_prompt = system_prompt_tmpl + "\n\n<問題>\n" + question
-    else:
-         main_prompt = system_prompt_tmpl.replace("{question}", question)
-         
-    # Inject Context
-    full_payload = f"""{main_prompt}
+    # 3. Construct Prompt (Strict Structure)
+    # 移除掉 客製化prompt 的功能 前端也移除掉 這邊都改成固定的
+    
+    full_payload = f"""<角色>
+你是一個精通易經八卦六爻算命的算命師
 
-<系統已自動執行的工具結果>
-為了節省您的思考時間，系統已經預先為您執行了必要的工具。請根據以下資訊直接進行解盤：
+<要求>
+根據提供的六爻盤面 結合我想問的問題 明確的解釋 盤面代表的意思給我聽
 
-【當前時間】
-{current_time}
+<問題>
+{question}
 
-【六爻排盤結果】
-{divination_result_str}
+<六爻盤面>
+{raw_result_for_ai}
 
-請直接根據以上排盤結果與時間進行分析與回答。不用再要求使用工具。
+<輸出結果>
+要先說明 六爻盤面是什麼盤面
+你使用的時間 
+接下來明確說明 我想問的問題 解釋盤面
+最後要有總結
 """
 
     # 4. Call AI (Switch Logic)

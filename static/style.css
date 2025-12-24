@@ -163,7 +163,7 @@ main {
     font-size: 3.5rem;
     margin-bottom: 1rem;
     font-weight: 400;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.5px;
     background: linear-gradient(to bottom, #fff 0%, #aaa 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -393,7 +393,7 @@ select.elegant-select {
     margin-left: 15px;
     padding: 4px 10px;
     border-radius: 12px;
-    background: rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--glass-border);
 }
 
@@ -401,17 +401,20 @@ select.elegant-select {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: #7f8c8d; /* Gray */
-    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    background-color: #7f8c8d;
+    /* Gray */
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
 .status-dot.success {
-    background-color: #27ae60; /* Green */
+    background-color: #27ae60;
+    /* Green */
     box-shadow: 0 0 8px #27ae60;
 }
 
 .status-dot.error {
-    background-color: #c0392b; /* Red */
+    background-color: #c0392b;
+    /* Red */
     box-shadow: 0 0 8px #c0392b;
 }
 
@@ -419,9 +422,10 @@ select.elegant-select {
 textarea.prompt-editor {
     width: 100%;
     height: 150px;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--glass-border);
-    color: #ffd700; /* Goldish text for prompt */
+    color: #ffd700;
+    /* Goldish text for prompt */
     font-family: monospace;
     padding: 15px;
     border-radius: 8px;
@@ -431,6 +435,7 @@ textarea.prompt-editor {
     margin-top: 10px;
     outline: none;
 }
+
 textarea.prompt-editor:focus {
     border-color: var(--primary-gold);
 }
@@ -478,4 +483,52 @@ textarea.prompt-editor:focus {
     .nav-menu i {
         font-size: 1.2rem;
     }
+}
+/* Coin Visuals */
+.coin-visual {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+.coin-yang {
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    color: #1a1a2e;
+    border: 3px solid #ffed4e;
+}
+
+.coin-yin {
+    background: linear-gradient(135deg, #4a5568, #2d3748);
+    color: #f7fafc;
+    border: 3px solid #4a5568;
+}
+
+.coin-row {
+    display: flex;
+    align-items: center;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.animate-pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
