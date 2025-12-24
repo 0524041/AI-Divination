@@ -5,148 +5,191 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>靈機一動 - AI 易經算卦</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="/static/style.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Zen+Maru+Gothic:wght@700&display=swap"
-        rel="stylesheet">
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Zen+Maru+Gothic:wght@700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-    <div class="app-container" x-data="app()">
+    <div x-data="app()">
+        <!-- Header (Top Nav) -->
         <header>
-            <button class="back-btn" x-show="currentView !== 'home'" @click="goHome()" x-transition.opacity>
-                <i class="fas fa-arrow-left"></i>
-            </button>
-            <h1 @click="goHome()">靈機一動</h1>
+            <div class="logo-small" @click="closeModal(); goHome()">
+                <i class="fas fa-yin-yang"></i> 靈機一動
+            </div>
+            <div class="top-nav">
+                <a class="nav-link" @click="fetchHistory(); activeModal = 'history'">
+                    <i class="fas fa-history"></i> <span class="nav-label">歷史紀錄</span>
+                </a>
+                <a class="nav-link" @click="activeModal = 'intro'">
+                    <i class="fas fa-book-open"></i> <span class="nav-label">六爻說明</span>
+                </a>
+                <a class="nav-link" @click="fetchSettings(); activeModal = 'settings'">
+                    <i class="fas fa-cog"></i> <span class="nav-label">設定</span>
+                </a>
+                <!-- User Profile / Avatar Placeholder -->
+                <div style="width:32px; height:32px; background:#8ab4f8; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#202124; font-weight:bold; cursor:pointer;"
+                    title="User">
+                    U
+                </div>
+            </div>
         </header>
 
+        <!-- Main Content (Centered) -->
         <main>
-            <!-- HOME VIEW -->
-            <div class="view" :class="{ 'active': currentView === 'home' }">
-                <div class="menu-grid">
-                    <div class="menu-item" @click="currentView = 'divine'">
-                        <i class="fas fa-yin-yang"></i>
-                        <h3>誠心問卦</h3>
-                    </div>
-                    <div class="menu-item" @click="fetchHistory(); currentView = 'history'">
-                        <i class="fas fa-history"></i>
-                        <h3>歷史紀錄</h3>
-                    </div>
-                    <div class="menu-item" @click="currentView = 'intro'">
-                        <i class="fas fa-book-open"></i>
-                        <h3>六爻說明</h3>
-                    </div>
-                    <div class="menu-item" @click="fetchSettings(); currentView = 'settings'">
-                        <i class="fas fa-cog"></i>
-                        <h3>系統設定</h3>
-                    </div>
+            <div class="center-container" x-show="!resultMode">
+                <div class="main-logo">靈機一動</div>
+
+                <div class="search-box-wrapper">
+                    <!-- Expanded textarea acting like a search bar -->
+                    <textarea class="google-input" x-model="question" placeholder="在此輸入您想要問的問題..." rows="1"
+                        @input="$el.style.height = ''; $el.style.height = Math.min($el.scrollHeight, 200) + 'px'"
+                        @keydown.command.enter="performDivination()"></textarea>
                 </div>
-            </div>
 
-            <!-- DIVINE VIEW -->
-            <div class="view" :class="{ 'active': currentView === 'divine' }">
-                <div class="input-group">
-                    <textarea x-model="question" placeholder="心中默念所求之事，例如：這週末去台北旅遊運勢如何？"></textarea>
-
-                    <button class="primary-btn" @click="performDivination()" :disabled="loading">
+                <div class="search-actions">
+                    <button class="google-btn primary" @click="performDivination()" :disabled="loading"
+                        style="min-width: 120px;">
                         <template x-if="!loading">
-                            <span><i class="fas fa-sparkles"></i> 開始占卜</span>
+                            <span><i class="fas fa-search"></i> Google 算卦</span>
                         </template>
                         <template x-if="loading">
-                            <div class="spinner"></div>
+                            <span class="spinner"></span>
                         </template>
                     </button>
-                </div>
-                <p x-show="errorMessage" x-text="errorMessage"
-                    style="color: #e74c3c; margin-top: 15px; text-align: center;"></p>
-            </div>
-
-            <!-- RESULT VIEW (Separate view for result) -->
-            <div class="view" :class="{ 'active': currentView === 'result' }">
-                <div class="markdown-body" x-html="parsedResult"></div>
-
-                <div style="margin-top: 30px; display: flex; gap: 10px;">
-                    <button class="primary-btn" style="flex: 1; background: #95a5a6;" @click="copyResult()">
-                        <i class="fas fa-copy"></i> 複製
-                    </button>
-                    <!-- Favorite Logic could remain in history for simplicity, or add here -->
-                    <button class="primary-btn" style="flex: 1;" @click="goHome()">
-                        <i class="fas fa-check"></i> 完成
+                    <button class="google-btn" @click="randomQuestion()">
+                        手氣不錯
                     </button>
                 </div>
+
+                <div style="margin-top: 20px; color: #9aa0a6; font-size: 0.9rem;">
+                    提供服務： <a href="#" style="color:#8ab4f8; text-decoration:none;">六爻占卜</a> <a href="#"
+                        style="color:#8ab4f8; text-decoration:none;">梅花易數</a>
+                </div>
+
+                <p x-show="errorMessage" x-text="errorMessage" style="color: #e74c3c; margin-top: 15px;"></p>
             </div>
 
-            <!-- HISTORY VIEW -->
-            <div class="view" :class="{ 'active': currentView === 'history' }">
-                <div x-show="historyList.length === 0" style="text-align: center; color: #999; margin-top: 50px;">
+            <!-- Result Mode (Can be a modal or substitute the center view) -->
+            <!-- We'll make it overlay-like or a dedicated view swapping the center content -->
+            <div class="modal-content" style="max-width: 800px; max-height: 90vh;" x-show="resultMode"
+                x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4"
+                x-transition:enter-end="opacity-100 translate-y-0">
+                <div class="modal-header">
+                    <h2>卦象解析</h2>
+                    <button class="close-btn" @click="resultMode = false"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="markdown-body" x-html="parsedResult" style="text-align: left;"></div>
+                <div style="margin-top: 30px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button class="google-btn" @click="copyResult()">複製結果</button>
+                    <button class="google-btn primary" @click="resultMode = false">完成</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- MODALS -->
+
+        <!-- History Modal -->
+        <div class="modal-overlay" x-show="activeModal === 'history'" @click.self="activeModal = null"
+            x-transition.opacity>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>歷史紀錄</h2>
+                    <button class="close-btn" @click="activeModal = null"><i class="fas fa-times"></i></button>
+                </div>
+                <div x-show="historyList.length === 0" style="text-align: center; color: #9aa0a6; padding: 20px;">
                     暫無紀錄
                 </div>
                 <template x-for="item in historyList" :key="item.id">
                     <div class="history-item">
-                        <div class="history-info" @click="showResult(item)">
+                        <div style="flex-grow:1; cursor:pointer;" @click="showResult(item); activeModal = null">
                             <div class="history-question" x-text="item.question"></div>
                             <div class="history-date" x-text="item.created_at"></div>
                         </div>
-                        <div class="history-actions">
-                            <button @click="toggleFavorite(item)" :class="{ 'active': item.is_favorite }">
-                                <i :class="item.is_favorite ? 'fas fa-heart' : 'far fa-heart'"></i>
-                            </button>
-                        </div>
+                        <button class="close-btn" @click="toggleFavorite(item)" style="font-size:1.2rem;">
+                            <i :class="item.is_favorite ? 'fas fa-heart' : 'far fa-heart'"
+                                :style="item.is_favorite ? 'color: #e74c3c' : ''"></i>
+                        </button>
                     </div>
                 </template>
             </div>
+        </div>
 
-            <!-- INTRO VIEW -->
-            <div class="view" :class="{ 'active': currentView === 'intro' }">
-                <div class="intro-text">
+        <!-- Intro Modal -->
+        <div class="modal-overlay" x-show="activeModal === 'intro'" @click.self="activeModal = null"
+            x-transition.opacity>
+            <div class="modal-content">
+                <div class="modal-header">
                     <h2>六爻占卜規則</h2>
+                    <button class="close-btn" @click="activeModal = null"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="markdown-body">
                     <p><strong>心誠則靈</strong>：占卜最重要的是誠心。所謂「無事不占」，心中有疑慮、有決斷不下的事情時，是最好的占卜時機。</p>
-                    <p><strong>一事一占</strong>：同一件事情，如果不滿意結果而反覆占卜，稱為「褻瀆」，結果往往不準。一段時間內（通常是一個月或事件發生變化前）對同一件事只占一次。</p>
-                    <p><strong>問法明確</strong>：問題越具體越好。避免問「我的命運如何」這種太空泛的問題，而應問「我下個月換工作是否吉利」。</p>
-                    <p><strong>靈機一動</strong>：除了正式搖卦，如果在路上看到奇特的現象，或者心中突然有所感應，也可以隨時起卦，這就是所謂的「梅花易數」或「外應」。</p>
+                    <p><strong>一事一占</strong>：同一件事情，如果不滿意結果而反覆占卜，稱為「褻瀆」，結果往往不準。一段時間內對同一件事只占一次。</p>
+                    <p><strong>靈機一動</strong>：除了正式搖卦，如果在路上看到奇特的現象，或者心中突然有所感應，也可以隨時起卦。</p>
+                </div>
+                <div style="margin-top:20px; text-align:right;">
+                    <button class="google-btn primary" @click="activeModal = null">了解</button>
                 </div>
             </div>
+        </div>
 
-            <!-- SETTINGS VIEW -->
-            <div class="view" :class="{ 'active': currentView === 'settings' }">
-                <div class="form-group">
-                    <label>每日算卦上限</label>
-                    <select x-model="settings.daily_limit" @change="saveSettings()">
+        <!-- Settings Modal -->
+        <div class="modal-overlay" x-show="activeModal === 'settings'" @click.self="activeModal = null"
+            x-transition.opacity>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>搜尋設定</h2>
+                    <button class="close-btn" @click="activeModal = null"><i class="fas fa-times"></i></button>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; margin-bottom:10px; color: #e8eaed;">每日算卦上限</label>
+                    <select x-model="settings.daily_limit" @change="saveSettings()"
+                        style="width:100%; padding:10px; background:#303134; color:white; border:1px solid #5f6368; border-radius:4px;">
                         <option value="1">1 次</option>
                         <option value="3">3 次</option>
                         <option value="5">5 次 (預設)</option>
                         <option value="10">10 次</option>
                         <option value="unlimited">無上限</option>
                     </select>
-                    <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">設定每天可以請求 AI 算卦的次數，避免過度依賴。</p>
+                </div>
+
+                <div style="text-align:right;">
+                    <button class="google-btn primary" @click="activeModal = null">完成</button>
                 </div>
             </div>
+        </div>
 
-        </main>
     </div>
 
     <script>
         function app() {
             return {
-                currentView: 'home',
+                activeModal: null, // 'history', 'intro', 'settings'
+                resultMode: false,
                 question: '',
                 loading: false,
                 result: '', // raw markdown
                 parsedResult: '',
                 errorMessage: '',
                 historyList: [],
-                settings: {
-                    daily_limit: '5'
-                },
+                settings: { daily_limit: '5' },
 
                 goHome() {
-                    this.currentView = 'home';
+                    this.resultMode = false;
+                    this.activeModal = null;
                     this.errorMessage = '';
-                    this.question = '';
+                },
+
+                closeModal() {
+                    this.activeModal = null;
                 },
 
                 async performDivination() {
@@ -170,7 +213,7 @@
 
                         this.result = data.result;
                         this.parsedResult = marked.parse(data.result);
-                        this.currentView = 'result';
+                        this.resultMode = true; // Show result view
                     } catch (e) {
                         this.errorMessage = e.message;
                     } finally {
@@ -178,10 +221,26 @@
                     }
                 },
 
+                randomQuestion() {
+                    const samples = [
+                        "我最近的財運如何？",
+                        "這週末適合出遊嗎？",
+                        "目前的感情狀況發展？",
+                        "工作上是否會有變動？",
+                        "遺失的物品能找回嗎？"
+                    ];
+                    this.question = samples[Math.floor(Math.random() * samples.length)];
+                },
+
                 showResult(item) {
                     this.result = item.interpretation;
                     this.parsedResult = marked.parse(this.result);
-                    this.currentView = 'result';
+                    this.resultMode = true;
+                },
+
+                copyResult() {
+                    navigator.clipboard.writeText(this.result);
+                    alert('已複製到剪貼簿');
                 },
 
                 async fetchHistory() {
@@ -191,17 +250,12 @@
 
                 async toggleFavorite(item) {
                     const newState = !item.is_favorite;
-                    item.is_favorite = newState; // Optimistic update
+                    item.is_favorite = newState;
                     await fetch(`/api/history/${item.id}/favorite`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ is_favorite: newState })
                     });
-                },
-
-                copyResult() {
-                    navigator.clipboard.writeText(this.result);
-                    alert('已複製到剪貼簿');
                 },
 
                 async fetchSettings() {
