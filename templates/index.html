@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>靈機一動 - AI 易經算卦</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-yin-yang"></i>
+                <h1>靈機一動</h1>
+            </div>
+            <nav>
+                <button id="nav-divine" class="active" onclick="showSection('divine')">問卦</button>
+                <button id="nav-history" onclick="showSection('history')">歷史紀錄</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- 1. Divination Section -->
+            <section id="section-divine" class="active-section">
+                <div class="input-container">
+                    <h2>誠心起卦</h2>
+                    <p class="subtitle">心中默念所求之事，輸入您的問題。</p>
+                    <textarea id="question-input" placeholder="例如：這週末去台北旅遊運勢如何？"></textarea>
+                    <div class="controls">
+                        <button id="divine-btn" onclick="performDivination()">
+                            <span class="btn-text">占卜</span>
+                            <span class="btn-icon"><i class="fas fa-sparkles"></i></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Result Section (Overlay or dedicated view) -->
+            <section id="section-result" class="hidden">
+                 <div class="result-card">
+                    <div class="result-header">
+                        <h2>卦象解析</h2>
+                        <button class="close-btn" onclick="showSection('divine')"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div id="loading-indicator" class="hidden">
+                        <div class="spinner"></div>
+                        <p>天機運算中...</p>
+                    </div>
+                    <div id="result-content">
+                        <!-- Content injected by JS -->
+                    </div>
+                    <div class="result-actions">
+                        <button onclick="copyToMarkdown()"><i class="fas fa-copy"></i> 複製 MD</button>
+                        <button onclick="saveCurrentResult()"><i class="fas fa-save"></i> 收藏</button>
+                    </div>
+                 </div>
+            </section>
+
+            <!-- 3. History Section -->
+            <section id="section-history" class="hidden">
+                <h2>歷史紀錄</h2>
+                <div id="history-list">
+                    <!-- List items injected by JS -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>

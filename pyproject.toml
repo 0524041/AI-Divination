@@ -1,0 +1,10 @@
+[project]
+name = "divination-app"
+version = "0.1.0"
+description = "AI Divination App using Gemini and MCP"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "flask",
+    "google-genai"
+]
