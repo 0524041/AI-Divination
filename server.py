@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from database import init_db, add_history, get_history, delete_history, toggle_favorite, get_daily_usage_count, get_setting, set_setting
+from database import add_to_queue, get_queue_status, get_next_pending_request, update_queue_status, get_queue_position
 from tools import get_current_time, get_divination_tool
 from google import genai
 from google.genai import types
@@ -9,9 +10,14 @@ import time
 import random
 import urllib.request
 import urllib.error
-
+import auth
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+
+# Session configuration
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
 
 # Initialize DB
 init_db()
@@ -102,19 +108,130 @@ tools_map = {
     "get_divination_tool": get_divination_tool
 }
 
+
+# ============= Authentication Routes =============
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    user = auth.authenticate_user(username, password)
+    if user:
+        session['user_id'] = user['id']
+        session['username'] = user['username']
+        session['role'] = user['role']
+        session.permanent = True
+        return jsonify({
+            "success": True,
+            "user": {
+                "id": user['id'],
+                "username": user['username'],
+                "role": user['role']
+            }
+        })
+    
+    return jsonify({"error": "Invalid credentials"}), 401
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({"success": True})
+
+@app.route('/api/current-user', methods=['GET'])
+def get_current_user():
+    if 'user_id' in session:
+        return jsonify({
+            "id": session['user_id'],
+            "username": session['username'],
+            "role": session['role']
+        })
+    return jsonify({"error": "Not logged in"}), 401
+
+# ============= User Management (Admin) =============
+@app.route('/api/admin/users', methods=['GET'])
+@auth.admin_required
+def list_users():
+    users = auth.get_all_users()
+    return jsonify(users)
+
+@app.route('/api/admin/users', methods=['POST'])
+@auth.admin_required
+def create_user():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role', 'user')
+    
+    try:
+        user_id = auth.create_user(username, password, role)
+        return jsonify({"success": True, "user_id": user_id})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
+@auth.admin_required
+def delete_user_route(user_id):
+    if user_id == 1:
+        return jsonify({"error": "Cannot delete admin user"}), 403
+    auth.delete_user(user_id)
+    return jsonify({"success": True})
+
+# ============= User Profile =============
+@app.route('/api/user/password', methods=['PUT'])
+@auth.login_required
+def update_password():
+    data = request.json
+    new_password = data.get('new_password')
+    
+    if not new_password or len(new_password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    
+    auth.update_user_password(session['user_id'], new_password)
+    return jsonify({"success": True})
+
+@app.route('/api/user/api-keys', methods=['GET'])
+@auth.login_required
+def get_user_keys():
+    keys = auth.get_user_api_keys(session['user_id'])
+    return jsonify(keys)
+
+@app.route('/api/user/api-keys', methods=['POST'])
+@auth.login_required
+def add_user_key():
+    data = request.json
+    provider = data.get('provider')
+    api_key = data.get('api_key')
+    
+    if provider not in ['gemini', 'local']:
+        return jsonify({"error": "Invalid provider"}), 400
+    
+    auth.add_api_key(session['user_id'], provider, api_key)
+    return jsonify({"success": True})
+
+@app.route('/api/user/api-keys/<provider>', methods=['DELETE'])
+@auth.login_required
+def delete_user_key(provider):
+    auth.delete_api_key(session['user_id'], provider)
+    return jsonify({"success": True})
+
+# ============= Main App Routes =============
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/api/divinate', methods=['POST'])
-@app.route('/api/divinate', methods=['POST'])
+@auth.login_required
 def divinate():
     data = request.json
     question = data.get('question')
     coins = data.get('coins') # Expected list of 6 ints, e.g. [1, 2, 1, 2, 1, 2]
     
+    user_id = session['user_id']
+    
     # Log the coins received from frontend
     print(f"=== 收到前端六爻數據 ===")
+    print(f"用戶: {session['username']} (ID: {user_id})")
     print(f"問題: {question}")
     print(f"六個硬幣結果 (背面數): {coins}")
     if coins:
@@ -138,7 +255,7 @@ def divinate():
     if limit_str != 'unlimited':
         try:
             limit = int(limit_str)
-            count = get_daily_usage_count()
+            count = get_daily_usage_count(user_id)
             if count >= limit:
                 return jsonify({"error": f"Daily limit of {limit} divinations reached."}), 403
         except ValueError:
@@ -197,9 +314,9 @@ def divinate():
 你是一個精通易經八卦六爻算命的算命師
 
 <要求>
-根據提供的六爻盤面 結合我想問的問題 明確的解釋 盤面代表的意思給我聽
+你先閱讀我提供的六爻盤面 然後理解一下六爻盤面代表的意義 然後再根據提供的六爻盤面 結合我想問的問題 明確的解釋 盤面代表的意思給我聽
 
-<問題>
+<我想問的問題>
 {question}
 
 <六爻盤面>
@@ -240,7 +357,7 @@ def divinate():
 
         
         # Save History
-        history_id = add_history(question, {"raw": divination_result_str}, interpretation)
+        history_id = add_history(question, {"raw": divination_result_str}, interpretation, user_id)
         
         return jsonify({
             "id": history_id,
@@ -255,18 +372,26 @@ def divinate():
 
 
 @app.route('/api/history', methods=['GET'])
+@auth.login_required
 def history():
-    return jsonify(get_history())
+    user_id = session['user_id']
+    role = session['role']
+    
+    # Admin can see all history, users see only their own
+    if role == 'admin' and request.args.get('all') == 'true':
+        return jsonify(get_history())  # No filter = all history
+    else:
+        return jsonify(get_history(user_id))
 
 @app.route('/api/history/<int:id>/favorite', methods=['PUT'])
+@auth.login_required
 def favorite(id):
     data = request.json
     toggle_favorite(id, data.get('is_favorite'))
     return jsonify({"success": True})
 
-    return jsonify({"success": True})
-
 @app.route('/api/history/<int:id>', methods=['DELETE'])
+@auth.login_required
 def delete_history_item(id):
     delete_history(id)
     return jsonify({"success": True})

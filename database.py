@@ -27,32 +27,36 @@ def init_db():
     conn.commit()
     conn.close()
 
-def get_daily_usage_count():
+def get_daily_usage_count(user_id=1):
     conn = get_db_connection()
     c = conn.cursor()
     today_str = datetime.now().strftime('%Y-%m-%d')
-    c.execute('SELECT COUNT(*) FROM history WHERE date_str = ?', (today_str,))
+    c.execute('SELECT COUNT(*) FROM history WHERE date_str = ? AND user_id = ?', (today_str, user_id))
     count = c.fetchone()[0]
     conn.close()
     return count
 
-def add_history(question, result_json, interpretation):
+def add_history(question, result_json, interpretation, user_id=1):
     conn = get_db_connection()
     c = conn.cursor()
     today_str = datetime.now().strftime('%Y-%m-%d')
     c.execute('''
-        INSERT INTO history (question, result_json, interpretation, date_str)
-        VALUES (?, ?, ?, ?)
-    ''', (question, json.dumps(result_json), interpretation, today_str))
+        INSERT INTO history (user_id, question, result_json, interpretation, date_str)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (user_id, question, json.dumps(result_json), interpretation, today_str))
     last_id = c.lastrowid
     conn.commit()
     conn.close()
     return last_id
 
-def get_history():
+def get_history(user_id=None):
+    """Get history, optionally filtered by user_id. If user_id is None, returns all (admin)"""
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute('SELECT * FROM history ORDER BY created_at DESC')
+    if user_id:
+        c.execute('SELECT * FROM history WHERE user_id = ? ORDER BY created_at DESC', (user_id,))
+    else:
+        c.execute('SELECT h.*, u.username FROM history h LEFT JOIN users u ON h.user_id = u.id ORDER BY h.created_at DESC')
     rows = c.fetchall()
     history = [dict(row) for row in rows]
     conn.close()
