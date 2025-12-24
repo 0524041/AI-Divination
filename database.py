@@ -58,6 +58,9 @@ def get_history():
     conn.close()
     return history
 
+def toggle_favorite(record_id, is_favorite):
+    conn = get_db_connection()
+    c = conn.cursor()
     c.execute('UPDATE history SET is_favorite = ? WHERE id = ?', (is_favorite, record_id))
     conn.commit()
     conn.close()
