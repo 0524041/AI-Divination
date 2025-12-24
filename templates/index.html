@@ -170,8 +170,8 @@
                                 x-transition:enter-end="opacity-100 transform scale-100">
                                 <span style="font-size:0.8rem; color:var(--text-muted); margin-right:10px;"
                                     x-text="'第 ' + (index+1) + ' 爻'"></span>
-                                <div class="coin-visual" :class="coin === 1 ? 'coin-yang' : 'coin-yin'">
-                                    <span x-text="coin === 1 ? '陽' : '陰'"></span>
+                                <div class="coin-visual" :class="getCoinClass(coin)">
+                                    <span x-text="getCoinLabel(coin)"></span>
                                 </div>
                             </div>
                         </template>
@@ -302,6 +302,26 @@
                     }
 
                     setTimeout(() => this.typeWriter(), typeSpeed);
+                },
+
+                getCoinLabel(coin) {
+                    // 0: 老阴, 1: 阳, 2: 阴, 3: 老阳
+                    const labels = {
+                        0: '老陰',
+                        1: '陽',
+                        2: '陰',
+                        3: '老陽'
+                    };
+                    return labels[coin] || '?';
+                },
+
+                getCoinClass(coin) {
+                    // 0: 老阴, 1: 阳, 2: 阴, 3: 老阳
+                    if (coin === 0) return 'coin-old-yin';
+                    if (coin === 1) return 'coin-yang';
+                    if (coin === 2) return 'coin-yin';
+                    if (coin === 3) return 'coin-old-yang';
+                    return '';
                 },
 
                 goHome() {

@@ -532,3 +532,18 @@ textarea.prompt-editor:focus {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
+
+/* Old Yin and Old Yang styles */
+.coin-old-yin {
+    background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+    color: #f7fafc;
+    border: 3px solid #667;
+    box-shadow: 0 0 15px rgba(100, 100, 150, 0.5);
+}
+
+.coin-old-yang {
+    background: linear-gradient(135deg, #ff6b35, #f7931e);
+    color: #1a1a2e;
+    border: 3px solid #ff6b35;
+    box-shadow: 0 0 15px rgba(255, 107, 53, 0.5);
+}

@@ -113,6 +113,15 @@ def divinate():
     question = data.get('question')
     coins = data.get('coins') # Expected list of 6 ints, e.g. [1, 2, 1, 2, 1, 2]
     
+    # Log the coins received from frontend
+    print(f"=== 收到前端六爻數據 ===")
+    print(f"問題: {question}")
+    print(f"六個硬幣結果 (背面數): {coins}")
+    if coins:
+        coin_labels = {0: '老陰(3正)', 1: '陽(2正1負)', 2: '陰(1正2負)', 3: '老陽(3負)'}
+        print(f"解讀: {[coin_labels.get(c, '?') for c in coins]}")
+    print("=" * 30)
+    
     if not question:
         return jsonify({"error": "Question is required"}), 400
         
