@@ -43,8 +43,9 @@ class DivinationClient:
             }
         }
         self.send_request(init_req)
-        # We expect a response to initialize
-        self.read_response()
+        self.send_request(init_req)
+        # We expect a response to initialize (ID: 1)
+        self.read_response(request_id=1)
         
         # Send initialized notification
         init_notif = {
@@ -63,19 +64,36 @@ class DivinationClient:
         self.process.stdin.write(json_str + "\n")
         self.process.stdin.flush()
 
-    def read_response(self):
+    def read_response(self, request_id=None):
         while True:
             line = self.process.stdout.readline()
             if not line:
                 break
+            # print(f"DEBUG: Received: {line.strip()}")
             try:
                 data = json.loads(line)
-                # Skip any notifications or non-response messages if we are waiting for a specific response
-                # But for simplicity, we just return the first JSON object for now.
+                # If we are looking for a specific ID
+                if request_id is not None:
+                    if data.get('id') == request_id:
+                        return data
+                    else:
+                        # Skip notifications or other ID responses
+                        continue
+                # If no ID specified (e.g. initial handshake sometimes?), just return data
                 return data
             except json.JSONDecodeError:
                 continue
     
+    def get_tool_list(self):
+        req = {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "method": "tools/list"
+        }
+        self.send_request(req)
+        response = self.read_response(request_id=10)
+        return response['result']['tools']
+
     def call_liu_yao(self):
         """
         Calls the liu_yao tool on the MCP server.
@@ -84,22 +102,27 @@ class DivinationClient:
             self.start_server()
 
         # Construct the tool call
-        # Based on typical MCP, we need to list tools to find the name or assume "liu_yao" based on user prompt
-        # Let's inspect tools first just to be sure, or just try calling it.
-        # User prompt implies "divination-chart-mcp" has "liu_yao".
+        now = datetime.now()
+        input_data = {
+            "year": now.year,
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute
+        }
         
-        # Actually, let's just make a tool call request.
         req = {
             "jsonrpc": "2.0",
             "id": 2,
             "method": "tools/call",
             "params": {
-                "name": "liu_yao",
-                "arguments": {} 
+                "name": "divination_liu_yao",
+                "arguments": { "input_data": input_data } 
             }
         }
         self.send_request(req)
-        response = self.read_response()
+        self.send_request(req)
+        response = self.read_response(request_id=2)
         
         if "error" in response:
             raise Exception(f"MCP Error: {response['error']}")
