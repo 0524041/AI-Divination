@@ -112,10 +112,15 @@ def divinate():
         )
     )
 
-    # Config for subsequent turns: AUTO tool use (or NONE implied if we want text)
-    # Default is AUTO, which is fine for interpretation.
-    config_auto = types.GenerateContentConfig(
-        tools=[get_current_time, get_divination_tool],
+    # Config for subsequent turns: Force NONE to prevent loops.
+    # We want the model to ONLY generate text after getting tool outputs.
+    config_none = types.GenerateContentConfig(
+        tools=[get_current_time, get_divination_tool], # Tools must be present to validate the response? Actually no, usually valid to have tools but forbid using them.
+        tool_config=types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(
+                mode=types.FunctionCallingConfigMode.NONE
+            )
+        ),
         thinking_config=types.ThinkingConfig(thinking_level="high")
     )
     
@@ -169,10 +174,10 @@ def divinate():
                         response={"result": result}
                     ))
             
-            # Send tool outputs back -> Expect Interpretation (AUTO)
-            # IMPORTANT: We switched to config_auto here to allow text generation
+            # Send tool outputs back -> Expect Interpretation (Force NONE)
+            # IMPORTANT: We switch to config_none here to forcing text generation and STOP the loop
             print("Sending tool outputs (Expecting Interpretation)...")
-            response = retry_gemini_call(chat.send_message, parts, config=config_auto)
+            response = retry_gemini_call(chat.send_message, parts, config=config_none)
 
 
         # Final response text
