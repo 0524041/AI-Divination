@@ -407,10 +407,19 @@ def history():
     user_id = session['user_id']
     role = session['role']
     
-    # Admin can see all history, users see only their own
-    if role == 'admin' and request.args.get('all') == 'true':
-        return jsonify(get_history())  # No filter = all history
+    target_user_id = request.args.get('user_id')
+    
+    # Admin can see all history or filter by specific user
+    if role == 'admin':
+        if target_user_id == 'all' or not target_user_id:
+            return jsonify(get_history()) # All history
+        else:
+            try:
+                return jsonify(get_history(int(target_user_id)))
+            except ValueError:
+                return jsonify(get_history())
     else:
+        # Regular users only see their own
         return jsonify(get_history(user_id))
 
 @app.route('/api/history/<int:id>/favorite', methods=['PUT'])
