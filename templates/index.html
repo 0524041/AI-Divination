@@ -102,7 +102,52 @@
                             <strong style="color:var(--primary-gold);">問題：</strong>
                             <span x-text="lastQuestion"></span>
                         </div>
-                        <div class="markdown-content" x-html="parsedResult"></div>
+                        <!-- Results Content -->
+                        <div class="result-display-area">
+                            <!-- Think Box -->
+                            <template x-if="thinkContent">
+                                <details class="think-details">
+                                    <summary class="think-summary">
+                                        <i class="fas fa-brain"></i> 大師思考過程 (點擊展開)
+                                    </summary>
+                                    <div class="think-content" x-text="thinkContent"></div>
+                                </details>
+                            </template>
+
+                            <!-- Structured Result -->
+                            <template x-if="structuredData">
+                                <div class="structured-container">
+                                    <div class="summary-banner" x-text="structuredData.summary"></div>
+
+                                    <div class="overview-header">
+                                        <div class="overview-title" x-text="structuredData.overview.title"></div>
+                                        <div class="overview-meaning" x-text="structuredData.overview.meaning"></div>
+                                    </div>
+
+                                    <template x-for="sec in structuredData.sections" :key="sec.title">
+                                        <div class="analysis-section">
+                                            <div class="section-title" x-text="sec.title"></div>
+                                            <div class="section-body" x-text="sec.content"></div>
+                                        </div>
+                                    </template>
+
+                                    <div class="guidance-box">
+                                        <div class="conclusion-badge" x-text="structuredData.guidance.conclusion"></div>
+                                        <ul class="suggestion-list">
+                                            <template x-for="sug in structuredData.guidance.suggestions" :key="sug">
+                                                <li class="suggestion-item" x-text="sug"></li>
+                                            </template>
+                                        </ul>
+                                        <div class="motto-box" x-text="structuredData.guidance.motto"></div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Legacy/Markdown Result -->
+                            <template x-if="!structuredData">
+                                <div class="markdown-content" x-html="parsedResult"></div>
+                            </template>
+                        </div>
                     </div>
                     <div style="padding:20px 30px; text-align:right; border-top:1px solid rgba(255,255,255,0.05);">
                         <button class="action-btn" style="padding: 8px 24px; font-size:1rem;"
@@ -450,6 +495,8 @@
                 loading: false,
                 result: '',
                 parsedResult: '',
+                structuredData: null,
+                thinkContent: '',
                 errorMessage: '',
                 historyList: [],
                 historyUserId: 'all',
@@ -596,6 +643,52 @@
                 getCoinLabel(c) { return { 0: '老陰', 1: '陽', 2: '陰', 3: '老陽' }[c] || '?'; },
                 getCoinClass(c) { return ['coin-old-yin', 'coin-yang', 'coin-yin', 'coin-old-yang'][c] || ''; },
 
+                processResult(rawText) {
+                    this.thinkContent = '';
+                    this.structuredData = null;
+                    this.parsedResult = '';
+                    let cleanText = rawText;
+
+                    // 1. Extract <think> content
+                    const thinkMatch = rawText.match(/<think>([\s\S]*?)<\/think>/);
+                    if (thinkMatch) {
+                        this.thinkContent = thinkMatch[1].trim();
+                        cleanText = rawText.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+                    }
+
+                    // 2. Try to parse JSON from remaining text
+                    // We look for any JSON-like structure, possibly inside markdown blocks
+                    try {
+                        let potentialJson = cleanText;
+
+                        // Handle markdown code blocks (```json ... ```)
+                        const codeBlockMatch = cleanText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+                        if (codeBlockMatch) {
+                            potentialJson = codeBlockMatch[1].trim();
+                        }
+
+                        // Extract content between first { and last }
+                        const firstBrace = potentialJson.indexOf('{');
+                        const lastBrace = potentialJson.lastIndexOf('}');
+
+                        if (firstBrace !== -1 && lastBrace !== -1) {
+                            const jsonStr = potentialJson.substring(firstBrace, lastBrace + 1);
+                            const parsed = JSON.parse(jsonStr);
+
+                            // Validate essential fields
+                            if (parsed.summary && parsed.overview && parsed.sections && Array.isArray(parsed.sections)) {
+                                this.structuredData = parsed;
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Structured JSON parsing failed, falling back to markdown", e);
+                    }
+
+                    // 3. Fallback: If JSON parsing fails or schema is invalid, render as Markdown
+                    this.parsedResult = marked.parse(cleanText);
+                },
+
                 async performDivination() {
                     if (!this.question.trim()) { this.errorMessage = "請輸入問題"; return; }
                     this.tossingMode = true;
@@ -621,7 +714,7 @@
 
                         this.tossingMode = false;
                         this.result = data.result;
-                        this.parsedResult = marked.parse(data.result);
+                        this.processResult(data.result);
                         this.toolStatus = data.tool_status || {};
                         this.resultMode = true;
                     } catch (e) {
@@ -640,7 +733,7 @@
                 showResult(item) {
                     this.lastQuestion = item.question || '';
                     this.result = item.interpretation;
-                    this.parsedResult = marked.parse(item.interpretation);
+                    this.processResult(item.interpretation);
                     this.resultMode = true;
                 },
 

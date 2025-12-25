@@ -484,6 +484,7 @@ textarea.prompt-editor:focus {
         font-size: 1.2rem;
     }
 }
+
 /* Coin Visuals */
 .coin-visual {
     display: inline-flex;
@@ -494,7 +495,7 @@ textarea.prompt-editor:focus {
     border-radius: 50%;
     font-weight: bold;
     font-size: 1.2rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     transition: all 0.3s ease;
 }
 
@@ -516,8 +517,13 @@ textarea.prompt-editor:focus {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .fade-in {
@@ -529,8 +535,15 @@ textarea.prompt-editor:focus {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
 }
 
 /* Old Yin and Old Yang styles */
@@ -552,9 +565,9 @@ textarea.prompt-editor:focus {
 .auth-input {
     width: 100%;
     padding: 12px;
-    background: rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.05);
     color: white;
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 5px;
     font-size: 1rem;
     outline: none;
@@ -562,4 +575,163 @@ textarea.prompt-editor:focus {
 
 .auth-input:focus {
     border-color: var(--primary-gold);
+}
+
+/* Think Content Folding */
+.think-details {
+    margin: 15px 0;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.think-summary {
+    cursor: pointer;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.4);
+    outline: none;
+    user-select: none;
+}
+
+.think-summary:hover {
+    color: var(--primary-gold);
+}
+
+.think-content {
+    margin-top: 10px;
+    white-space: pre-wrap;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 10px;
+}
+
+/* Structured Divination Card */
+.structured-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.summary-banner {
+    background: rgba(212, 175, 55, 0.1);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+    padding: 15px 20px;
+    border-radius: 12px;
+    color: var(--primary-gold);
+    font-weight: 500;
+    position: relative;
+    padding-left: 50px;
+}
+
+.summary-banner::before {
+    content: '\f0eb';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+}
+
+.overview-header {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.overview-title {
+    font-size: 1.8rem;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.overview-meaning {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.analysis-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.section-title {
+    color: var(--primary-gold);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-title::before {
+    content: '';
+    width: 3px;
+    height: 16px;
+    background: var(--primary-gold);
+    display: inline-block;
+}
+
+.section-body {
+    color: var(--text-main);
+    line-height: 1.8;
+    font-size: 1rem;
+}
+
+.guidance-box {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 16px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 10px;
+}
+
+.conclusion-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--primary-gold);
+    color: #000;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+}
+
+.suggestion-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.suggestion-item {
+    padding-left: 25px;
+    position: relative;
+    color: var(--text-main);
+}
+
+.suggestion-item::before {
+    content: '\f058';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    position: absolute;
+    left: 0;
+    color: #27ae60;
+}
+
+.motto-box {
+    margin-top: 25px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 15px;
+    text-align: center;
+    font-style: italic;
+    color: var(--text-muted);
 }

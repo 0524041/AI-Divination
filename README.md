@@ -94,6 +94,24 @@ python server.py
 - **AI**: Google Gemini / Local LLM (OpenAI Compatible)
 - **占卜工具**: divination-chart-mcp
 
+---
+
+## 🛠 ToDo & 專案進度 (Handover)
+
+### 當前進度
+- [x] **Prompt 整合優化**：系統提示詞已移至 `prompts/system_prompt.md`。
+- [x] **數據格式化**：實作 `format_divination_result` 將 JSON 轉為易讀文字。
+- [x] **UI 結構化呈現**：支援 AI 輸出 JSON 自動轉為精美卡片。
+- [x] **思考過程摺疊**：自動識別並摺疊 `<think>` 標籤。
+- [x] **Bug 修復**：解決了 `.format()` 在 JSON 大括號下的 `KeyError` 問題（已換成 `.replace()`）。
+
+### 待辦事項 (ToDo)
+- [ ] **強健性開發**：目前前端 `processResult` 解析 JSON 的邏輯需更強大，以應對不同 Local AI (如 DeepSeek, Qwen) 可能夾雜的額外文字或 Markdown 標籤。
+- [ ] **多樣性測試**：需要針對更多 Local AI 回覆模式進行測試（例如沒有 ```json 標籤的情況）。
+- [ ] **智慧複製優化**：確保 `copyResult` 在各種複雜結果下都能生成完美的 Markdown。
+
+---
+
 ## License
 
 MIT

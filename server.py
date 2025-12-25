@@ -68,6 +68,82 @@ def get_system_prompt():
         print(f"Error loading prompt: {e}")
     return """你是一個精通易經八卦六爻算命的算命師。<問題>{question}<內容>{divination_result}"""
 
+def format_divination_result(data):
+    """
+    Formats the raw MCP JSON output into a human-readable string for the AI prompt.
+    """
+    if not data or not isinstance(data, dict):
+        return str(data)
+    
+    if "error" in data:
+        return f"錯誤：{data['error']}"
+
+    lines = []
+    lines.append("【基礎資訊】")
+    lines.append(f"起卦時間：{data.get('time', '未知')}")
+    lines.append(f"干支：{data.get('bazi', '未知')}")
+    lines.append(f"空亡：{data.get('kongwang', '未知')}")
+    
+    shensha_data = data.get('shensha', [])
+    if shensha_data:
+        shensha_list = [f"{s.get('name', '未知')}-{','.join(s.get('zhi', []))}" for s in shensha_data]
+        lines.append(f"神煞：{', '.join(shensha_list)}")
+    else:
+        lines.append("神煞：無")
+    lines.append("")
+
+    lines.append("【卦象結構】")
+    lines.append(f"本卦：{data.get('benguaming', '未知')}")
+    lines.append(f"變卦：{data.get('bianguaming', '未知')}")
+    lines.append("")
+
+    lines.append("【六爻排盤】")
+    
+    # Yao position names
+    yao_names = {
+        "yao_6": "上爻",
+        "yao_5": "五爻",
+        "yao_4": "四爻",
+        "yao_3": "三爻",
+        "yao_2": "二爻",
+        "yao_1": "初爻"
+    }
+
+    # Iterate from yao_6 down to yao_1
+    for key in ["yao_6", "yao_5", "yao_4", "yao_3", "yao_2", "yao_1"]:
+        yao = data.get(key)
+        if not yao:
+            continue
+        
+        liushen = yao.get('liushen', '')
+        origin = yao.get('origin', {})
+        
+        # Markers
+        marker = ""
+        if origin.get('is_subject'):
+            marker = "[世] "
+        elif origin.get('is_object'):
+            marker = "[應] "
+            
+        relative = origin.get('relative', '')
+        zhi = origin.get('zhi', '')
+        wuxing = origin.get('wuxing', '')
+        
+        # Format: {爻位名稱}：{世應標記} {六親}{地支}{五行} ({六神})
+        line_text = f"{yao_names[key]}：{marker}{relative}{zhi}{wuxing} ({liushen})"
+        
+        # Moving line logic: 檢查 origin.is_changed
+        if origin.get('is_changed'):
+            variant = yao.get('variant', {})
+            v_relative = variant.get('relative', '')
+            v_zhi = variant.get('zhi', '')
+            v_wuxing = variant.get('wuxing', '')
+            line_text += f" ——動變——> {v_relative}{v_zhi}{v_wuxing}"
+            
+        lines.append(line_text)
+        
+    return "\n".join(lines)
+
 DEFAULT_PROMPT = get_system_prompt()
 
 def call_local_ai(prompt, api_url, model_name):
@@ -319,33 +395,23 @@ def divinate():
         # Check for dict error returned by tool wrapper
         if isinstance(divination_result, dict) and "error" in divination_result:
              tool_status["get_divination_tool"] = "error"
-             # Error case
              divination_result_str = json.dumps(divination_result, ensure_ascii=False)
-             raw_result_for_ai = divination_result_str
+             raw_result_for_ai = format_divination_result(divination_result)
         else:
              tool_status["get_divination_tool"] = "success"
-             # Remove 'yaogua' from result as requested: "已除掉 yaohua 的內容"
-             if 'yaogua' in divination_result:
-                 del divination_result['yaogua']
-                 
              divination_result_str = json.dumps(divination_result, ensure_ascii=False, indent=2)
-             raw_result_for_ai = divination_result_str
-             
-             # Also inject time manually into result if MCP didn't (it usually does) or just rely on 'time' field in json.
-             # The user asked: "{mcp 工具回傳的內容 ... 包含time}"
+             raw_result_for_ai = format_divination_result(divination_result)
 
     except Exception as e:
-        divination_result_str = f"Error performing divination: {e}"
-        raw_result_for_ai = divination_result_str
+        raw_result_for_ai = f"Error performing divination: {e}"
+        divination_result_str = json.dumps({"error": str(e)})
         tool_status["get_divination_tool"] = "error"
 
     # 3. Construct Prompt (Externalized)
     # Using the prompt template from the separate file
     prompt_template = get_system_prompt()
-    full_payload = prompt_template.format(
-        question=question,
-        divination_result=raw_result_for_ai
-    )
+    # Use replace to avoid KeyError from JSON braces in the template
+    full_payload = prompt_template.replace('{question}', str(question)).replace('{divination_result}', str(raw_result_for_ai))
 
     # 4. Call AI (Switch Logic)
     ai_provider = get_setting('ai_provider', 'gemini')
