@@ -55,18 +55,20 @@ def retry_gemini_call(func, *args, **kwargs):
             print(f"API Limit/Error ({'429' if is_429 else '503'}). Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
             time.sleep(sleep_time)
 
-DEFAULT_PROMPT = """<角色>
-你現在是一個算命老師 正在使用六爻算命
-<背景>
-為了協助你解盤，系統已經預先執行了「六爻排盤」與「時間查詢」工具，並會將結果提供給你。
-<要求>
-請根據提供的【卦象結果】與【當前時間】，結合【使用者的問題】進行解卦。
-1. 說明起卦時間(干支)。
-2. 說明本卦、變卦及其卦象含義。
-3. 根據卦象與爻辭，直接回答使用者的問題。
-4. 給予明確的指引，不要模稜兩可。
-<問題>
-{question}"""
+def get_system_prompt():
+    """
+    Loads the system prompt from prompts/system_prompt.md.
+    """
+    try:
+        path = os.path.join(os.path.dirname(__file__), 'prompts', 'system_prompt.md')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return f.read()
+    except Exception as e:
+        print(f"Error loading prompt: {e}")
+    return """你是一個精通易經八卦六爻算命的算命師。<問題>{question}<內容>{divination_result}"""
+
+DEFAULT_PROMPT = get_system_prompt()
 
 def call_local_ai(prompt, api_url, model_name):
     """
@@ -337,27 +339,13 @@ def divinate():
         raw_result_for_ai = divination_result_str
         tool_status["get_divination_tool"] = "error"
 
-    # 3. Construct Prompt (Strict Structure)
-    # 移除掉 客製化prompt 的功能 前端也移除掉 這邊都改成固定的
-    
-    full_payload = f"""<角色>
-你是一個精通易經八卦六爻算命的算命師
-
-<要求>
-你先閱讀我提供的六爻盤面 然後理解一下六爻盤面代表的意義 然後再根據提供的六爻盤面 結合我想問的問題 明確的解釋 盤面代表的意思給我聽
-
-<我想問的問題>
-{question}
-
-<六爻盤面>
-{raw_result_for_ai}
-
-<輸出結果>
-要先說明 六爻盤面是什麼盤面
-你使用的時間 
-接下來明確說明 我想問的問題 解釋盤面
-最後要有總結
-"""
+    # 3. Construct Prompt (Externalized)
+    # Using the prompt template from the separate file
+    prompt_template = get_system_prompt()
+    full_payload = prompt_template.format(
+        question=question,
+        divination_result=raw_result_for_ai
+    )
 
     # 4. Call AI (Switch Logic)
     ai_provider = get_setting('ai_provider', 'gemini')

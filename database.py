@@ -87,22 +87,19 @@ def init_settings():
     ''')
     # Default settings
     c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('daily_limit', '5'))
-    # Default System Prompt (will be populated by server if missing, or here. Let's put a placeholder or basic one here to ensure key exists)
-    # Actually server.py will have the full text. Let's just ensure the key is there if needed, 
-    # but init_settings is called on import. 
-    # Let's insert the default prompt here to be safe.
-    default_prompt = """<角色>
-你現在是一個算命老師 正在使用六爻算命
-<背景>
-為了協助你解盤，系統已經預先執行了「六爻排盤」與「時間查詢」工具，並會將結果提供給你。
-<要求>
-請根據提供的【卦象結果】與【當前時間】，結合【使用者的問題】進行解卦。
-1. 說明起卦時間(干支)。
-2. 說明本卦、變卦及其卦象含義。
-3. 根據卦象與爻辭，直接回答使用者的問題。
-4. 給予明確的指引，不要模稜兩可。
-<問題>
-{question}"""
+    # Load System Prompt from file
+    try:
+        prompt_path = os.path.join(os.path.dirname(__file__), 'prompts', 'system_prompt.md')
+        if os.path.exists(prompt_path):
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                default_prompt = f.read()
+        else:
+            # Fallback if file missing
+            default_prompt = """你現在是一個算命老師，正在使用六爻算命。{question}"""
+    except Exception as e:
+        print(f"Error loading system prompt file: {e}")
+        default_prompt = "{question}"
+        
     c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('system_prompt', default_prompt))
     
     # New Settings for Local AI
