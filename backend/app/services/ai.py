@@ -75,9 +75,15 @@ def get_system_prompt() -> str:
     return """你是一個精通易經八卦六爻算命的算命師。<問題>{question}<內容>{divination_result}"""
 
 
-def format_divination_result(data: dict) -> str:
+def format_divination_result(data: dict, gender: str = None, target: str = None) -> str:
     """
     Formats the raw divination result into a human-readable string for the AI prompt.
+    輸出格式更豐富，包含完整的六爻排盤信息。
+    
+    Args:
+        data: 六爻排盤結果字典
+        gender: 求測者性別 (男/女)
+        target: 占卜對象 (自己/父母/朋友/他人)
     """
     if not data or not isinstance(data, dict):
         return str(data)
@@ -86,36 +92,51 @@ def format_divination_result(data: dict) -> str:
         return f"錯誤：{data['error']}"
 
     lines = []
-    lines.append("【基礎資訊】")
-    lines.append(f"起卦時間：{data.get('time', '未知')}")
-    lines.append(f"干支：{data.get('bazi', '未知')}")
-    lines.append(f"空亡：{data.get('kongwang', '未知')}")
     
+    # 分隔線
+    sep = "=" * 60
+    dash = "-" * 60
+    
+    lines.append(sep)
+    lines.append(f"起卦時間: {data.get('time', '未知')}")
+    lines.append(f"八字: {data.get('bazi', '未知')}")
+    lines.append(f"空亡: {data.get('kongwang', '未知')}")
+    lines.append(f"卦宮: {data.get('guashen', '未知')}")
+    lines.append(f"本卦: {data.get('benguaming', '未知')}")
+    biangua = data.get('bianguaming', '無變卦')
+    lines.append(f"變卦: {biangua if biangua else '無變卦'}")
+    
+    # 求測者資訊
+    if gender or target:
+        lines.append(sep)
+        if gender:
+            lines.append(f"求測者性別: {gender}")
+        if target:
+            lines.append(f"占卜對象: {target}")
+    
+    lines.append(sep)
+    
+    # 神煞
     shensha_data = data.get('shensha', [])
     if shensha_data:
-        shensha_list = [f"{s.get('name', '未知')}-{','.join(s.get('zhi', []))}" for s in shensha_data]
-        lines.append(f"神煞：{', '.join(shensha_list)}")
+        shensha_parts = []
+        for s in shensha_data:
+            name = s.get('name', '未知')
+            zhi_list = s.get('zhi', [])
+            shensha_parts.append(f"{name}:{zhi_list}")
+        lines.append(f"神煞: {', '.join(shensha_parts)}")
     else:
-        lines.append("神煞：無")
-    lines.append("")
-
-    lines.append("【卦象結構】")
-    lines.append(f"本卦：{data.get('benguaming', '未知')}")
-    lines.append(f"變卦：{data.get('bianguaming', '未知')}")
-    lines.append("")
-
-    lines.append("【六爻排盤】")
+        lines.append("神煞: 無")
     
-    yao_names = {
-        "yao_6": "上爻",
-        "yao_5": "五爻",
-        "yao_4": "四爻",
-        "yao_3": "三爻",
-        "yao_2": "二爻",
-        "yao_1": "初爻"
-    }
-
-    for key in ["yao_6", "yao_5", "yao_4", "yao_3", "yao_2", "yao_1"]:
+    lines.append(dash)
+    
+    # 表頭
+    lines.append("爻位   六神     六親     地支   五行   爻象   世應   動    變爻")
+    lines.append(dash)
+    
+    # 六爻詳情 (從上到下: 6爻 -> 1爻)
+    for yao_num in [6, 5, 4, 3, 2, 1]:
+        key = f"yao_{yao_num}"
         yao = data.get(key)
         if not yao:
             continue
@@ -123,27 +144,37 @@ def format_divination_result(data: dict) -> str:
         liushen = yao.get('liushen', '')
         origin = yao.get('origin', {})
         
-        marker = ""
+        # 世應標記
+        shi_ying = ""
         if origin.get('is_subject'):
-            marker = "[世] "
+            shi_ying = "世"
         elif origin.get('is_object'):
-            marker = "[應] "
-            
+            shi_ying = "應"
+        
         relative = origin.get('relative', '')
         zhi = origin.get('zhi', '')
         wuxing = origin.get('wuxing', '')
+        line_symbol = origin.get('line', '⚊' if origin.get('is_yang', True) else '⚋')
         
-        line_text = f"{yao_names[key]}：{marker}{relative}{zhi}{wuxing} ({liushen})"
+        # 動爻標記
+        is_moving = origin.get('is_changed', False)
+        moving_mark = "○" if is_moving else ""
         
-        if origin.get('is_changed'):
-            variant = yao.get('variant', {})
-            v_relative = variant.get('relative', '')
-            v_zhi = variant.get('zhi', '')
-            v_wuxing = variant.get('wuxing', '')
-            line_text += f" ——動變——> {v_relative}{v_zhi}{v_wuxing}"
-            
+        # 變爻信息
+        variant_str = ""
+        if is_moving and yao.get('variant'):
+            v = yao['variant']
+            v_rel = v.get('relative', '')
+            v_zhi = v.get('zhi', '')
+            v_wuxing = v.get('wuxing', '')
+            variant_str = f"→ {v_rel} {v_zhi}{v_wuxing}"
+        
+        # 格式化輸出行
+        line_text = f"{yao_num}爻    {liushen:<5} {relative:<5} {zhi:<3} {wuxing:<3} {line_symbol:<3} {shi_ying:<3} {moving_mark:<3} {variant_str}"
         lines.append(line_text)
-        
+    
+    lines.append(sep)
+    
     return "\n".join(lines)
 
 
@@ -176,7 +207,8 @@ def call_local_ai(prompt: str, api_url: str, model_name: str) -> str:
     
     try:
         print(f"[Local AI] Sending request...")
-        with urllib.request.urlopen(req, timeout=120) as response:
+        # 設定 timeout 為 5 分鐘 (300秒)，因為本地 AI 模型生成可能較慢
+        with urllib.request.urlopen(req, timeout=300) as response:
             result = json.loads(response.read().decode('utf-8'))
             content = result['choices'][0]['message']['content']
             print(f"[Local AI] Response received, length: {len(content)} chars")

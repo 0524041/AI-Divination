@@ -31,6 +31,8 @@ export interface Settings {
 export interface DivinationRequest {
   question: string;
   coins: number[]; // 6 個數字，每個 0-3，代表背面個數
+  gender?: '男' | '女';  // 求測者性別
+  target?: '自己' | '父母' | '朋友' | '他人' | string;  // 占卜對象
 }
 
 export interface ToolStatus {

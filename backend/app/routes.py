@@ -193,12 +193,15 @@ def register_routes(app):
         data = request.json
         question = data.get('question')
         coins = data.get('coins')
+        gender = data.get('gender')  # 求測者性別: 男/女
+        target = data.get('target')  # 占卜對象: 自己/父母/朋友/他人
         
         user_id = session['user_id']
         
-        print(f"=== 收到前端六爻數據 ===")
+        print(f"=== 收到前端六爻數據 ===" )
         print(f"用戶: {session['username']} (ID: {user_id})")
         print(f"問題: {question}")
+        print(f"性別: {gender}, 對象: {target}")
         print(f"六個硬幣結果 (背面數): {coins}")
         if coins:
             coin_labels = {0: '老陰(3正)', 1: '陽(2正1負)', 2: '陰(1正2負)', 3: '老陽(3負)'}
@@ -243,7 +246,7 @@ def register_routes(app):
                 tool_status["get_divination_tool"] = "success"
                 
             divination_result_str = json.dumps(divination_result, ensure_ascii=False, indent=2)
-            raw_result_for_ai = format_divination_result(divination_result)
+            raw_result_for_ai = format_divination_result(divination_result, gender=gender, target=target)
 
         except Exception as e:
             raw_result_for_ai = f"Error performing divination: {e}"
@@ -268,7 +271,7 @@ def register_routes(app):
             )
             
             # Save History with AI model
-            history_id = add_history(question, {"raw": divination_result_str}, interpretation, user_id, ai_model)
+            history_id = add_history(question, {"raw": divination_result_str}, interpretation, user_id, ai_model, gender, target)
             
             return jsonify({
                 "id": history_id,

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CoinTossing } from '@/components/CoinTossing';
 import { DivinationResult } from '@/components/DivinationResult';
-import { HelpCircle, BookOpen, SendHorizonal, Bot } from 'lucide-react';
+import { HelpCircle, BookOpen, SendHorizonal, Bot, User, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -30,12 +30,28 @@ const PLACEHOLDER_EXAMPLES = [
   "我的健康狀況如何？",
 ];
 
+// 性別選項
+const GENDER_OPTIONS: { id: '男' | '女', label: string, icon: string }[] = [
+  { id: '男', label: '男', icon: '👨' },
+  { id: '女', label: '女', icon: '👩' },
+];
+
+// 占卜對象選項
+const TARGET_OPTIONS: { id: '自己' | '父母' | '朋友' | '他人', label: string }[] = [
+  { id: '自己', label: '算自己' },
+  { id: '父母', label: '算父母' },
+  { id: '朋友', label: '算朋友' },
+  { id: '他人', label: '算他人' },
+];
+
 type Mode = 'input' | 'tossing' | 'result';
 
 export function LiuYaoPage() {
   const { settings, geminiApiKey } = useApp();
   const [mode, setMode] = useState<Mode>('input');
   const [question, setQuestion] = useState('');
+  const [gender, setGender] = useState<'男' | '女' | ''>('');
+  const [target, setTarget] = useState<'自己' | '父母' | '朋友' | '他人' | ''>('');
   const [coins, setCoins] = useState<number[]>([]);
   const [resultData, setResultData] = useState<{
     result: string;
@@ -114,6 +130,8 @@ export function LiuYaoPage() {
       const response = await api.divinate({
         question,
         coins,
+        gender: gender || undefined,
+        target: target || undefined,
       }, apiKey);
 
       setResultData({
@@ -131,6 +149,8 @@ export function LiuYaoPage() {
   const handleCloseResult = () => {
     setMode('input');
     setQuestion('');
+    setGender('');
+    setTarget('');
     setCoins([]);
     setResultData(null);
   };
@@ -187,6 +207,57 @@ export function LiuYaoPage() {
       {/* Input Card */}
       <Card className="glass-panel w-full max-w-2xl">
         <CardContent className="p-6">
+          {/* Gender & Target Selection */}
+          <div className="mb-6 space-y-4">
+            {/* Gender Selection */}
+            <div>
+              <label className="block text-sm font-medium text-foreground/70 mb-2">
+                <User className="w-4 h-4 inline-block mr-1" />
+                您的性別
+              </label>
+              <div className="flex gap-3">
+                {GENDER_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setGender(option.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                      gender === option.id
+                        ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
+                        : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
+                    }`}
+                  >
+                    <span className="text-xl">{option.icon}</span>
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Target Selection */}
+            <div>
+              <label className="block text-sm font-medium text-foreground/70 mb-2">
+                <Users className="w-4 h-4 inline-block mr-1" />
+                占卜對象
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {TARGET_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setTarget(option.id)}
+                    className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                      target === option.id
+                        ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
+                        : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Question Input */}
           <div className="relative">
             <textarea
               ref={inputRef}

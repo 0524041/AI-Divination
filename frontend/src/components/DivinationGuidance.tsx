@@ -7,20 +7,42 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { divinationCategories, getRandomQuestion } from '@/lib/categories';
 import { DivinationCategory, SubCategory } from '@/types';
-import { ChevronLeft, Sparkles, Lightbulb } from 'lucide-react';
+import { ChevronLeft, Sparkles, Lightbulb, User, Users } from 'lucide-react';
 
 interface DivinationGuidanceProps {
-  onSubmit: (question: string) => void;
+  onSubmit: (question: string, gender?: string, target?: string) => void;
   isLoading: boolean;
 }
 
-type Step = 'category' | 'subcategory' | 'question';
+type Step = 'info' | 'category' | 'subcategory' | 'question';
+
+// 性別選項
+const genderOptions = [
+  { id: '男', label: '男', icon: '👨' },
+  { id: '女', label: '女', icon: '👩' },
+];
+
+// 占卜對象選項
+const targetOptions = [
+  { id: '自己', label: '算自己', description: '為自己的事情占卜' },
+  { id: '父母', label: '算父母', description: '為父母的事情占卜' },
+  { id: '朋友', label: '算朋友', description: '為朋友的事情占卜' },
+  { id: '他人', label: '算他人', description: '為其他人占卜' },
+];
 
 export function DivinationGuidance({ onSubmit, isLoading }: DivinationGuidanceProps) {
-  const [step, setStep] = useState<Step>('category');
+  const [step, setStep] = useState<Step>('info');
+  const [selectedGender, setSelectedGender] = useState<string>('');
+  const [selectedTarget, setSelectedTarget] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<DivinationCategory | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<SubCategory | null>(null);
   const [question, setQuestion] = useState('');
+
+  const handleInfoComplete = () => {
+    if (selectedGender && selectedTarget) {
+      setStep('category');
+    }
+  };
 
   const handleCategorySelect = (category: DivinationCategory) => {
     setSelectedCategory(category);
@@ -34,7 +56,6 @@ export function DivinationGuidance({ onSubmit, isLoading }: DivinationGuidancePr
   const handleSubCategorySelect = (subCategory: SubCategory) => {
     setSelectedSubCategory(subCategory);
     setStep('question');
-    // 如果有提示，預填一些引導文字
     if (subCategory.promptHint) {
       setQuestion('');
     }
@@ -56,6 +77,8 @@ export function DivinationGuidance({ onSubmit, isLoading }: DivinationGuidancePr
     } else if (step === 'subcategory') {
       setStep('category');
       setSelectedCategory(null);
+    } else if (step === 'category') {
+      setStep('info');
     }
   };
 
@@ -67,18 +90,96 @@ export function DivinationGuidance({ onSubmit, isLoading }: DivinationGuidancePr
 
   const handleSubmit = () => {
     if (question.trim()) {
-      onSubmit(question.trim());
+      onSubmit(question.trim(), selectedGender, selectedTarget);
     }
   };
 
   return (
     <div className="w-full max-w-2xl mx-auto">
+      {/* Step 0: Gender & Target Selection */}
+      {step === 'info' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-[var(--gold)] mb-2">開始占卜前...</h2>
+            <p className="text-muted-foreground">請先提供一些基本資訊，有助於更準確的解讀</p>
+          </div>
+
+          {/* 性別選擇 */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[var(--gold)]">
+              <User className="w-5 h-5" />
+              <span className="font-medium">您的性別</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {genderOptions.map((option) => (
+                <Card
+                  key={option.id}
+                  className={`glass-panel cursor-pointer transition-all hover:scale-105 ${
+                    selectedGender === option.id 
+                      ? 'border-[var(--gold)] bg-[var(--gold)]/10' 
+                      : 'hover:border-[var(--gold)]/50'
+                  }`}
+                  onClick={() => setSelectedGender(option.id)}
+                >
+                  <CardContent className="p-4 text-center">
+                    <div className="text-3xl mb-2">{option.icon}</div>
+                    <span className="font-semibold">{option.label}</span>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* 占卜對象選擇 */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[var(--gold)]">
+              <Users className="w-5 h-5" />
+              <span className="font-medium">占卜對象</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {targetOptions.map((option) => (
+                <Card
+                  key={option.id}
+                  className={`glass-panel cursor-pointer transition-all ${
+                    selectedTarget === option.id 
+                      ? 'border-[var(--gold)] bg-[var(--gold)]/10' 
+                      : 'hover:border-[var(--gold)]/50'
+                  }`}
+                  onClick={() => setSelectedTarget(option.id)}
+                >
+                  <CardContent className="p-3">
+                    <h3 className="font-semibold text-[var(--gold)]">{option.label}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <Button
+            className="btn-gold w-full"
+            onClick={handleInfoComplete}
+            disabled={!selectedGender || !selectedTarget}
+          >
+            繼續
+          </Button>
+        </div>
+      )}
+
       {/* Step 1: Category Selection */}
       {step === 'category' && (
         <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-[var(--gold)] mb-2">您想問什麼類型的問題？</h2>
-            <p className="text-muted-foreground">選擇一個類別，幫助您更好地整理問題</p>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={handleBack}>
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <div className="flex gap-2 mb-1">
+                <Badge variant="secondary">{selectedGender === '男' ? '👨' : '👩'} {selectedGender}</Badge>
+                <Badge variant="outline">{selectedTarget}</Badge>
+              </div>
+              <h2 className="text-xl font-bold text-[var(--gold)]">您想問什麼類型的問題？</h2>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -152,16 +253,22 @@ export function DivinationGuidance({ onSubmit, isLoading }: DivinationGuidancePr
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div>
-              {selectedCategory && (
-                <div className="flex gap-2 mb-1">
+              <div className="flex gap-2 mb-1">
+                {selectedGender && (
+                  <Badge variant="secondary">{selectedGender === '男' ? '👨' : '👩'} {selectedGender}</Badge>
+                )}
+                {selectedTarget && (
+                  <Badge variant="outline">{selectedTarget}</Badge>
+                )}
+                {selectedCategory && (
                   <Badge variant="secondary">
                     {selectedCategory.icon} {selectedCategory.name}
                   </Badge>
-                  {selectedSubCategory && (
-                    <Badge variant="outline">{selectedSubCategory.name}</Badge>
-                  )}
-                </div>
-              )}
+                )}
+                {selectedSubCategory && (
+                  <Badge variant="outline">{selectedSubCategory.name}</Badge>
+                )}
+              </div>
               <h2 className="text-xl font-bold text-[var(--gold)]">誠心寫下您的問題</h2>
             </div>
           </div>

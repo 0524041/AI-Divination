@@ -84,6 +84,18 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # 欄位已存在
     
+    # 升級：新增 gender 欄位 (求測者性別)
+    try:
+        c.execute('ALTER TABLE history ADD COLUMN gender TEXT')
+    except sqlite3.OperationalError:
+        pass  # 欄位已存在
+    
+    # 升級：新增 target 欄位 (占卜對象)
+    try:
+        c.execute('ALTER TABLE history ADD COLUMN target TEXT')
+    except sqlite3.OperationalError:
+        pass  # 欄位已存在
+    
     # Settings table
     c.execute('''
         CREATE TABLE IF NOT EXISTS settings (
@@ -157,15 +169,15 @@ def set_setting(key: str, value: str) -> None:
 
 
 # ============= History Functions =============
-def add_history(question: str, result_json: dict, interpretation: str, user_id: int = 1, ai_model: str = 'unknown') -> int:
+def add_history(question: str, result_json: dict, interpretation: str, user_id: int = 1, ai_model: str = 'unknown', gender: str = None, target: str = None) -> int:
     """新增歷史記錄"""
     conn = get_db_connection()
     date_str = datetime.now().strftime('%Y-%m-%d')
     
     cursor = conn.execute(
-        '''INSERT INTO history (user_id, question, result_json, interpretation, ai_model, date_str)
-           VALUES (?, ?, ?, ?, ?, ?)''',
-        (user_id, question, json.dumps(result_json, ensure_ascii=False), interpretation, ai_model, date_str)
+        '''INSERT INTO history (user_id, question, result_json, interpretation, ai_model, date_str, gender, target)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+        (user_id, question, json.dumps(result_json, ensure_ascii=False), interpretation, ai_model, date_str, gender, target)
     )
     history_id = cursor.lastrowid
     conn.commit()
