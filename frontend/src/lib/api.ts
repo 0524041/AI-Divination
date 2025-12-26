@@ -152,6 +152,14 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // ========== Local AI 測試 ==========
+  async testLocalAI(apiUrl: string): Promise<{ success: boolean; models: string[]; message: string }> {
+    return this.request('/api/test-local-ai', {
+      method: 'POST',
+      body: JSON.stringify({ api_url: apiUrl }),
+    });
+  }
 }
 
 export const api = new ApiClient();

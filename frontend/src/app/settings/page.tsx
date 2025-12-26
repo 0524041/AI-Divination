@@ -47,6 +47,10 @@ import {
   Edit,
   UserPlus,
   LogOut,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -69,6 +73,11 @@ export default function SettingsPage() {
   const [newUsername, setNewUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
+  
+  // Local AI test state
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const isAdmin = user?.role === 'admin';
 
@@ -198,6 +207,37 @@ export default function SettingsPage() {
       router.push('/');
     } catch {
       toast.error('登出失敗');
+    }
+  };
+
+  const handleTestConnection = async () => {
+    const apiUrl = localSettings.local_api_url;
+    if (!apiUrl) {
+      toast.error('請先填寫 API URL');
+      return;
+    }
+    
+    setTestingConnection(true);
+    setConnectionStatus('idle');
+    setAvailableModels([]);
+    
+    try {
+      const result = await api.testLocalAI(apiUrl);
+      if (result.success) {
+        setConnectionStatus('success');
+        setAvailableModels(result.models);
+        toast.success(result.message);
+        
+        // 如果目前沒有選擇模型，自動選擇第一個
+        if (!localSettings.local_model_name && result.models.length > 0) {
+          setLocalSettings({ ...localSettings, local_model_name: result.models[0] });
+        }
+      }
+    } catch (error) {
+      setConnectionStatus('error');
+      toast.error(error instanceof Error ? error.message : '連線測試失敗');
+    } finally {
+      setTestingConnection(false);
     }
   };
 
@@ -340,24 +380,75 @@ export default function SettingsPage() {
                     <Separator />
                     <div>
                       <Label>Local API URL</Label>
-                      <Input
-                        value={localSettings.local_api_url || ''}
-                        onChange={(e) => setLocalSettings({ ...localSettings, local_api_url: e.target.value })}
-                        placeholder="http://localhost:1234/v1"
-                        className="mt-1 bg-transparent border-border"
-                      />
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          value={localSettings.local_api_url || ''}
+                          onChange={(e) => {
+                            setLocalSettings({ ...localSettings, local_api_url: e.target.value });
+                            setConnectionStatus('idle');
+                            setAvailableModels([]);
+                          }}
+                          placeholder="http://localhost:1234/v1"
+                          className="flex-1 bg-transparent border-border"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={handleTestConnection}
+                          disabled={testingConnection || !localSettings.local_api_url}
+                          className="shrink-0"
+                        >
+                          {testingConnection ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : connectionStatus === 'success' ? (
+                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          ) : connectionStatus === 'error' ? (
+                            <XCircle className="w-4 h-4 text-red-500" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                          <span className="ml-2">測試連線</span>
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         支援 LM Studio、Ollama 等 OpenAI 相容 API
                       </p>
                     </div>
                     <div>
                       <Label>Model Name</Label>
-                      <Input
-                        value={localSettings.local_model_name || ''}
-                        onChange={(e) => setLocalSettings({ ...localSettings, local_model_name: e.target.value })}
-                        placeholder="qwen/qwen3-8b"
-                        className="mt-1 bg-transparent border-border"
-                      />
+                      {availableModels.length > 0 ? (
+                        <Select
+                          value={localSettings.local_model_name || ''}
+                          onValueChange={(v) => setLocalSettings({ ...localSettings, local_model_name: v })}
+                        >
+                          <SelectTrigger className="mt-1 bg-transparent border-border">
+                            <SelectValue placeholder="選擇模型" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableModels.map((model) => (
+                              <SelectItem key={model} value={model}>
+                                {model}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={localSettings.local_model_name || ''}
+                          onChange={(e) => setLocalSettings({ ...localSettings, local_model_name: e.target.value })}
+                          placeholder="qwen/qwen3-8b"
+                          className="mt-1 bg-transparent border-border"
+                        />
+                      )}
+                      {availableModels.length > 0 && (
+                        <p className="text-xs text-green-500 mt-1">
+                          ✓ 已從伺服器取得 {availableModels.length} 個可用模型
+                        </p>
+                      )}
+                      {availableModels.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          點擊「測試連線」自動取得可用模型列表
+                        </p>
+                      )}
                     </div>
                   </>
                 )}

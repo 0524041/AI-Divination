@@ -337,3 +337,43 @@ def register_routes(app):
             if 'local_model_name' in data:
                 set_setting('local_model_name', data['local_model_name'])
             return jsonify({"success": True})
+
+    @app.route('/api/test-local-ai', methods=['POST'])
+    @login_required
+    def test_local_ai():
+        """測試 Local AI 連線並取得模型列表"""
+        import urllib.request
+        import urllib.error
+        
+        data = request.json
+        api_url = data.get('api_url', '').rstrip('/')
+        
+        if not api_url:
+            return jsonify({"error": "請提供 API URL"}), 400
+        
+        # 嘗試取得模型列表
+        models_url = f"{api_url}/models"
+        
+        try:
+            req = urllib.request.Request(models_url, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                
+                # OpenAI 格式的模型列表
+                models = []
+                if 'data' in result and isinstance(result['data'], list):
+                    for model in result['data']:
+                        model_id = model.get('id', '')
+                        if model_id:
+                            models.append(model_id)
+                
+                return jsonify({
+                    "success": True,
+                    "models": models,
+                    "message": f"連線成功！找到 {len(models)} 個模型"
+                })
+                
+        except urllib.error.URLError as e:
+            return jsonify({"error": f"無法連線到 {api_url}：{str(e.reason)}"}), 400
+        except Exception as e:
+            return jsonify({"error": f"測試失敗：{str(e)}"}), 400
