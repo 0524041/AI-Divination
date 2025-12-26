@@ -136,14 +136,24 @@ export function LiuYaoPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // 檢查是否在輸入法組字中（中文、日文等）
+    if (e.nativeEvent.isComposing || e.keyCode === 229) {
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
   };
 
+  const handleCancelDivination = useCallback(() => {
+    setMode('input');
+    setCoins([]);
+    toast.info('已取消占卜');
+  }, []);
+
   if (mode === 'tossing') {
-    return <CoinTossing coins={coins} onComplete={handleTossingComplete} />;
+    return <CoinTossing coins={coins} onComplete={handleTossingComplete} onCancel={handleCancelDivination} />;
   }
 
   if (mode === 'result' && resultData) {

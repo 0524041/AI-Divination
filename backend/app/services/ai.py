@@ -158,6 +158,10 @@ def call_local_ai(prompt: str, api_url: str, model_name: str) -> str:
     url = api_url.rstrip('/')
     if not url.endswith('/chat/completions'):
         url = f"{url}/chat/completions"
+    
+    print(f"[Local AI] Request URL: {url}")
+    print(f"[Local AI] Model: {model_name}")
+    print(f"[Local AI] Prompt length: {len(prompt)} chars")
         
     payload = {
         "model": model_name,
@@ -171,10 +175,17 @@ def call_local_ai(prompt: str, api_url: str, model_name: str) -> str:
     req = urllib.request.Request(url, data=data, headers=headers)
     
     try:
+        print(f"[Local AI] Sending request...")
         with urllib.request.urlopen(req, timeout=120) as response:
             result = json.loads(response.read().decode('utf-8'))
-            return result['choices'][0]['message']['content']
+            content = result['choices'][0]['message']['content']
+            print(f"[Local AI] Response received, length: {len(content)} chars")
+            return content
+    except urllib.error.URLError as e:
+        print(f"[Local AI] URLError: {e}")
+        raise Exception(f"Local AI Error: 無法連線到 {url} - {e.reason}")
     except Exception as e:
+        print(f"[Local AI] Error: {e}")
         raise Exception(f"Local AI Error: {e}")
 
 

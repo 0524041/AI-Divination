@@ -3,15 +3,19 @@
 import { useEffect, useState } from 'react';
 import { parseCoinResult, getYaoName, getCoinDisplayClass } from '@/lib/divination';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 
 interface CoinTossingProps {
   coins: number[];
   onComplete: () => void;
+  onCancel?: () => void;
 }
 
-export function CoinTossing({ coins, onComplete }: CoinTossingProps) {
+export function CoinTossing({ coins, onComplete, onCancel }: CoinTossingProps) {
   const [visibleCount, setVisibleCount] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
+  const [isWaitingAI, setIsWaitingAI] = useState(false);
 
   useEffect(() => {
     // 逐個顯示硬幣結果
@@ -22,7 +26,11 @@ export function CoinTossing({ coins, onComplete }: CoinTossingProps) {
       return () => clearTimeout(timeout);
     } else if (visibleCount === coins.length && !isComplete) {
       setIsComplete(true);
-      const timeout = setTimeout(onComplete, 1500);
+      setIsWaitingAI(true);
+      // 等待 1.5 秒後開始調用 AI
+      const timeout = setTimeout(() => {
+        onComplete();
+      }, 1500);
       return () => clearTimeout(timeout);
     }
   }, [coins.length, visibleCount, isComplete, onComplete]);
@@ -82,6 +90,18 @@ export function CoinTossing({ coins, onComplete }: CoinTossingProps) {
                 />
               ))}
             </div>
+          )}
+
+          {/* 取消按鈕 */}
+          {onCancel && (
+            <Button
+              variant="ghost"
+              onClick={onCancel}
+              className="mt-6 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4 mr-2" />
+              取消占卜
+            </Button>
           )}
         </CardContent>
       </Card>
