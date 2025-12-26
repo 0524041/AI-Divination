@@ -4,6 +4,7 @@ Flask Application Entry Point
 """
 import os
 import sys
+import signal
 
 # 添加後端目錄到 Python 路徑
 backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -57,7 +58,10 @@ def main():
     
     app = create_app()
     print(f"\n🔮 AI Divination Backend V2 running on http://0.0.0.0:8080\n")
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    
+    # 使用 use_reloader=False 避免 macOS 上的 semaphore 洩漏警告
+    # 在開發時如果需要自動重載，可以改為 True
+    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
 
 
 if __name__ == '__main__':
