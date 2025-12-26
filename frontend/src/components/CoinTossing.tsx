@@ -10,25 +10,25 @@ interface CoinTossingProps {
 }
 
 export function CoinTossing({ coins, onComplete }: CoinTossingProps) {
-  const [visibleCoins, setVisibleCoins] = useState<number[]>([]);
+  const [visibleCount, setVisibleCount] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
     // 逐個顯示硬幣結果
-    let currentIndex = 0;
-    const interval = setInterval(() => {
-      if (currentIndex < coins.length) {
-        setVisibleCoins((prev) => [...prev, coins[currentIndex]]);
-        currentIndex++;
-      } else {
-        clearInterval(interval);
-        setIsComplete(true);
-        setTimeout(onComplete, 1500);
-      }
-    }, 600);
+    if (visibleCount < coins.length) {
+      const timeout = setTimeout(() => {
+        setVisibleCount((prev) => prev + 1);
+      }, 600);
+      return () => clearTimeout(timeout);
+    } else if (visibleCount === coins.length && !isComplete) {
+      setIsComplete(true);
+      const timeout = setTimeout(onComplete, 1500);
+      return () => clearTimeout(timeout);
+    }
+  }, [coins.length, visibleCount, isComplete, onComplete]);
 
-    return () => clearInterval(interval);
-  }, [coins, onComplete]);
+  // 取得當前可見的硬幣結果
+  const visibleCoins = coins.slice(0, visibleCount);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90">
