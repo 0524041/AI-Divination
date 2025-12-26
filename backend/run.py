@@ -29,6 +29,8 @@ def create_app():
     # Configuration
     app.secret_key = config.SECRET_KEY
     app.config['SESSION_COOKIE_HTTPONLY'] = config.SESSION_COOKIE_HTTPONLY
+    app.config['SESSION_COOKIE_SAMESITE'] = config.SESSION_COOKIE_SAMESITE
+    app.config['SESSION_COOKIE_SECURE'] = config.SESSION_COOKIE_SECURE
     app.config['PERMANENT_SESSION_LIFETIME'] = config.PERMANENT_SESSION_LIFETIME
     
     # Enable CORS

@@ -96,7 +96,6 @@ export function LiuYaoPage() {
   }, [placeholderIndex, isTyping]);
 
   const handleSubmit = useCallback(async () => {
-    console.log('[LiuYaoPage] handleSubmit called, question:', question);
     if (!question.trim()) {
       toast.error('請輸入您想問的問題');
       return;
@@ -104,28 +103,18 @@ export function LiuYaoPage() {
     
     // 生成六爻結果
     const newCoins = performDivination();
-    console.log('[LiuYaoPage] Generated coins:', newCoins);
     setCoins(newCoins);
     setMode('tossing');
-    console.log('[LiuYaoPage] Mode set to tossing');
   }, [question]);
 
   const handleTossingComplete = useCallback(async () => {
-    console.log('[LiuYaoPage] handleTossingComplete called');
-    console.log('[LiuYaoPage] question:', question);
-    console.log('[LiuYaoPage] coins:', coins);
-    console.log('[LiuYaoPage] settings?.ai_provider:', settings?.ai_provider);
-    
     try {
       const apiKey = settings?.ai_provider === 'gemini' ? geminiApiKey || undefined : undefined;
       
-      console.log('[LiuYaoPage] Calling api.divinate...');
       const response = await api.divinate({
         question,
         coins,
       }, apiKey);
-      
-      console.log('[LiuYaoPage] Response received:', response);
 
       setResultData({
         result: response.result,

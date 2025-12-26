@@ -310,10 +310,25 @@ def register_routes(app):
     @app.route('/api/history/<int:id>', methods=['DELETE'])
     @login_required
     def delete_history_item(id):
+        # 檢查權限：只能刪除自己的記錄，管理員可以刪除任何記錄
+        user_id = session['user_id']
+        role = session.get('role')
+        
+        conn = get_db_connection()
+        record = conn.execute('SELECT user_id FROM history WHERE id = ?', (id,)).fetchone()
+        conn.close()
+        
+        if not record:
+            return jsonify({"error": "Record not found"}), 404
+        
+        if role != 'admin' and record['user_id'] != user_id:
+            return jsonify({"error": "Permission denied"}), 403
+        
         delete_history(id)
         return jsonify({"success": True})
 
     @app.route('/api/settings', methods=['GET', 'POST'])
+    @login_required
     def handle_settings():
         default_prompt = get_system_prompt()
         
@@ -327,6 +342,10 @@ def register_routes(app):
                 "local_model_name": get_setting('local_model_name', 'qwen/qwen3-8b')
             })
         else:
+            # POST 需要管理員權限
+            if session.get('role') != 'admin':
+                return jsonify({"error": "Admin access required"}), 403
+            
             data = request.json
             if 'daily_limit' in data:
                 set_setting('daily_limit', data['daily_limit'])

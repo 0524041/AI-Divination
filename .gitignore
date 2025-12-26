@@ -27,6 +27,10 @@ frontend/out/
 .env.local
 .env.*.local
 
+# Security keys (auto-generated for development)
+.secret_key
+.encryption_key
+
 # Logs
 *.log
 npm-debug.log*

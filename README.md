@@ -184,6 +184,26 @@ ollama run qwen2.5:7b
 
 ## 🔄 更新日誌
 
+### v2.2.0 (2025-12-26)
+**🔒 安全性增強**
+- ✨ SECRET_KEY 和 ENCRYPTION_KEY 持久化存儲（避免重啟後 session 失效）
+- ✨ Session Cookie 加入 SameSite=Lax 防護 CSRF 攻擊
+- ✨ 生產環境自動啟用 Secure Cookie
+- ✨ `/api/settings` POST 操作需要管理員權限
+- ✨ 歷史記錄刪除增加權限檢查（只能刪除自己的記錄）
+- 🔧 API Key 加密金鑰使用一致的來源
+
+**🛠️ 性能修復**
+- ✨ Local AI 連線測試功能（可獲取模型列表）
+- ✨ 設定頁面新增模型下拉選單
+- ✨ 占卜過程可取消
+- 🐛 修復 CoinTossing useEffect cleanup 導致 AI 請求無法發出的問題
+- 🐛 修復中文輸入法 Enter 鍵誤觸發送出的問題
+- 🐛 修復 macOS 上的 semaphore 洩漏警告
+
+**📖 使用說明**
+- ✨ Gemini 使用小技巧：API 配額限制說明
+
 ### v2.1.0 (2025-06-XX)
 **🛠️ 功能增強**
 - ✨ 占卜頁面顯示當前 AI 模型

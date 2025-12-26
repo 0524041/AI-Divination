@@ -25,7 +25,6 @@ export function CoinTossing({ coins, onComplete, onCancel }: CoinTossingProps) {
       }, 600);
       return () => clearTimeout(timeout);
     } else if (visibleCount === coins.length && !isComplete) {
-      console.log('[CoinTossing] All coins visible, setting complete');
       setIsComplete(true);
       setIsWaitingAI(true);
     }
@@ -34,9 +33,7 @@ export function CoinTossing({ coins, onComplete, onCancel }: CoinTossingProps) {
   // Effect 2: 完成後調用 AI（獨立的 effect 避免 cleanup 問題）
   useEffect(() => {
     if (isComplete && isWaitingAI) {
-      console.log('[CoinTossing] Starting AI call timeout');
       const timeout = setTimeout(() => {
-        console.log('[CoinTossing] Calling onComplete()');
         onComplete();
       }, 1500);
       return () => clearTimeout(timeout);

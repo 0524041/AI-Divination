@@ -4,13 +4,25 @@ Authentication utilities - 認證工具
 from functools import wraps
 from flask import session, jsonify
 from cryptography.fernet import Fernet
-import os
+import base64
+import hashlib
 
 from ..core.database import get_db_connection
+from ..core.config import get_config
 
-# Encryption key for API keys
-ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', Fernet.generate_key())
-cipher = Fernet(ENCRYPTION_KEY) if isinstance(ENCRYPTION_KEY, bytes) else Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
+# 從 config 獲取加密金鑰並轉換為 Fernet 格式
+config = get_config()
+_raw_key = config.ENCRYPTION_KEY
+
+# Fernet 需要 32 bytes base64 編碼的金鑰
+# 將任意長度的 hex 金鑰轉換為 Fernet 格式
+def _get_fernet_key(raw_key: str) -> bytes:
+    """將 hex 金鑰轉換為 Fernet 格式"""
+    # 使用 SHA256 確保得到 32 bytes
+    key_bytes = hashlib.sha256(raw_key.encode()).digest()
+    return base64.urlsafe_b64encode(key_bytes)
+
+cipher = Fernet(_get_fernet_key(_raw_key))
 
 def login_required(f):
     """裝飾器：需要登入"""
