@@ -96,6 +96,7 @@ export function LiuYaoPage() {
   }, [placeholderIndex, isTyping]);
 
   const handleSubmit = useCallback(async () => {
+    console.log('[LiuYaoPage] handleSubmit called, question:', question);
     if (!question.trim()) {
       toast.error('請輸入您想問的問題');
       return;
@@ -103,8 +104,10 @@ export function LiuYaoPage() {
     
     // 生成六爻結果
     const newCoins = performDivination();
+    console.log('[LiuYaoPage] Generated coins:', newCoins);
     setCoins(newCoins);
     setMode('tossing');
+    console.log('[LiuYaoPage] Mode set to tossing');
   }, [question]);
 
   const handleTossingComplete = useCallback(async () => {
