@@ -10,6 +10,7 @@ interface AppState {
   settings: Settings | null;
   history: HistoryItem[];
   geminiApiKey: string | null;  // 儲存在 localStorage
+  backendApiKeys: { gemini: boolean; local: boolean }; // 儲存在後端資料庫
 }
 
 interface AppContextType extends AppState {
@@ -21,6 +22,9 @@ interface AppContextType extends AppState {
   refreshHistory: (userId?: number | 'all') => Promise<void>;
   updateSettings: (settings: Partial<Settings>) => Promise<void>;
   setGeminiApiKey: (key: string | null) => void;
+  refreshBackendKeys: () => Promise<void>;
+  saveBackendApiKey: (provider: 'gemini' | 'local', key: string) => Promise<void>;
+  deleteBackendApiKey: (provider: 'gemini' | 'local') => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -32,6 +36,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     settings: null,
     history: [],
     geminiApiKey: null,
+    backendApiKeys: { gemini: false, local: false },
   });
 
   // 從 localStorage 讀取 Gemini API Key
@@ -82,6 +87,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const refreshBackendKeys = useCallback(async () => {
+    try {
+      const keys = await api.getUserApiKeys();
+      setState((prev) => ({ ...prev, backendApiKeys: keys }));
+    } catch (error) {
+      console.error('Failed to fetch backend keys:', error);
+    }
+  }, []);
+
+  const saveBackendApiKey = async (provider: 'gemini' | 'local', key: string) => {
+    await api.saveUserApiKey(provider, key);
+    await refreshBackendKeys();
+  };
+
+  const deleteBackendApiKey = async (provider: 'gemini' | 'local') => {
+    await api.deleteUserApiKey(provider);
+    await refreshBackendKeys();
+  };
+
   const login = async (username: string, password: string) => {
     const result = await api.login({ username, password });
     setState((prev) => ({ ...prev, user: result.user }));
@@ -107,6 +131,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     refreshSettings();
   }, [refreshUser, refreshSettings]);
 
+  useEffect(() => {
+    if (state.user) {
+      refreshBackendKeys();
+    }
+  }, [state.user, refreshBackendKeys]);
+
   return (
     <AppContext.Provider
       value={{
@@ -119,6 +149,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshHistory,
         updateSettings,
         setGeminiApiKey,
+        refreshBackendKeys,
+        saveBackendApiKey,
+        deleteBackendApiKey,
       }}
     >
       {children}

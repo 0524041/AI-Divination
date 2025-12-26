@@ -56,12 +56,25 @@ import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, isLoading, settings, updateSettings, geminiApiKey, setGeminiApiKey, logout } = useApp();
+  const {
+    user,
+    isLoading,
+    settings,
+    updateSettings,
+    geminiApiKey,
+    setGeminiApiKey,
+    logout,
+    backendApiKeys,
+    saveBackendApiKey,
+    deleteBackendApiKey
+  } = useApp();
   const [localSettings, setLocalSettings] = useState<Partial<Settings>>({});
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [localGeminiKey, setLocalGeminiKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingToCloud, setIsSavingToCloud] = useState(false);
+  const [isDeletingFromCloud, setIsDeletingFromCloud] = useState(false);
 
   // Admin state
   const [users, setUsers] = useState<User[]>([]);
@@ -126,19 +139,48 @@ export default function SettingsPage() {
         await updateSettings(localSettings);
       }
 
-      // 無論是否為管理員，都可以儲存本地 Gemini API Key
+      // 儲存本地 Gemini API Key
       if (localGeminiKey && !localGeminiKey.startsWith('••••')) {
         setGeminiApiKey(localGeminiKey);
       } else if (!localGeminiKey) {
         setGeminiApiKey(null);
       }
 
-      toast.success('設定已儲存');
+      toast.success('本地設定已儲存');
     } catch (error) {
       console.error('Save settings failed:', error);
-      toast.error('儲存全域設定失敗 (可能需要管理員權限)');
+      toast.error('儲存失敗');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveToCloud = async () => {
+    if (!localGeminiKey || localGeminiKey.startsWith('••••')) {
+      toast.error('請先輸入有效的 API Key');
+      return;
+    }
+    setIsSavingToCloud(true);
+    try {
+      await saveBackendApiKey('gemini', localGeminiKey);
+      toast.success('API Key 已加密上傳至雲端');
+    } catch (error) {
+      toast.error('上傳雲端失敗');
+    } finally {
+      setIsSavingToCloud(false);
+    }
+  };
+
+  const handleDeleteFromCloud = async () => {
+    if (!confirm('確定要從雲端刪除您的 API Key 嗎？')) return;
+    setIsDeletingFromCloud(true);
+    try {
+      await deleteBackendApiKey('gemini');
+      toast.success('已從雲端刪除');
+    } catch (error) {
+      toast.error('刪除失敗');
+    } finally {
+      setIsDeletingFromCloud(false);
     }
   };
 
@@ -495,9 +537,41 @@ export default function SettingsPage() {
                           }
                         }}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        API Key 僅儲存於您的瀏覽器，不會上傳到伺服器
-                      </p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSaveToCloud}
+                          disabled={isSavingToCloud || !localGeminiKey || localGeminiKey.startsWith('••••')}
+                        >
+                          {isSavingToCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
+                          上傳加密至雲端
+                        </Button>
+
+                        {backendApiKeys.gemini && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleDeleteFromCloud}
+                            disabled={isDeletingFromCloud}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            {isDeletingFromCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                            刪除雲端備份
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1 mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          • 本地狀態：{geminiApiKey ? <span className="text-green-500 font-medium">已儲存</span> : <span className="text-muted-foreground">未設定</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          • 雲端狀態：{backendApiKeys.gemini ? <span className="text-[var(--gold)] font-medium">已加密備份</span> : <span className="text-muted-foreground">未備份</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          💡 提示：上傳至雲端後，更換裝置或瀏覽器也能量自動套用
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -24,7 +24,8 @@ from .models.user import (
     update_user_password,
     get_user_api_keys,
     add_api_key,
-    delete_api_key
+    delete_api_key,
+    get_user_api_key
 )
 import json
 
@@ -185,7 +186,11 @@ def register_routes(app):
     # ============= Main App Routes =============
     @app.route('/')
     def index():
-        return render_template('index.html')
+        return jsonify({
+            "name": "AI Divination API",
+            "version": "2.0.0",
+            "status": "online"
+        })
 
     @app.route('/api/divinate', methods=['POST'])
     @login_required
@@ -260,6 +265,12 @@ def register_routes(app):
         # Call AI
         ai_provider = data.get('provider') or get_setting('ai_provider', 'local')
         user_gemini_key = request.headers.get('X-Gemini-Api-Key')
+        
+        # 如果是 Gemini 且 header 沒給 Key，試著從資料庫抓
+        if ai_provider == 'gemini' and not user_gemini_key:
+            user_gemini_key = get_user_api_key(user_id, 'gemini')
+            if user_gemini_key:
+                print(f"[Routes] Found Gemini API Key in backend for user {user_id}")
         
         print(f"[Routes] About to call AI, provider='{ai_provider}'")
         

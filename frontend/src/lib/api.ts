@@ -90,6 +90,24 @@ class ApiClient {
     });
   }
 
+  // User API Keys
+  async getUserApiKeys(): Promise<{ gemini: boolean; local: boolean }> {
+    return this.request('/api/user/api-keys');
+  }
+
+  async saveUserApiKey(provider: 'gemini' | 'local', apiKey: string): Promise<{ success: boolean }> {
+    return this.request('/api/user/api-keys', {
+      method: 'POST',
+      body: JSON.stringify({ provider, api_key: apiKey }),
+    });
+  }
+
+  async deleteUserApiKey(provider: 'gemini' | 'local'): Promise<{ success: boolean }> {
+    return this.request(`/api/user/api-keys/${provider}`, {
+      method: 'DELETE',
+    });
+  }
+
   // ========== 占卜 API ==========
   async divinate(data: DivinationRequest, geminiApiKey?: string): Promise<DivinationResponse> {
     const headers: Record<string, string> = {};
