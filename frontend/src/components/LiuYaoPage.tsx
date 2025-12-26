@@ -135,7 +135,7 @@ export function LiuYaoPage() {
       }, apiKey);
 
       setResultData({
-        result: response.result || '', # 如果正在處理中，result 為空
+        result: response.result || '', // 如果正在處理中，result 為空
         toolStatus: response.tool_status,
         aiModel: response.ai_model,
       });
@@ -224,8 +224,8 @@ export function LiuYaoPage() {
                     key={option.id}
                     onClick={() => setGender(option.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${gender === option.id
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
-                        : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
+                      ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
+                      : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
                       }`}
                   >
                     <span className="text-xl">{option.icon}</span>
@@ -247,8 +247,8 @@ export function LiuYaoPage() {
                     key={option.id}
                     onClick={() => setTarget(option.id)}
                     className={`px-4 py-2 rounded-lg border-2 transition-all ${target === option.id
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
-                        : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
+                      ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
+                      : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
                       }`}
                   >
                     {option.label}
