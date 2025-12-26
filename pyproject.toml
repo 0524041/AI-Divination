@@ -8,5 +8,7 @@ dependencies = [
     "flask",
     "google-genai",
     "bcrypt",
-    "cryptography"
+    "cryptography",
+    "flask-cors>=6.0.2",
+    "lunar-python>=1.4.8",
 ]

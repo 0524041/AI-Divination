@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory, session
+from flask_cors import CORS
 from database import init_db, add_history, get_history, delete_history, toggle_favorite, get_daily_usage_count, get_setting, set_setting
-# Queue imports will be added when implementing queue feature
-from tools import get_current_time, get_divination_tool
+# V2: 使用本地 lib 模組取代 MCP
+from lib.divination import get_current_time, get_divination_tool
 from google import genai
 from google.genai import types
 import os
@@ -13,6 +14,9 @@ import urllib.error
 import auth
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+
+# Enable CORS for Next.js frontend
+CORS(app, supports_credentials=True, origins=['http://localhost:3000', 'http://127.0.0.1:3000'])
 
 # Session configuration
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
@@ -497,7 +501,7 @@ def handle_settings():
             "system_prompt": get_setting('system_prompt', DEFAULT_PROMPT),
             "default_prompt": DEFAULT_PROMPT,
             "ai_provider": get_setting('ai_provider', 'gemini'),
-            "local_api_url": get_setting('local_api_url', 'http://localhost:1234/v1'),
+            "local_api_url": get_setting('local_api_url', 'http://192.168.1.163:1234/v1'),
             "local_model_name": get_setting('local_model_name', 'qwen/qwen3-8b')
         })
     else:

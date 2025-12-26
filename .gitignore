@@ -9,3 +9,21 @@ wheels/
 # Virtual environments
 .venv
 *.db
+
+# PID files
+.backend.pid
+.frontend.pid
+
+# Node.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
