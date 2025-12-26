@@ -20,8 +20,39 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            role TEXT DEFAULT 'user',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP
+        )
+    ''')
+    
+    # API keys table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            provider TEXT NOT NULL CHECK(provider IN ('gemini', 'local')),
+            api_key_encrypted TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Request queue table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS request_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            question TEXT NOT NULL,
+            coins TEXT NOT NULL,
+            status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'completed', 'failed')),
+            position INTEGER,
+            result TEXT,
+            error TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
     
@@ -36,13 +67,20 @@ def init_db():
             is_favorite BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             date_str TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
     
-    # Create default admin if not exists
-    import hashlib
-    admin_hash = hashlib.sha256('admin123'.encode()).hexdigest()
+    # Create indices
+    c.execute('CREATE INDEX IF NOT EXISTS idx_history_user_id ON history(user_id)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_history_date ON history(date_str)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_queue_status ON request_queue(status)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_queue_user ON request_queue(user_id)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_apikeys_user ON api_keys(user_id)')
+    
+    # Create default admin if not exists (password: admin123)
+    import bcrypt
+    admin_hash = bcrypt.hashpw('admin123'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     c.execute('INSERT OR IGNORE INTO users (id, username, password_hash, role) VALUES (1, ?, ?, ?)',
               ('admin', admin_hash, 'admin'))
     
