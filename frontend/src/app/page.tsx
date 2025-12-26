@@ -4,16 +4,14 @@ import { useState, useCallback, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { api } from '@/lib/api';
 import { performDivination } from '@/lib/divination';
-import { ToolStatus, HistoryItem } from '@/types';
+import { ToolStatus } from '@/types';
 
 import { AuthForm } from '@/components/AuthForm';
 import { Header } from '@/components/Header';
 import { DivinationGuidance } from '@/components/DivinationGuidance';
 import { CoinTossing } from '@/components/CoinTossing';
 import { DivinationResult } from '@/components/DivinationResult';
-import { HistoryModal } from '@/components/HistoryModal';
 import { TutorialModal } from '@/components/TutorialModal';
-import { SettingsModal } from '@/components/SettingsModal';
 import { toast } from 'sonner';
 
 type AppMode = 'input' | 'tossing' | 'result';
@@ -31,9 +29,7 @@ export default function Home() {
   } | null>(null);
 
   // Modal state
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [tutorialSeen, setTutorialSeen] = useState(false);
 
   // Check if user has seen tutorial
@@ -93,19 +89,6 @@ export default function Home() {
     setResultData(null);
   };
 
-  const handleSelectHistory = (item: HistoryItem) => {
-    setCurrentQuestion(item.question);
-    setResultData({
-      result: item.interpretation,
-      toolStatus: {
-        get_divination_tool: 'success',
-        get_current_time: 'success',
-      },
-    });
-    setMode('result');
-    setHistoryOpen(false);
-  };
-
   // Loading state
   if (isLoading) {
     return (
@@ -132,9 +115,7 @@ export default function Home() {
 
       {/* Header */}
       <Header
-        onOpenHistory={() => setHistoryOpen(true)}
         onOpenTutorial={() => setTutorialOpen(true)}
-        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* Main Content */}
@@ -169,21 +150,10 @@ export default function Home() {
       )}
 
       {/* Modals */}
-      <HistoryModal
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        onSelectHistory={handleSelectHistory}
-      />
-
       <TutorialModal
         open={tutorialOpen}
         onClose={handleTutorialClose}
         mustRead={!tutorialSeen}
-      />
-
-      <SettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
       />
     </div>
   );

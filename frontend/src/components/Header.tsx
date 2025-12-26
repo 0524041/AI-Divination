@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,13 +13,11 @@ import {
 import { User, History, BookOpen, Settings, LogOut, Users } from 'lucide-react';
 
 interface HeaderProps {
-  onOpenHistory: () => void;
   onOpenTutorial: () => void;
-  onOpenSettings: () => void;
-  onOpenAdmin?: () => void;
 }
 
-export function Header({ onOpenHistory, onOpenTutorial, onOpenSettings, onOpenAdmin }: HeaderProps) {
+export function Header({ onOpenTutorial }: HeaderProps) {
+  const router = useRouter();
   const { user, logout } = useApp();
 
   const handleLogout = async () => {
@@ -48,7 +47,7 @@ export function Header({ onOpenHistory, onOpenTutorial, onOpenSettings, onOpenAd
                 variant="ghost"
                 size="sm"
                 className="text-muted-foreground hover:text-[var(--gold)] hover:bg-[var(--gold)]/10"
-                onClick={onOpenHistory}
+                onClick={() => router.push('/history')}
               >
                 <History className="w-4 h-4 mr-2" />
                 歷史
@@ -68,7 +67,7 @@ export function Header({ onOpenHistory, onOpenTutorial, onOpenSettings, onOpenAd
                 variant="ghost"
                 size="sm"
                 className="text-muted-foreground hover:text-[var(--gold)] hover:bg-[var(--gold)]/10"
-                onClick={onOpenSettings}
+                onClick={() => router.push('/settings')}
               >
                 <Settings className="w-4 h-4 mr-2" />
                 設定
@@ -86,9 +85,9 @@ export function Header({ onOpenHistory, onOpenTutorial, onOpenSettings, onOpenAd
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  {user.role === 'admin' && onOpenAdmin && (
+                  {user.role === 'admin' && (
                     <>
-                      <DropdownMenuItem onClick={onOpenAdmin}>
+                      <DropdownMenuItem onClick={() => router.push('/admin')}>
                         <Users className="w-4 h-4 mr-2" />
                         用戶管理
                       </DropdownMenuItem>

@@ -12,10 +12,30 @@ import { X, Copy, Star, ChevronDown, Brain } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState } from 'react';
 
-// 配置 marked
-marked.setOptions({
+// 配置 marked - 同步渲染
+const renderer = new marked.Renderer();
+
+// 自訂標題渲染
+renderer.heading = ({ text, depth }: { text: string; depth: number }) => {
+  const tag = `h${depth}`;
+  return `<${tag}>${text}</${tag}>\n`;
+};
+
+// 自訂段落渲染
+renderer.paragraph = ({ text }: { text: string }) => {
+  return `<p>${text}</p>\n`;
+};
+
+// 自訂列表項渲染
+renderer.listitem = ({ text }: { text: string }) => {
+  return `<li>${text}</li>\n`;
+};
+
+marked.use({
+  renderer,
   breaks: true,
   gfm: true,
+  async: false,
 });
 
 interface DivinationResultProps {
@@ -64,7 +84,8 @@ export function DivinationResult({ question, result, toolStatus, onClose }: Divi
   // 將 Markdown 轉換為 HTML (使用 DOMPurify 清理)
   const htmlContent = useMemo(() => {
     if (structuredData) return '';
-    const rawHtml = marked.parse(mainContent) as string;
+    // 使用同步版本的 parse
+    const rawHtml = marked.parse(mainContent, { async: false }) as string;
     // 在瀏覽器環境使用 DOMPurify
     if (typeof window !== 'undefined') {
       return DOMPurify.sanitize(rawHtml);
@@ -85,8 +106,8 @@ export function DivinationResult({ question, result, toolStatus, onClose }: Divi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-      <Card className="glass-panel w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80">
+      <Card className="glass-panel w-full max-w-[95vw] lg:max-w-5xl xl:max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
         <CardHeader className="flex-shrink-0 border-b border-border/50 px-4 sm:px-6">
           <div className="flex items-center justify-between gap-2">
