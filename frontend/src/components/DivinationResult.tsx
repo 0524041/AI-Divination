@@ -41,21 +41,21 @@ export function DivinationResult({ question, result, toolStatus, aiModel, onClos
   useEffect(() => {
     const renderMarkdown = async () => {
       if (typeof window === 'undefined') return;
-      
+
       const { marked } = await import('marked');
       const DOMPurify = (await import('dompurify')).default;
-      
+
       // 配置 marked
       marked.setOptions({
         breaks: true,
         gfm: true,
       });
-      
+
       const rawHtml = await marked.parse(mainContent);
       const cleanHtml = DOMPurify.sanitize(rawHtml);
       setHtmlContent(cleanHtml);
     };
-    
+
     renderMarkdown();
   }, [mainContent]);
 
@@ -128,10 +128,23 @@ export function DivinationResult({ question, result, toolStatus, aiModel, onClos
           )}
 
           {/* Main Content - Rendered Markdown */}
-          <div 
-            className="result-content"
-            dangerouslySetInnerHTML={{ __html: htmlContent }}
-          />
+          {mainContent ? (
+            <div
+              className="result-content"
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+              <div className="animate-spin text-[var(--gold)]">
+                <Brain className="w-12 h-12" />
+              </div>
+              <p className="text-xl text-foreground font-medium">大師正在閉目沉思，調閱天機...</p>
+              <p className="text-base text-muted-foreground max-w-md">
+                由於高級思考模式運算較慢，且系統為確保結果準確正在全力運算中。
+                您可以現在關閉此視窗，解卦完成後會自動存入<strong>歷史紀錄</strong>。
+              </p>
+            </div>
+          )}
         </CardContent>
 
         {/* Footer */}

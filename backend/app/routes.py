@@ -263,26 +263,53 @@ def register_routes(app):
         
         print(f"[Routes] About to call AI, provider='{ai_provider}'")
         
-        try:
-            interpretation, ai_model = call_ai(
-                prompt=full_payload,
-                provider=ai_provider,
-                user_gemini_key=user_gemini_key
-            )
-            
-            # Save History with AI model
-            history_id = add_history(question, {"raw": divination_result_str}, interpretation, user_id, ai_model, gender, target)
-            
-            return jsonify({
-                "id": history_id,
-                "result": interpretation,
-                "tool_status": tool_status,
-                "ai_model": ai_model
-            })
+        # 1. 立即保存初步歷史紀錄（無解卦結果）
+        history_id = add_history(
+            question=question, 
+            result_json={"raw": divination_result_str}, 
+            interpretation="",  # 初始為空，表示處理中
+            user_id=user_id, 
+            ai_model="processing...", 
+            gender=gender, 
+            target=target
+        )
 
-        except Exception as e:
-            print(f"AI Error: {e}")
-            return jsonify({"error": str(e)}), 500
+        # 2. 定義背景任務函數
+        def run_ai_background(h_id, payload, provider, gemini_key):
+            try:
+                print(f"[Background] AI Thread starting for History ID: {h_id}")
+                content, used_model = call_ai(
+                    prompt=payload,
+                    provider=provider,
+                    user_gemini_key=gemini_key
+                )
+                
+                # 更新資料庫
+                from .core.database import update_history_interpretation
+                update_history_interpretation(h_id, content, used_model)
+                print(f"[Background] AI Thread completed for History ID: {h_id}")
+            except Exception as e:
+                print(f"[Background] AI Thread error: {e}")
+                from .core.database import update_history_interpretation
+                update_history_interpretation(h_id, f"解卦出錯: {str(e)}", "error")
+
+        # 3. 啟動背景執行緒 (並傳入必要參數)
+        import threading
+        thread = threading.Thread(
+            target=run_ai_background, 
+            args=(history_id, full_payload, ai_provider, user_gemini_key)
+        )
+        thread.daemon = True # 設為守護執行緒
+        thread.start()
+
+        # 4. 立即回傳
+        return jsonify({
+            "id": history_id,
+            "result": None, # 代表正在處理中
+            "tool_status": tool_status,
+            "ai_model": "processing...",
+            "status": "processing"
+        })
 
     @app.route('/api/history', methods=['GET'])
     @login_required

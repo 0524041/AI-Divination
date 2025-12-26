@@ -152,7 +152,7 @@ fi
 
 # 啟動前端
 echo -e "${BLUE}🚀 啟動前端服務 (Port 3000)...${NC}"
-(cd "$SCRIPT_DIR/frontend" && npm run dev) &
+(cd "$SCRIPT_DIR/frontend" && npx next dev -H 0.0.0.0) &
 FRONTEND_PID=$!
 echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
 echo -e "${GREEN}   ✓ 前端已啟動 (PID: $FRONTEND_PID)${NC}"

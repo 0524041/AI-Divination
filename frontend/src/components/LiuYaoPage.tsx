@@ -58,16 +58,16 @@ export function LiuYaoPage() {
     toolStatus: ToolStatus;
     aiModel?: string;
   } | null>(null);
-  
+
   // 動畫佔位符
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [displayedPlaceholder, setDisplayedPlaceholder] = useState('');
   const [isTyping, setIsTyping] = useState(true);
-  
+
   // Modal states
   const [showHowTo, setShowHowTo] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
-  
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // 打字動畫效果
@@ -116,7 +116,7 @@ export function LiuYaoPage() {
       toast.error('請輸入您想問的問題');
       return;
     }
-    
+
     // 生成六爻結果
     const newCoins = performDivination();
     setCoins(newCoins);
@@ -126,7 +126,7 @@ export function LiuYaoPage() {
   const handleTossingComplete = useCallback(async () => {
     try {
       const apiKey = settings?.ai_provider === 'gemini' ? geminiApiKey || undefined : undefined;
-      
+
       const response = await api.divinate({
         question,
         coins,
@@ -135,11 +135,14 @@ export function LiuYaoPage() {
       }, apiKey);
 
       setResultData({
-        result: response.result,
+        result: response.result || '', # 如果正在處理中，result 為空
         toolStatus: response.tool_status,
         aiModel: response.ai_model,
       });
       setMode('result');
+      if (!response.result) {
+        toast.success('卦盤已生成！AI 正在後端努力解析中，您可以稍後在歷史紀錄查看完整結果。');
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '占卜失敗，請稍後再試');
       setMode('input');
@@ -220,11 +223,10 @@ export function LiuYaoPage() {
                   <button
                     key={option.id}
                     onClick={() => setGender(option.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
-                      gender === option.id
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${gender === option.id
                         ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
                         : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
-                    }`}
+                      }`}
                   >
                     <span className="text-xl">{option.icon}</span>
                     <span>{option.label}</span>
@@ -244,11 +246,10 @@ export function LiuYaoPage() {
                   <button
                     key={option.id}
                     onClick={() => setTarget(option.id)}
-                    className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                      target === option.id
+                    className={`px-4 py-2 rounded-lg border-2 transition-all ${target === option.id
                         ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)]'
                         : 'border-[var(--gold)]/30 hover:border-[var(--gold)]/50 text-foreground/70'
-                    }`}
+                      }`}
                   >
                     {option.label}
                   </button>
@@ -276,7 +277,7 @@ export function LiuYaoPage() {
               開始占卜
             </Button>
           </div>
-          
+
           <p className="text-base text-foreground/60 mt-3 text-center">
             按 Enter 開始占卜，Shift + Enter 換行
           </p>
@@ -319,7 +320,7 @@ export function LiuYaoPage() {
                 <li>• <strong>不問重複</strong>：同一件事不要反覆占卜</li>
               </ul>
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold text-[var(--gold)] mb-2">✅ 好的問法</h3>
               <ul className="space-y-1 text-muted-foreground">
@@ -328,7 +329,7 @@ export function LiuYaoPage() {
                 <li>• 「與某人合作是否順利？」</li>
               </ul>
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold text-[var(--gold)] mb-2">❌ 不當問法</h3>
               <ul className="space-y-1 text-muted-foreground">
@@ -337,7 +338,7 @@ export function LiuYaoPage() {
                 <li>• 「我應該選A還是B？」（太模糊）</li>
               </ul>
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold text-[var(--gold)] mb-2">⏰ 占卜時機</h3>
               <p className="text-muted-foreground">
@@ -362,7 +363,7 @@ export function LiuYaoPage() {
                 得出六個爻位，組成一個卦象，再根據卦象解讀吉凶禍福。
               </p>
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold text-[var(--gold)] mb-2">🪙 起卦方式</h3>
               <p className="text-muted-foreground">
@@ -371,7 +372,7 @@ export function LiuYaoPage() {
                 本系統採用電腦模擬，原理相同。
               </p>
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold text-[var(--gold)] mb-2">📖 卦象結構</h3>
               <ul className="space-y-1 text-muted-foreground">
@@ -383,7 +384,7 @@ export function LiuYaoPage() {
                 <li>• <strong>六神</strong>：青龍、朱雀、勾陳、螣蛇、白虎、玄武</li>
               </ul>
             </section>
-            
+
             <section>
               <h3 className="text-lg font-semibold text-[var(--gold)] mb-2">🤖 AI 解卦</h3>
               <p className="text-muted-foreground">

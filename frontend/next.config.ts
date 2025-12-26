@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
     "127.0.0.1",
     "::1"
   ],
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8080/api/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

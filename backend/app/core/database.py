@@ -226,6 +226,17 @@ def toggle_favorite(history_id: int, is_favorite: bool) -> None:
     conn.close()
 
 
+def update_history_interpretation(history_id: int, interpretation: str, ai_model: str) -> None:
+    """更新歷史記錄的解卦結果"""
+    conn = get_db_connection()
+    conn.execute(
+        'UPDATE history SET interpretation = ?, ai_model = ? WHERE id = ?',
+        (interpretation, ai_model, history_id)
+    )
+    conn.commit()
+    conn.close()
+
+
 def get_daily_usage_count(user_id: int) -> int:
     """取得用戶今日使用次數"""
     conn = get_db_connection()
