@@ -8,7 +8,10 @@ import {
   HistoryItem,
 } from '@/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined'
+    ? ''
+    : 'http://localhost:8080');
 
 class ApiClient {
   private async request<T>(
@@ -16,22 +19,27 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${API_BASE}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
 
-    const data = await response.json();
+    try {
+      const response = await fetch(url, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(data.error || 'Request failed');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Request failed');
+      }
+
+      return data;
+    } catch (error) {
+      throw error;
     }
-
-    return data;
   }
 
   // ========== 認證 API ==========

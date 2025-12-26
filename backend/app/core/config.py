@@ -39,15 +39,15 @@ class Config:
     # Flask 設定 - 使用持久化金鑰避免重啟後 session 失效
     SECRET_KEY = _get_or_create_key('SECRET_KEY', '.secret_key', 32)
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'  # 防止 CSRF
-    SESSION_COOKIE_SECURE = os.getenv('FLASK_ENV') == 'production'  # 生產環境啟用
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = False  # 如果是 HTTP 訪問 IP，必須為 False
     PERMANENT_SESSION_LIFETIME = 86400  # 24 hours
     
     # CORS 設定
-    CORS_ORIGINS = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000'
-    ]
+    # 當 supports_credentials=True 時，origins 不能為 "*"
+    # 使用的正則表達式允許所有來源（開發環境用）
+    import re
+    CORS_ORIGINS = re.compile(r"https?://.*")
     
     # 資料庫設定 (在專案根目錄)
     DATABASE_PATH = BASE_DIR / 'divination.db'
