@@ -13,17 +13,39 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
+    
+    # Users table (with default admin)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'user',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # History table (with user_id foreign key)
     c.execute('''
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER DEFAULT 1,
             question TEXT NOT NULL,
             result_json TEXT,
             interpretation TEXT,
             is_favorite BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            date_str TEXT NOT NULL
+            date_str TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
+    
+    # Create default admin if not exists
+    import hashlib
+    admin_hash = hashlib.sha256('admin123'.encode()).hexdigest()
+    c.execute('INSERT OR IGNORE INTO users (id, username, password_hash, role) VALUES (1, ?, ?, ?)',
+              ('admin', admin_hash, 'admin'))
+    
     conn.commit()
     conn.close()
 
