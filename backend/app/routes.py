@@ -328,11 +328,11 @@ def register_routes(app):
         return jsonify({"success": True})
 
     @app.route('/api/settings', methods=['GET', 'POST'])
-    @login_required
     def handle_settings():
         default_prompt = get_system_prompt()
         
         if request.method == 'GET':
+            # GET 不需要登入，公開訪問（首頁需要顯示當前 AI 模型）
             return jsonify({
                 "daily_limit": get_setting('daily_limit', '5'),
                 "system_prompt": get_setting('system_prompt', default_prompt),
@@ -342,7 +342,10 @@ def register_routes(app):
                 "local_model_name": get_setting('local_model_name', 'qwen/qwen3-8b')
             })
         else:
-            # POST 需要管理員權限
+            # POST 需要登入且為管理員
+            if 'user_id' not in session:
+                return jsonify({"error": "Authentication required"}), 401
+            
             if session.get('role') != 'admin':
                 return jsonify({"error": "Admin access required"}), 403
             
