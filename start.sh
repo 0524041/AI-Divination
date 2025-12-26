@@ -85,21 +85,61 @@ if ! command -v uv &> /dev/null; then
     echo -e "${RED}❌ 未找到 uv，請先安裝: curl -LsSf https://astral.sh/uv/install.sh | sh${NC}"
     exit 1
 fi
+echo -e "${GREEN}   ✓ uv 已安裝${NC}"
 
 # 檢查 Node.js
 if ! command -v npm &> /dev/null; then
     echo -e "${RED}❌ 未找到 npm，請先安裝 Node.js${NC}"
     exit 1
 fi
+echo -e "${GREEN}   ✓ npm 已安裝${NC}"
 
-echo -e "${GREEN}✅ 環境檢查通過${NC}"
 echo ""
 
-# 安裝前端依賴（如果需要）
-if [ ! -d "frontend/node_modules" ]; then
-    echo -e "${BLUE}📦 安裝前端依賴...${NC}"
-    cd frontend && npm install && cd ..
+# ====== Python 環境設置 ======
+echo -e "${BLUE}🐍 設置 Python 環境...${NC}"
+
+# 使用 uv sync 確保虛擬環境和依賴正確
+if [ -f "pyproject.toml" ]; then
+    echo -e "   → 同步 Python 依賴..."
+    uv sync --quiet
+    echo -e "${GREEN}   ✓ Python 依賴已同步${NC}"
 fi
+
+# ====== 資料庫初始化 ======
+echo -e "${BLUE}🗄️  檢查資料庫...${NC}"
+
+# 執行資料庫遷移（如果 users 表不存在）
+if [ -f "divination.db" ]; then
+    # 檢查 users 表是否存在
+    USER_TABLE_EXISTS=$(sqlite3 divination.db "SELECT name FROM sqlite_master WHERE type='table' AND name='users';" 2>/dev/null || echo "")
+    if [ -z "$USER_TABLE_EXISTS" ]; then
+        echo -e "   → 執行資料庫遷移..."
+        if [ -f "migrations/001_add_users.sql" ]; then
+            sqlite3 divination.db < migrations/001_add_users.sql
+            echo -e "${GREEN}   ✓ 資料庫遷移完成${NC}"
+        fi
+    else
+        echo -e "${GREEN}   ✓ 資料庫結構正常${NC}"
+    fi
+else
+    echo -e "   → 資料庫將在首次啟動時創建"
+fi
+
+# ====== 前端依賴 ======
+echo -e "${BLUE}📦 檢查前端依賴...${NC}"
+
+if [ ! -d "frontend/node_modules" ]; then
+    echo -e "   → 安裝前端依賴 (首次可能需要較長時間)..."
+    cd frontend && npm install --silent && cd ..
+    echo -e "${GREEN}   ✓ 前端依賴安裝完成${NC}"
+else
+    echo -e "${GREEN}   ✓ 前端依賴已存在${NC}"
+fi
+
+echo ""
+echo -e "${GREEN}✅ 環境檢查全部通過${NC}"
+echo ""
 
 # 啟動後端
 echo -e "${BLUE}🚀 啟動後端服務 (Port 8080)...${NC}"

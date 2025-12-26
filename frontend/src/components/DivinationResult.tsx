@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +11,12 @@ import { ToolStatus, StructuredResult } from '@/types';
 import { X, Copy, Star, ChevronDown, Brain } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState } from 'react';
+
+// 配置 marked
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
 
 interface DivinationResultProps {
   question: string;
@@ -54,10 +61,15 @@ export function DivinationResult({ question, result, toolStatus, onClose }: Divi
     return { thinkContent: think, mainContent: main, structuredData: structured };
   }, [result]);
 
-  // 將 Markdown 轉換為 HTML
+  // 將 Markdown 轉換為 HTML (使用 DOMPurify 清理)
   const htmlContent = useMemo(() => {
     if (structuredData) return '';
-    return marked(mainContent);
+    const rawHtml = marked.parse(mainContent) as string;
+    // 在瀏覽器環境使用 DOMPurify
+    if (typeof window !== 'undefined') {
+      return DOMPurify.sanitize(rawHtml);
+    }
+    return rawHtml;
   }, [mainContent, structuredData]);
 
   const handleCopy = async () => {
@@ -76,25 +88,25 @@ export function DivinationResult({ question, result, toolStatus, onClose }: Divi
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
       <Card className="glass-panel w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <CardHeader className="flex-shrink-0 border-b border-border/50">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-[var(--gold)]">
-              <Star className="w-5 h-5" />
+        <CardHeader className="flex-shrink-0 border-b border-border/50 px-4 sm:px-6">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-[var(--gold)] text-base sm:text-lg">
+              <Star className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
               卦象解析
             </CardTitle>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {/* Status indicators */}
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                 <div className="flex items-center gap-1">
                   <div className={`status-dot ${toolStatus.get_divination_tool === 'success' ? 'success' : toolStatus.get_divination_tool === 'error' ? 'error' : ''}`} />
-                  <span className="text-muted-foreground">排盤</span>
+                  <span className="text-muted-foreground hidden sm:inline">排盤</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className={`status-dot ${toolStatus.get_current_time === 'success' ? 'success' : toolStatus.get_current_time === 'error' ? 'error' : ''}`} />
-                  <span className="text-muted-foreground">天時</span>
+                  <span className="text-muted-foreground hidden sm:inline">天時</span>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={onClose}>
+              <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0">
                 <X className="w-5 h-5" />
               </Button>
             </div>
@@ -186,7 +198,7 @@ export function DivinationResult({ question, result, toolStatus, onClose }: Divi
           ) : (
             /* Markdown Content */
             <div
-              className="markdown-content prose prose-invert max-w-none"
+              className="markdown-content"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
           )}

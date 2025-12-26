@@ -428,22 +428,36 @@ def divinate():
     # 4. Call AI (Switch Logic)
     ai_provider = get_setting('ai_provider', 'local')  # 默認使用 local
     
+    # 取得使用者提供的 Gemini API Key (從 header)
+    user_gemini_key = request.headers.get('X-Gemini-Api-Key')
+    
     try:
-        if ai_provider == 'gemini' and client:
-            config = types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_level="high")
-            )
-            # Use models.generate_content instead of chat
-            response = retry_gemini_call(
-                client.models.generate_content, 
-                model=MODEL_ID, 
-                contents=[full_payload],
-                config=config
-            )
-            interpretation = response.text
+        if ai_provider == 'gemini':
+            # 使用者需要提供自己的 API Key
+            if not user_gemini_key:
+                return jsonify({"error": "使用 Gemini 需要提供 API Key，請在設定中填入您的 API Key"}), 400
+            
+            # 使用使用者的 API Key 創建臨時 client
+            try:
+                user_client = genai.Client(api_key=user_gemini_key)
+                config = types.GenerateContentConfig(
+                    thinking_config=types.ThinkingConfig(thinking_level="high")
+                )
+                response = retry_gemini_call(
+                    user_client.models.generate_content, 
+                    model=MODEL_ID, 
+                    contents=[full_payload],
+                    config=config
+                )
+                interpretation = response.text
+            except Exception as e:
+                error_msg = str(e)
+                if "API key" in error_msg or "401" in error_msg or "403" in error_msg:
+                    return jsonify({"error": "Gemini API Key 無效，請檢查您的 API Key"}), 401
+                raise e
         
         else:  # Default to local AI
-            local_url = get_setting('local_api_url', 'http://192.168.1.163:1234/v1')
+            local_url = get_setting('local_api_url', 'http://localhost:1234/v1')
             local_model = get_setting('local_model_name', 'qwen/qwen3-8b')
             print(f"Calling Local AI: {local_model} at {local_url}")
             interpretation = call_local_ai(full_payload, local_url, local_model)
@@ -506,7 +520,7 @@ def handle_settings():
             "system_prompt": get_setting('system_prompt', DEFAULT_PROMPT),
             "default_prompt": DEFAULT_PROMPT,
             "ai_provider": get_setting('ai_provider', 'gemini'),
-            "local_api_url": get_setting('local_api_url', 'http://192.168.1.163:1234/v1'),
+            "local_api_url": get_setting('local_api_url', 'http://localhost:1234/v1'),
             "local_model_name": get_setting('local_model_name', 'qwen/qwen3-8b')
         })
     else:

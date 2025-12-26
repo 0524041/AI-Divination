@@ -104,7 +104,7 @@ def init_settings():
     
     # New Settings for Local AI
     c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ai_provider', 'local'))
-    c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_api_url', 'http://192.168.1.163:1234/v1'))
+    c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_api_url', 'http://localhost:1234/v1'))
     c.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_model_name', 'qwen/qwen3-8b'))
     
     conn.commit()

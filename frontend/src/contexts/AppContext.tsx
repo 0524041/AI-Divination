@@ -9,6 +9,7 @@ interface AppState {
   isLoading: boolean;
   settings: Settings | null;
   history: HistoryItem[];
+  geminiApiKey: string | null;  // 儲存在 localStorage
 }
 
 interface AppContextType extends AppState {
@@ -19,6 +20,7 @@ interface AppContextType extends AppState {
   refreshSettings: () => Promise<void>;
   refreshHistory: (userId?: number | 'all') => Promise<void>;
   updateSettings: (settings: Partial<Settings>) => Promise<void>;
+  setGeminiApiKey: (key: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -29,7 +31,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isLoading: true,
     settings: null,
     history: [],
+    geminiApiKey: null,
   });
+
+  // 從 localStorage 讀取 Gemini API Key
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedKey = localStorage.getItem('gemini_api_key');
+      if (savedKey) {
+        setState((prev) => ({ ...prev, geminiApiKey: savedKey }));
+      }
+    }
+  }, []);
+
+  const setGeminiApiKey = useCallback((key: string | null) => {
+    if (typeof window !== 'undefined') {
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+      } else {
+        localStorage.removeItem('gemini_api_key');
+      }
+    }
+    setState((prev) => ({ ...prev, geminiApiKey: key }));
+  }, []);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -94,6 +118,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshSettings,
         refreshHistory,
         updateSettings,
+        setGeminiApiKey,
       }}
     >
       {children}

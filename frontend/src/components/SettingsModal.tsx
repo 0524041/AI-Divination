@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -22,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { User, Bot, Save } from 'lucide-react';
+import { User, Bot, Save, Key, AlertCircle } from 'lucide-react';
 
 interface SettingsModalProps {
   open: boolean;
@@ -30,10 +31,11 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
-  const { settings, updateSettings } = useApp();
+  const { settings, updateSettings, geminiApiKey, setGeminiApiKey } = useApp();
   const [localSettings, setLocalSettings] = useState<Partial<Settings>>({});
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [localGeminiKey, setLocalGeminiKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -42,10 +44,24 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
     }
   }, [settings]);
 
+  // 載入已儲存的 Gemini Key (顯示遮蔽版本)
+  useEffect(() => {
+    if (geminiApiKey) {
+      // 顯示遮蔽的 key
+      setLocalGeminiKey('••••••••••••' + geminiApiKey.slice(-4));
+    }
+  }, [geminiApiKey]);
+
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
       await updateSettings(localSettings);
+      
+      // 如果使用者輸入了新的 Gemini API Key (非遮蔽版本)
+      if (localGeminiKey && !localGeminiKey.startsWith('••••')) {
+        setGeminiApiKey(localGeminiKey);
+      }
+      
       toast.success('設定已儲存');
     } catch (error) {
       toast.error('儲存失敗');
@@ -154,6 +170,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                       placeholder="http://localhost:1234/v1"
                       className="input-mystical mt-1"
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      支援 LM Studio、Ollama 等 OpenAI 相容 API
+                    </p>
                   </div>
                   <div>
                     <Label>Model Name</Label>
@@ -165,6 +184,40 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
                     />
                   </div>
                 </>
+              )}
+
+              {localSettings.ai_provider === 'gemini' && (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-200">
+                      使用 Gemini 需要提供您自己的 API Key。
+                      請前往 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-[var(--gold)] underline">Google AI Studio</a> 免費取得。
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      <Key className="w-4 h-4" />
+                      Gemini API Key
+                    </Label>
+                    <Input
+                      type="password"
+                      value={localGeminiKey}
+                      onChange={(e) => setLocalGeminiKey(e.target.value)}
+                      placeholder="AIza..."
+                      className="input-mystical mt-1"
+                      onFocus={() => {
+                        // 清除遮蔽版本，讓用戶可以輸入新 key
+                        if (localGeminiKey.startsWith('••••')) {
+                          setLocalGeminiKey('');
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      API Key 僅儲存於您的瀏覽器 (localStorage)，不會上傳到伺服器
+                    </p>
+                  </div>
+                </div>
               )}
 
               <div>

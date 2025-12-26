@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 type AppMode = 'input' | 'tossing' | 'result';
 
 export default function Home() {
-  const { user, isLoading } = useApp();
+  const { user, isLoading, settings, geminiApiKey } = useApp();
 
   // App state
   const [mode, setMode] = useState<AppMode>('input');
@@ -67,10 +67,13 @@ export default function Home() {
 
   const handleTossingComplete = useCallback(async () => {
     try {
+      // 如果使用 Gemini 且有 API Key，傳遞給後端
+      const apiKey = settings?.ai_provider === 'gemini' ? geminiApiKey || undefined : undefined;
+      
       const response = await api.divinate({
         question: currentQuestion,
         coins: currentCoins,
-      });
+      }, apiKey);
 
       setResultData({
         result: response.result,
@@ -81,7 +84,7 @@ export default function Home() {
       toast.error(error instanceof Error ? error.message : '占卜失敗，請稍後再試');
       setMode('input');
     }
-  }, [currentQuestion, currentCoins]);
+  }, [currentQuestion, currentCoins, settings?.ai_provider, geminiApiKey]);
 
   const handleCloseResult = () => {
     setMode('input');

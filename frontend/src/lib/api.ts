@@ -79,10 +79,15 @@ class ApiClient {
   }
 
   // ========== 占卜 API ==========
-  async divinate(data: DivinationRequest): Promise<DivinationResponse> {
+  async divinate(data: DivinationRequest, geminiApiKey?: string): Promise<DivinationResponse> {
+    const headers: Record<string, string> = {};
+    if (geminiApiKey) {
+      headers['X-Gemini-Api-Key'] = geminiApiKey;
+    }
     return this.request('/api/divinate', {
       method: 'POST',
       body: JSON.stringify(data),
+      headers,
     });
   }
 

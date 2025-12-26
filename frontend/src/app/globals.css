@@ -132,9 +132,9 @@
   75% { transform: translate(40px, 10px) scale(1.02); }
 }
 
-/* 玻璃擬態效果 */
+/* 玻璃擬態效果 - 結果視窗自適應 */
 .glass-panel {
-  background: rgba(20, 20, 30, 0.7);
+  background: rgba(20, 20, 30, 0.85);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 16px;
@@ -152,13 +152,21 @@
   animation: coin-flip 0.6s ease-in-out;
 }
 
-/* Markdown 內容樣式 */
+/* Markdown 內容樣式 - 自適應寬度，無橫向滾動 */
+.markdown-content {
+  max-width: 100%;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
 .markdown-content h1,
 .markdown-content h2,
 .markdown-content h3 {
   color: var(--gold);
   margin-top: 1.5em;
   margin-bottom: 0.5em;
+  word-break: break-word;
 }
 
 .markdown-content h1 { font-size: 1.5rem; }
@@ -168,16 +176,19 @@
 .markdown-content p {
   margin-bottom: 1em;
   line-height: 1.8;
+  word-break: break-word;
 }
 
 .markdown-content ul,
 .markdown-content ol {
   margin-left: 1.5em;
   margin-bottom: 1em;
+  padding-left: 0;
 }
 
 .markdown-content li {
   margin-bottom: 0.5em;
+  word-break: break-word;
 }
 
 .markdown-content strong {
@@ -190,6 +201,34 @@
   margin: 1em 0;
   color: var(--muted-foreground);
   font-style: italic;
+  word-break: break-word;
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid rgba(212, 175, 55, 0.3);
+  margin: 1.5em 0;
+}
+
+.markdown-content code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
+.markdown-content pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.markdown-content pre code {
+  background: none;
+  padding: 0;
 }
 
 /* 金色按鈕樣式 */
@@ -243,4 +282,35 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* 自定義滾動條 - 深色主題風格 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.5);
+}
+
+/* Firefox 滾動條 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.3) rgba(255, 255, 255, 0.05);
+}
+
+/* 隱藏水平滾動條 */
+.overflow-y-auto {
+  overflow-x: hidden;
 }
