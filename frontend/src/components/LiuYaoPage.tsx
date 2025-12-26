@@ -163,9 +163,9 @@ export function LiuYaoPage() {
       {/* Title */}
       <div className="text-center mb-8">
         <h1 className="text-4xl lg:text-5xl font-bold text-[var(--gold)] mb-3">六爻占卜</h1>
-        <p className="text-lg text-muted-foreground">誠心問卦，洞察天機</p>
+        <p className="text-xl text-foreground/80">誠心問卦，洞察天機</p>
         {/* Current AI Model */}
-        <div className="flex items-center justify-center gap-2 mt-3 text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 mt-3 text-base text-foreground/70">
           <Bot className="w-4 h-4" />
           <span>AI 模型：</span>
           <span className="text-[var(--gold)]">
@@ -184,7 +184,7 @@ export function LiuYaoPage() {
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={displayedPlaceholder}
-              className="w-full h-32 bg-transparent border-2 border-[var(--gold)]/30 rounded-xl p-4 text-lg resize-none focus:outline-none focus:border-[var(--gold)] transition-colors placeholder:text-muted-foreground/50"
+              className="w-full h-32 bg-transparent border-2 border-[var(--gold)]/30 rounded-xl p-4 text-lg resize-none focus:outline-none focus:border-[var(--gold)] transition-colors placeholder:text-foreground/40"
             />
             <Button
               onClick={handleSubmit}
@@ -196,7 +196,7 @@ export function LiuYaoPage() {
             </Button>
           </div>
           
-          <p className="text-sm text-muted-foreground mt-3 text-center">
+          <p className="text-base text-foreground/60 mt-3 text-center">
             按 Enter 開始占卜，Shift + Enter 換行
           </p>
         </CardContent>
@@ -207,7 +207,7 @@ export function LiuYaoPage() {
         <Button
           variant="ghost"
           onClick={() => setShowHowTo(true)}
-          className="text-muted-foreground hover:text-[var(--gold)]"
+          className="text-foreground/70 hover:text-[var(--gold)]"
         >
           <HelpCircle className="w-5 h-5 mr-2" />
           如何問卦？
@@ -215,7 +215,7 @@ export function LiuYaoPage() {
         <Button
           variant="ghost"
           onClick={() => setShowAbout(true)}
-          className="text-muted-foreground hover:text-[var(--gold)]"
+          className="text-foreground/70 hover:text-[var(--gold)]"
         >
           <BookOpen className="w-5 h-5 mr-2" />
           什麼是六爻？
