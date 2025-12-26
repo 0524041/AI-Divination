@@ -261,6 +261,13 @@ class LiuYaoChart:
         # 為每爻添加詳細信息
         gong_dizhi = GONG_DIZHI.get(self.gong, GONG_DIZHI['乾'])
         
+        # 如果有變卦，也要準備變卦的地支
+        if has_change and self.biangua_name:
+            # 變卦的卦宮（以變卦下卦為主）
+            bian_gong = self.bian_lower_gua
+            bian_gong_dizhi = GONG_DIZHI.get(bian_gong, GONG_DIZHI['乾'])
+            bian_gong_wuxing = BAGUA[bian_gong]['wuxing']
+        
         for i, yao in enumerate(self.yaos):
             pos = i + 1  # 爻位 1-6
             
@@ -287,15 +294,25 @@ class LiuYaoChart:
             # 空亡標記
             yao['is_kong'] = yao['zhi'] in self.kongwang
             
-            # 變爻信息
+            # 變爻信息 - 使用變卦的地支和五行
             if yao['is_moving'] and self.biangua_name:
                 changed_yao = changed_yaos[i]
-                # 變爻的地支和六親 (簡化處理)
+                
+                # 變爻的地支（從變卦取）
+                variant_zhi = bian_gong_dizhi[i] if i < len(bian_gong_dizhi) else '子'
+                
+                # 變爻的五行
+                variant_zhi_idx = DIZHI.index(variant_zhi)
+                variant_wuxing = DIZHI_WUXING[variant_zhi_idx]
+                
+                # 變爻的六親（相對於變卦卦宮）
+                variant_liuqin = get_liuqin(bian_gong_wuxing, variant_wuxing)
+                
                 yao['variant'] = {
                     'is_yang': changed_yao['is_yang'],
-                    'zhi': yao['zhi'],  # 變爻地支通常需要更複雜計算，這裡簡化
-                    'wuxing': yao['wuxing'],
-                    'liuqin': yao['liuqin']
+                    'zhi': variant_zhi,
+                    'wuxing': variant_wuxing,
+                    'liuqin': variant_liuqin
                 }
     
     def get_shensha(self) -> List[Dict[str, Any]]:
