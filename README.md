@@ -2,7 +2,7 @@
 
 **AI Divination App** - 結合現代 AI 技術與傳統六爻占卜的智慧算卦系統
 
-![Home Page Screenshot](homepage_screenshot.png)
+![Home Page Screenshot](img/homepage_screenshot.png)
 
 ## ✨ V2.0 重大更新
 
