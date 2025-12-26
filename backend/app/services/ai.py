@@ -215,7 +215,17 @@ def call_local_ai(prompt: str, api_url: str, model_name: str) -> str:
             return content
     except urllib.error.URLError as e:
         print(f"[Local AI] URLError: {e}")
-        raise Exception(f"Local AI Error: 無法連線到 {url} - {e.reason}")
+        if hasattr(e, 'reason'):
+            if 'timed out' in str(e.reason).lower():
+                raise Exception(f"Local AI Error: 連線逾時 (超過 5 分鐘)，請檢查本地 AI 服務是否正常運作")
+            raise Exception(f"Local AI Error: 無法連線到 {url} - {e.reason}")
+        raise Exception(f"Local AI Error: {e}")
+    except json.JSONDecodeError as e:
+        print(f"[Local AI] JSON Decode Error: {e}")
+        raise Exception(f"Local AI Error: 無法解析回應 JSON - {e}")
+    except KeyError as e:
+        print(f"[Local AI] Response format error: missing key {e}")
+        raise Exception(f"Local AI Error: 回應格式錯誤，缺少欄位 {e}")
     except Exception as e:
         print(f"[Local AI] Error: {e}")
         raise Exception(f"Local AI Error: {e}")
