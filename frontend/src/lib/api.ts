@@ -10,13 +10,9 @@ import {
 
 export const getBackendUrl = () => {
   if (typeof window === 'undefined') {
-    return 'http://localhost:8080';
+    return 'http://127.0.0.1:8080';
   }
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:8080';
-  }
-  return `http://${hostname}:8080`;
+  return `http://${window.location.hostname}:8080`;
 };
 
 const API_BASE = getBackendUrl();

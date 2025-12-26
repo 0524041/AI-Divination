@@ -144,7 +144,7 @@ def _init_default_settings(cursor):
     
     # Settings for Local AI
     cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('ai_provider', 'local'))
-    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_api_url', 'http://localhost:1234/v1'))
+    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_api_url', 'http://127.0.0.1:1234/v1'))
     cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('local_model_name', 'qwen/qwen3-8b'))
 
 
