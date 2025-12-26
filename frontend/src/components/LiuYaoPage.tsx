@@ -54,10 +54,28 @@ export function LiuYaoPage() {
   const [target, setTarget] = useState<'自己' | '父母' | '朋友' | '他人' | ''>('');
   const [coins, setCoins] = useState<number[]>([]);
   const [resultData, setResultData] = useState<{
+    id: number;
     result: string;
     toolStatus: ToolStatus;
     aiModel?: string;
   } | null>(null);
+
+  const [userProvider, setUserProvider] = useState<'local' | 'gemini' | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('preferred_ai_provider');
+    if (saved === 'local' || saved === 'gemini') {
+      setUserProvider(saved);
+    }
+  }, []);
+
+  const activeProvider = userProvider || settings?.ai_provider || 'local';
+
+  const toggleProvider = (p: 'local' | 'gemini') => {
+    setUserProvider(p);
+    localStorage.setItem('preferred_ai_provider', p);
+    toast.info(`已切換至 ${p === 'gemini' ? 'Gemini' : 'Local AI'}`);
+  };
 
   // 動畫佔位符
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -132,9 +150,11 @@ export function LiuYaoPage() {
         coins,
         gender: gender || undefined,
         target: target || undefined,
+        provider: activeProvider,
       }, apiKey);
 
       setResultData({
+        id: response.id,
         result: response.result || '', // 如果正在處理中，result 為空
         toolStatus: response.tool_status,
         aiModel: response.ai_model,
@@ -183,6 +203,7 @@ export function LiuYaoPage() {
     return (
       <DivinationResult
         question={question}
+        historyId={resultData.id}
         result={resultData.result}
         toolStatus={resultData.toolStatus}
         aiModel={resultData.aiModel}
@@ -197,13 +218,32 @@ export function LiuYaoPage() {
       <div className="text-center mb-8">
         <h1 className="text-4xl lg:text-5xl font-bold text-[var(--gold)] mb-3">六爻占卜</h1>
         <p className="text-xl text-foreground/80">誠心問卦，洞察天機</p>
-        {/* Current AI Model */}
-        <div className="flex items-center justify-center gap-2 mt-3 text-base text-foreground/70">
-          <Bot className="w-4 h-4" />
-          <span>AI 模型：</span>
-          <span className="text-[var(--gold)]">
-            {settings?.ai_provider === 'gemini' ? 'Gemini (gemini-3-flash-preview)' : settings?.local_model_name || 'Local AI'}
-          </span>
+        {/* AI Provider Switch */}
+        <div className="flex flex-col items-center gap-3 mt-4">
+          <div className="flex items-center gap-2 text-sm text-foreground/60">
+            <Bot className="w-4 h-4" />
+            <span>選擇解析 AI：</span>
+          </div>
+          <div className="flex bg-[var(--gold)]/5 p-1 rounded-full border border-[var(--gold)]/20">
+            <button
+              onClick={() => toggleProvider('local')}
+              className={`px-4 py-1.5 rounded-full text-sm transition-all ${activeProvider === 'local'
+                ? 'bg-[var(--gold)] text-black font-medium shadow-lg'
+                : 'text-foreground/60 hover:text-foreground'
+                }`}
+            >
+              Local AI ({settings?.local_model_name?.split('/').pop() || '本地'})
+            </button>
+            <button
+              onClick={() => toggleProvider('gemini')}
+              className={`px-4 py-1.5 rounded-full text-sm transition-all ${activeProvider === 'gemini'
+                ? 'bg-[var(--gold)] text-black font-medium shadow-lg'
+                : 'text-foreground/60 hover:text-foreground'
+                }`}
+            >
+              Gemini 3 Flash
+            </button>
+          </div>
         </div>
       </div>
 

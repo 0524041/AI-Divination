@@ -3,39 +3,68 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { api } from '@/lib/api';
 import { ToolStatus } from '@/types';
 import { X, Copy, ChevronDown, Brain, CheckCircle2, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DivinationResultProps {
   question: string;
+  historyId: number;
   result: string;
   toolStatus: ToolStatus;
   aiModel?: string;
   onClose: () => void;
 }
 
-export function DivinationResult({ question, result, toolStatus, aiModel, onClose }: DivinationResultProps) {
-  const [showThinking, setShowThinking] = useState(false);
+export function DivinationResult({ question, historyId, result, toolStatus, aiModel, onClose }: DivinationResultProps) {
+  const [showThinking, setShowThinking] = useState(true); // 預設展開思考過程
+  const [currentResult, setCurrentResult] = useState(result);
+  const [currentAiModel, setCurrentAiModel] = useState(aiModel);
   const [htmlContent, setHtmlContent] = useState('');
+  const [isPolling, setIsPolling] = useState(!result);
 
   // 解析結果，提取思考過程
   const { thinkContent, mainContent } = useMemo(() => {
     let think = '';
-    let main = result;
+    let main = currentResult;
+
+    if (!main) return { thinkContent: '', mainContent: '' };
 
     // 提取 <think> 標籤內容
-    const thinkMatch = result.match(/<think>([\s\S]*?)<\/think>/i);
+    const thinkMatch = main.match(/<think>([\s\S]*?)<\/think>/i);
     if (thinkMatch) {
       think = thinkMatch[1].trim();
-      main = result.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
+      main = main.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
     }
 
-    // 移除 markdown code fence (與歷史記錄頁面一致)
+    // 移除 markdown code fence
     main = main.replace(/^```[\s\S]*?\n/, '').replace(/\n```$/, '').trim();
 
     return { thinkContent: think, mainContent: main };
-  }, [result]);
+  }, [currentResult]);
+
+  // Polling logic
+  useEffect(() => {
+    if (!isPolling) return;
+
+    const poll = async () => {
+      try {
+        const item = await api.getHistoryItem(historyId);
+        if (item.interpretation && item.interpretation !== "processing...") {
+          setCurrentResult(item.interpretation);
+          setCurrentAiModel(item.ai_model);
+          setIsPolling(false);
+          toast.success('大師已完成解析！');
+        }
+      } catch (error) {
+        console.error('Polling failed:', error);
+      }
+    };
+
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [isPolling, historyId]);
 
   // 客戶端 Markdown 渲染
   useEffect(() => {
@@ -154,10 +183,10 @@ export function DivinationResult({ question, result, toolStatus, aiModel, onClos
               <CheckCircle2 className="w-4 h-4 text-green-500" />
               <span>六爻占卜</span>
             </div>
-            {aiModel && (
+            {currentAiModel && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Bot className="w-4 h-4 text-[var(--gold)]" />
-                <span>{aiModel}</span>
+                <span>{currentAiModel}</span>
               </div>
             )}
           </div>

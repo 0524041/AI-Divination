@@ -109,6 +109,10 @@ class ApiClient {
     return this.request(`/api/history${params}`);
   }
 
+  async getHistoryItem(id: number): Promise<HistoryItem> {
+    return this.request(`/api/history/${id}`);
+  }
+
   async toggleFavorite(id: number, isFavorite: boolean): Promise<{ success: boolean }> {
     return this.request(`/api/history/${id}/favorite`, {
       method: 'PUT',

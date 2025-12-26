@@ -62,7 +62,7 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [localGeminiKey, setLocalGeminiKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Admin state
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -73,7 +73,7 @@ export default function SettingsPage() {
   const [newUsername, setNewUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
-  
+
   // Local AI test state
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -121,13 +121,22 @@ export default function SettingsPage() {
   const handleSaveSettings = async () => {
     setIsSaving(true);
     try {
-      await updateSettings(localSettings);
+      // 只有管理員可以儲存全域設定
+      if (isAdmin) {
+        await updateSettings(localSettings);
+      }
+
+      // 無論是否為管理員，都可以儲存本地 Gemini API Key
       if (localGeminiKey && !localGeminiKey.startsWith('••••')) {
         setGeminiApiKey(localGeminiKey);
+      } else if (!localGeminiKey) {
+        setGeminiApiKey(null);
       }
+
       toast.success('設定已儲存');
-    } catch {
-      toast.error('儲存失敗');
+    } catch (error) {
+      console.error('Save settings failed:', error);
+      toast.error('儲存全域設定失敗 (可能需要管理員權限)');
     } finally {
       setIsSaving(false);
     }
@@ -216,18 +225,18 @@ export default function SettingsPage() {
       toast.error('請先填寫 API URL');
       return;
     }
-    
+
     setTestingConnection(true);
     setConnectionStatus('idle');
     setAvailableModels([]);
-    
+
     try {
       const result = await api.testLocalAI(apiUrl);
       if (result.success) {
         setConnectionStatus('success');
         setAvailableModels(result.models);
         toast.success(result.message);
-        
+
         // 如果目前沒有選擇模型，自動選擇第一個
         if (!localSettings.local_model_name && result.models.length > 0) {
           setLocalSettings({ ...localSettings, local_model_name: result.models[0] });

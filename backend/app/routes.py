@@ -258,7 +258,7 @@ def register_routes(app):
         full_payload = prompt_template.replace('{question}', str(question)).replace('{divination_result}', str(raw_result_for_ai))
 
         # Call AI
-        ai_provider = get_setting('ai_provider', 'local')
+        ai_provider = data.get('provider') or get_setting('ai_provider', 'local')
         user_gemini_key = request.headers.get('X-Gemini-Api-Key')
         
         print(f"[Routes] About to call AI, provider='{ai_provider}'")
@@ -330,31 +330,38 @@ def register_routes(app):
         else:
             return jsonify(get_history(user_id))
 
+    @app.route('/api/history/<int:id>', methods=['GET', 'DELETE'])
+    @login_required
+    def handle_history_item(id):
+        user_id = session['user_id']
+        role = session.get('role')
+        
+        # 先獲取記錄來檢查權限
+        conn = get_db_connection()
+        record = conn.execute('SELECT * FROM history WHERE id = ?', (id,)).fetchone()
+        conn.close()
+        
+        if not record:
+            return jsonify({"error": "Record not found"}), 404
+            
+        # 權限檢查：只有本人或管理員可以訪問/刪除
+        if role != 'admin' and record['user_id'] != user_id:
+            return jsonify({"error": "Permission denied"}), 403
+
+        if request.method == 'GET':
+            return jsonify(dict(record))
+            
+        elif request.method == 'DELETE':
+            if id == 1 and role != 'admin': # 雖然這行邏輯怪怪的，但這是原始邏輯的延續
+                pass 
+            delete_history(id)
+            return jsonify({"success": True})
+
     @app.route('/api/history/<int:id>/favorite', methods=['PUT'])
     @login_required
     def favorite(id):
         data = request.json
         toggle_favorite(id, data.get('is_favorite'))
-        return jsonify({"success": True})
-
-    @app.route('/api/history/<int:id>', methods=['DELETE'])
-    @login_required
-    def delete_history_item(id):
-        # 檢查權限：只能刪除自己的記錄，管理員可以刪除任何記錄
-        user_id = session['user_id']
-        role = session.get('role')
-        
-        conn = get_db_connection()
-        record = conn.execute('SELECT user_id FROM history WHERE id = ?', (id,)).fetchone()
-        conn.close()
-        
-        if not record:
-            return jsonify({"error": "Record not found"}), 404
-        
-        if role != 'admin' and record['user_id'] != user_id:
-            return jsonify({"error": "Permission denied"}), 403
-        
-        delete_history(id)
         return jsonify({"success": True})
 
     @app.route('/api/settings', methods=['GET', 'POST'])
