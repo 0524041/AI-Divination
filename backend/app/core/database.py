@@ -113,8 +113,8 @@ def init_db():
 
 def _init_default_settings(cursor):
     """初始化預設設定"""
-    # Default settings
-    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('daily_limit', '5'))
+    # Default settings - 預設無上限
+    cursor.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', ('daily_limit', 'unlimited'))
     
     # Load System Prompt from file
     try:

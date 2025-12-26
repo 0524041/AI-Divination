@@ -367,10 +367,16 @@ export default function SettingsPage() {
                     <Separator />
                     <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                       <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-amber-200">
-                        使用 Gemini 需要提供您自己的 API Key。
-                        請前往 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-[var(--gold)] underline">Google AI Studio</a> 免費取得。
-                      </p>
+                      <div className="text-sm text-amber-200 space-y-2">
+                        <p>
+                          使用 Gemini 需要提供您自己的 API Key。
+                          請前往 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-[var(--gold)] underline">Google AI Studio</a> 免費取得。
+                        </p>
+                        <p className="text-amber-300/80">
+                          💡 建議：Gemini API 有免費額度限制，建議設定每日占卜上限（如 10 次）以避免超額。
+                          {isAdmin ? '可在「系統」分頁調整。' : '如需調整請聯繫管理員。'}
+                        </p>
+                      </div>
                     </div>
                     <div>
                       <Label className="flex items-center gap-2">
