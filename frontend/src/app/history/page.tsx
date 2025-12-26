@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/contexts/AppContext';
 import { api } from '@/lib/api';
 import { HistoryItem, User } from '@/types';
 import { AppLayout } from '@/components/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -28,11 +28,62 @@ import {
   Clock,
   Copy,
   Search,
-  Eye,
   Filter,
   Users,
+  ChevronDown,
+  Brain,
+  Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// 提取並處理內容的 hook
+function useProcessedContent(interpretation: string | undefined) {
+  const [htmlContent, setHtmlContent] = useState('');
+  
+  const { thinkContent, mainContent } = useMemo(() => {
+    if (!interpretation) return { thinkContent: '', mainContent: '' };
+    
+    let think = '';
+    let main = interpretation;
+
+    // 提取 <think> 標籤內容
+    const thinkMatch = interpretation.match(/<think>([\s\S]*?)<\/think>/i);
+    if (thinkMatch) {
+      think = thinkMatch[1].trim();
+      main = interpretation.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
+    }
+
+    // 移除 markdown code fence
+    main = main.replace(/^```[\s\S]*?\n/, '').replace(/\n```$/, '').trim();
+
+    return { thinkContent: think, mainContent: main };
+  }, [interpretation]);
+
+  useEffect(() => {
+    const renderMarkdown = async () => {
+      if (typeof window === 'undefined' || !mainContent) {
+        setHtmlContent('');
+        return;
+      }
+      
+      const { marked } = await import('marked');
+      const DOMPurify = (await import('dompurify')).default;
+      
+      marked.setOptions({
+        breaks: true,
+        gfm: true,
+      });
+      
+      const rawHtml = await marked.parse(mainContent);
+      const cleanHtml = DOMPurify.sanitize(rawHtml);
+      setHtmlContent(cleanHtml);
+    };
+    
+    renderMarkdown();
+  }, [mainContent]);
+
+  return { thinkContent, htmlContent };
+}
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -132,7 +183,14 @@ export default function HistoryPage() {
   };
 
   const handleCopy = (item: HistoryItem) => {
-    const markdown = `## 問題\n${item.question}\n\n## 解卦結果\n${item.interpretation || '無解讀內容'}`;
+    // 清理 interpretation 內容
+    let content = item.interpretation || '無解讀內容';
+    // 移除 think 標籤
+    content = content.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
+    // 移除 code fence
+    content = content.replace(/^```[\s\S]*?\n/, '').replace(/\n```$/, '').trim();
+    
+    const markdown = `## 問題\n${item.question}\n\n## 解卦結果\n${content}`;
     navigator.clipboard.writeText(markdown);
     toast.success('已複製到剪貼簿（Markdown 格式）');
   };
@@ -243,7 +301,7 @@ export default function HistoryPage() {
                         <span className="px-2 py-0.5 rounded-full text-xs bg-[var(--gold)]/20 text-[var(--gold)]">
                           六爻
                         </span>
-                        {item.is_favorite && (
+                        {Boolean(item.is_favorite) && (
                           <Star className="w-4 h-4 fill-[var(--gold)] text-[var(--gold)]" />
                         )}
                         {isAdmin && item.username && (
@@ -261,19 +319,18 @@ export default function HistoryPage() {
                       <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
                         <span>{formatDate(item.created_at)}</span>
+                        {item.ai_model && (
+                          <>
+                            <span className="mx-1">•</span>
+                            <Bot className="w-3 h-3" />
+                            <span>{item.ai_model}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
                     {/* Actions */}
                     <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setViewItem(item)}
-                        title="查看詳情"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -318,44 +375,106 @@ export default function HistoryPage() {
             </DialogTitle>
           </DialogHeader>
           {viewItem && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="w-4 h-4" />
-                <span>{formatDate(viewItem.created_at)}</span>
-                {viewItem.is_favorite && (
-                  <>
-                    <span>•</span>
-                    <Star className="w-4 h-4 fill-[var(--gold)] text-[var(--gold)]" />
-                    <span className="text-[var(--gold)]">已收藏</span>
-                  </>
-                )}
-              </div>
-              <div className="prose prose-invert max-w-none result-content">
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: viewItem.interpretation || '無解讀內容',
-                  }}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                <Button variant="outline" onClick={() => handleCopy(viewItem)}>
-                  <Copy className="w-4 h-4 mr-2" />
-                  複製結果
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleToggleFavorite(viewItem.id, viewItem.is_favorite)}
-                  className={viewItem.is_favorite ? 'text-[var(--gold)] border-[var(--gold)]' : ''}
-                >
-                  <Star className={`w-4 h-4 mr-2 ${viewItem.is_favorite ? 'fill-current' : ''}`} />
-                  {viewItem.is_favorite ? '取消收藏' : '加入收藏'}
-                </Button>
-              </div>
-            </div>
+            <HistoryDetailView
+              item={viewItem}
+              formatDate={formatDate}
+              onCopy={handleCopy}
+              onToggleFavorite={handleToggleFavorite}
+            />
           )}
         </DialogContent>
       </Dialog>
     </AppLayout>
+  );
+}
+
+// 詳情視圖組件
+function HistoryDetailView({
+  item,
+  formatDate,
+  onCopy,
+  onToggleFavorite,
+}: {
+  item: HistoryItem;
+  formatDate: (date: string) => string;
+  onCopy: (item: HistoryItem) => void;
+  onToggleFavorite: (id: number, isFavorite: boolean) => void;
+}) {
+  const { thinkContent, htmlContent } = useProcessedContent(item.interpretation);
+  const [showThinking, setShowThinking] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Clock className="w-4 h-4" />
+        <span>{formatDate(item.created_at)}</span>
+        {item.ai_model && (
+          <>
+            <span>•</span>
+            <Bot className="w-4 h-4" />
+            <span>{item.ai_model}</span>
+          </>
+        )}
+        {item.is_favorite && (
+          <>
+            <span>•</span>
+            <Star className="w-4 h-4 fill-[var(--gold)] text-[var(--gold)]" />
+            <span className="text-[var(--gold)]">已收藏</span>
+          </>
+        )}
+      </div>
+
+      {/* 思考過程折疊區 */}
+      {thinkContent && (
+        <div className="border border-border rounded-lg overflow-hidden">
+          <button
+            onClick={() => setShowThinking(!showThinking)}
+            className="w-full flex items-center gap-2 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <Brain className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground flex-1 text-left">
+              AI 思考過程
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-muted-foreground transition-transform ${
+                showThinking ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          {showThinking && (
+            <div className="px-4 py-3 bg-muted/10 border-t border-border">
+              <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">
+                {thinkContent}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 解讀內容 */}
+      <div className="result-content">
+        {htmlContent ? (
+          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+        ) : (
+          <p className="text-muted-foreground">載入中...</p>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="outline" onClick={() => onCopy(item)}>
+          <Copy className="w-4 h-4 mr-2" />
+          複製結果
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => onToggleFavorite(item.id, item.is_favorite)}
+          className={item.is_favorite ? 'text-[var(--gold)] border-[var(--gold)]' : ''}
+        >
+          <Star className={`w-4 h-4 mr-2 ${item.is_favorite ? 'fill-current' : ''}`} />
+          {item.is_favorite ? '取消收藏' : '加入收藏'}
+        </Button>
+      </div>
+    </div>
   );
 }
 

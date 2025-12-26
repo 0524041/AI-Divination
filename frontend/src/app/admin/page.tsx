@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newConfirmPassword, setNewConfirmPassword] = useState('');
   const [newRole, setNewRole] = useState<'user' | 'admin'>('user');
 
   useEffect(() => {
@@ -74,12 +75,17 @@ export default function AdminPage() {
       toast.error('密碼至少需要 6 個字元');
       return;
     }
+    if (newPassword !== newConfirmPassword) {
+      toast.error('兩次輸入的密碼不一致');
+      return;
+    }
     try {
       await api.createUser(newUsername, newPassword, newRole);
       toast.success('用戶已創建');
       setShowCreateDialog(false);
       setNewUsername('');
       setNewPassword('');
+      setNewConfirmPassword('');
       setNewRole('user');
       loadUsers();
     } catch (error) {
@@ -220,6 +226,16 @@ export default function AdminPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="輸入密碼 (至少 6 字)"
+                className="input-mystical mt-1"
+              />
+            </div>
+            <div>
+              <Label>確認密碼</Label>
+              <Input
+                type="password"
+                value={newConfirmPassword}
+                onChange={(e) => setNewConfirmPassword(e.target.value)}
+                placeholder="再次輸入密碼"
                 className="input-mystical mt-1"
               />
             </div>

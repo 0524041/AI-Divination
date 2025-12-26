@@ -33,7 +33,6 @@ cleanup() {
         if kill -0 "$BACKEND_PID" 2>/dev/null; then
             echo -e "${BLUE}  → 關閉後端 (PID: $BACKEND_PID)${NC}"
             kill "$BACKEND_PID" 2>/dev/null || true
-            # 等待進程結束
             wait "$BACKEND_PID" 2>/dev/null || true
         fi
         rm -f "$BACKEND_PID_FILE"
@@ -45,14 +44,13 @@ cleanup() {
         if kill -0 "$FRONTEND_PID" 2>/dev/null; then
             echo -e "${BLUE}  → 關閉前端 (PID: $FRONTEND_PID)${NC}"
             kill "$FRONTEND_PID" 2>/dev/null || true
-            # 等待進程結束
             wait "$FRONTEND_PID" 2>/dev/null || true
         fi
         rm -f "$FRONTEND_PID_FILE"
     fi
     
     # 確保殺死所有相關進程
-    pkill -f "uv run server.py" 2>/dev/null || true
+    pkill -f "python run.py" 2>/dev/null || true
     pkill -f "next dev" 2>/dev/null || true
     
     echo -e "${GREEN}✅ 所有服務已關閉${NC}"
@@ -73,7 +71,11 @@ echo -e "${NC}"
 # 檢查必要目錄
 if [ ! -d "frontend" ]; then
     echo -e "${RED}❌ 錯誤：找不到 frontend 目錄${NC}"
-    echo "   請確保 Next.js 前端已正確設置"
+    exit 1
+fi
+
+if [ ! -d "backend" ]; then
+    echo -e "${RED}❌ 錯誤：找不到 backend 目錄${NC}"
     exit 1
 fi
 
@@ -96,32 +98,22 @@ echo -e "${GREEN}   ✓ npm 已安裝${NC}"
 
 echo ""
 
-# ====== Python 環境設置 ======
-echo -e "${BLUE}🐍 設置 Python 環境...${NC}"
+# ====== 後端環境設置 ======
+echo -e "${BLUE}🐍 設置後端環境...${NC}"
 
-# 使用 uv sync 確保虛擬環境和依賴正確
+cd backend
 if [ -f "pyproject.toml" ]; then
     echo -e "   → 同步 Python 依賴..."
-    uv sync --quiet
+    uv sync --quiet 2>/dev/null || uv sync
     echo -e "${GREEN}   ✓ Python 依賴已同步${NC}"
 fi
+cd ..
 
-# ====== 資料庫初始化 ======
+# ====== 資料庫檢查 ======
 echo -e "${BLUE}🗄️  檢查資料庫...${NC}"
 
-# 執行資料庫遷移（如果 users 表不存在）
 if [ -f "divination.db" ]; then
-    # 檢查 users 表是否存在
-    USER_TABLE_EXISTS=$(sqlite3 divination.db "SELECT name FROM sqlite_master WHERE type='table' AND name='users';" 2>/dev/null || echo "")
-    if [ -z "$USER_TABLE_EXISTS" ]; then
-        echo -e "   → 執行資料庫遷移..."
-        if [ -f "migrations/001_add_users.sql" ]; then
-            sqlite3 divination.db < migrations/001_add_users.sql
-            echo -e "${GREEN}   ✓ 資料庫遷移完成${NC}"
-        fi
-    else
-        echo -e "${GREEN}   ✓ 資料庫結構正常${NC}"
-    fi
+    echo -e "${GREEN}   ✓ 資料庫已存在${NC}"
 else
     echo -e "   → 資料庫將在首次啟動時創建"
 fi
@@ -141,15 +133,15 @@ echo ""
 echo -e "${GREEN}✅ 環境檢查全部通過${NC}"
 echo ""
 
-# 啟動後端
+# 啟動後端 (使用新的 backend 目錄)
 echo -e "${BLUE}🚀 啟動後端服務 (Port 8080)...${NC}"
-uv run server.py &
+(cd "$SCRIPT_DIR/backend" && uv run python run.py) &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
 echo -e "${GREEN}   ✓ 後端已啟動 (PID: $BACKEND_PID)${NC}"
 
 # 等待後端啟動
-sleep 2
+sleep 3
 
 # 檢查後端是否成功啟動
 if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
@@ -160,10 +152,9 @@ fi
 
 # 啟動前端
 echo -e "${BLUE}🚀 啟動前端服務 (Port 3000)...${NC}"
-cd frontend && npm run dev &
+(cd "$SCRIPT_DIR/frontend" && npm run dev) &
 FRONTEND_PID=$!
 echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
-cd ..
 echo -e "${GREEN}   ✓ 前端已啟動 (PID: $FRONTEND_PID)${NC}"
 
 # 等待前端啟動

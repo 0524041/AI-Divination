@@ -4,17 +4,18 @@ import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ToolStatus } from '@/types';
-import { X, Copy, ChevronDown, Brain, CheckCircle2 } from 'lucide-react';
+import { X, Copy, ChevronDown, Brain, CheckCircle2, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface DivinationResultProps {
   question: string;
   result: string;
   toolStatus: ToolStatus;
+  aiModel?: string;
   onClose: () => void;
 }
 
-export function DivinationResult({ question, result, toolStatus, onClose }: DivinationResultProps) {
+export function DivinationResult({ question, result, toolStatus, aiModel, onClose }: DivinationResultProps) {
   const [showThinking, setShowThinking] = useState(false);
   const [htmlContent, setHtmlContent] = useState('');
 
@@ -29,6 +30,9 @@ export function DivinationResult({ question, result, toolStatus, onClose }: Divi
       think = thinkMatch[1].trim();
       main = result.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
     }
+
+    // 移除 markdown code fence (與歷史記錄頁面一致)
+    main = main.replace(/^```[\s\S]*?\n/, '').replace(/\n```$/, '').trim();
 
     return { thinkContent: think, mainContent: main };
   }, [result]);
@@ -132,9 +136,17 @@ export function DivinationResult({ question, result, toolStatus, onClose }: Divi
 
         {/* Footer */}
         <div className="flex-shrink-0 p-4 border-t border-border/50 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="w-4 h-4 text-green-500" />
-            <span>六爻占卜</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <span>六爻占卜</span>
+            </div>
+            {aiModel && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Bot className="w-4 h-4 text-[var(--gold)]" />
+                <span>{aiModel}</span>
+              </div>
+            )}
           </div>
           <Button onClick={handleCopy} className="btn-gold">
             <Copy className="w-4 h-4 mr-2" />

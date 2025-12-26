@@ -2,8 +2,9 @@
 
 import { ReactNode } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Sidebar } from '@/components/Sidebar';
+import { AppSidebar } from '@/components/AppSidebar';
 import { AuthForm } from '@/components/AuthForm';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
@@ -32,26 +33,29 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen">
+    <SidebarProvider defaultOpen={false}>
       {/* Background effects */}
       <div className="bg-orb orb-1" />
       <div className="bg-orb orb-2" />
 
       {/* Sidebar */}
-      <Sidebar />
+      <AppSidebar />
 
       {/* Main Content */}
-      <main
-        className={cn(
-          "min-h-screen transition-all duration-300",
-          "lg:pl-16", // collapsed sidebar width
-          "pt-4 pb-8 px-4 lg:px-8"
-        )}
-      >
-        <div className="max-w-6xl mx-auto">
-          {children}
-        </div>
-      </main>
-    </div>
+      <SidebarInset className="bg-transparent">
+        {/* Mobile trigger */}
+        <header className="flex h-14 shrink-0 items-center gap-2 lg:hidden">
+          <div className="flex items-center px-4">
+            <SidebarTrigger className="-ml-1 text-[var(--gold)]" />
+          </div>
+        </header>
+        
+        <main className="flex-1 px-4 pb-8 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            {children}
+          </div>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -7,7 +7,10 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+.venv/
+backend/.venv/
+
+# Database files (local development)
 *.db
 
 # PID files
@@ -27,3 +30,23 @@ frontend/out/
 # Logs
 *.log
 npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files
+cookies.txt
+
+# Legacy backup (舊版程式碼備份)
+_legacy_backup/
+
+# Lock files (optional - uncomment if not needed in repo)
+# uv.lock
+# frontend/package-lock.json

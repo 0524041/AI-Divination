@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CoinTossing } from '@/components/CoinTossing';
 import { DivinationResult } from '@/components/DivinationResult';
-import { HelpCircle, BookOpen, SendHorizonal } from 'lucide-react';
+import { HelpCircle, BookOpen, SendHorizonal, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -40,6 +40,7 @@ export function LiuYaoPage() {
   const [resultData, setResultData] = useState<{
     result: string;
     toolStatus: ToolStatus;
+    aiModel?: string;
   } | null>(null);
   
   // 動畫佔位符
@@ -118,6 +119,7 @@ export function LiuYaoPage() {
       setResultData({
         result: response.result,
         toolStatus: response.tool_status,
+        aiModel: response.ai_model,
       });
       setMode('result');
     } catch (error) {
@@ -150,6 +152,7 @@ export function LiuYaoPage() {
         question={question}
         result={resultData.result}
         toolStatus={resultData.toolStatus}
+        aiModel={resultData.aiModel}
         onClose={handleCloseResult}
       />
     );
@@ -161,6 +164,14 @@ export function LiuYaoPage() {
       <div className="text-center mb-8">
         <h1 className="text-4xl lg:text-5xl font-bold text-[var(--gold)] mb-3">六爻占卜</h1>
         <p className="text-lg text-muted-foreground">誠心問卦，洞察天機</p>
+        {/* Current AI Model */}
+        <div className="flex items-center justify-center gap-2 mt-3 text-sm text-muted-foreground">
+          <Bot className="w-4 h-4" />
+          <span>AI 模型：</span>
+          <span className="text-[var(--gold)]">
+            {settings?.ai_provider === 'gemini' ? 'Gemini (gemini-3-flash-preview)' : settings?.local_model_name || 'Local AI'}
+          </span>
+        </div>
       </div>
 
       {/* Input Card */}

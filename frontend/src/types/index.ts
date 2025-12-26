@@ -42,6 +42,7 @@ export interface DivinationResponse {
   id: number;
   result: string;
   tool_status: ToolStatus;
+  ai_model?: string;
 }
 
 // 結構化 AI 輸出 (舊版 JSON 格式)
@@ -69,6 +70,7 @@ export interface HistoryItem {
   question: string;
   result_json: string;
   interpretation: string;
+  ai_model?: string;
   is_favorite: boolean;
   created_at: string;
   date_str: string;

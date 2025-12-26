@@ -15,7 +15,7 @@ export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({ username: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({ username: '', password: '', confirmPassword: '' });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +34,10 @@ export function AuthForm() {
     e.preventDefault();
     if (registerForm.password.length < 6) {
       toast.error('密碼至少需要 6 個字元');
+      return;
+    }
+    if (registerForm.password !== registerForm.confirmPassword) {
+      toast.error('兩次輸入的密碼不一致');
       return;
     }
     setIsLoading(true);
@@ -124,6 +128,18 @@ export function AuthForm() {
                     type="password"
                     value={registerForm.password}
                     onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                    className="input-mystical"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-confirm-password">確認密碼</Label>
+                  <Input
+                    id="register-confirm-password"
+                    type="password"
+                    value={registerForm.confirmPassword}
+                    onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
                     className="input-mystical"
                     required
                     minLength={6}
