@@ -17,23 +17,31 @@ export function CoinTossing({ coins, onComplete, onCancel }: CoinTossingProps) {
   const [isComplete, setIsComplete] = useState(false);
   const [isWaitingAI, setIsWaitingAI] = useState(false);
 
+  // Effect 1: 逐個顯示硬幣結果
   useEffect(() => {
-    // 逐個顯示硬幣結果
     if (visibleCount < coins.length) {
       const timeout = setTimeout(() => {
         setVisibleCount((prev) => prev + 1);
       }, 600);
       return () => clearTimeout(timeout);
     } else if (visibleCount === coins.length && !isComplete) {
+      console.log('[CoinTossing] All coins visible, setting complete');
       setIsComplete(true);
       setIsWaitingAI(true);
-      // 等待 1.5 秒後開始調用 AI
+    }
+  }, [coins.length, visibleCount, isComplete]);
+
+  // Effect 2: 完成後調用 AI（獨立的 effect 避免 cleanup 問題）
+  useEffect(() => {
+    if (isComplete && isWaitingAI) {
+      console.log('[CoinTossing] Starting AI call timeout');
       const timeout = setTimeout(() => {
+        console.log('[CoinTossing] Calling onComplete()');
         onComplete();
       }, 1500);
       return () => clearTimeout(timeout);
     }
-  }, [coins.length, visibleCount, isComplete, onComplete]);
+  }, [isComplete, isWaitingAI, onComplete]);
 
   // 取得當前可見的硬幣結果
   const visibleCoins = coins.slice(0, visibleCount);

@@ -108,13 +108,21 @@ export function LiuYaoPage() {
   }, [question]);
 
   const handleTossingComplete = useCallback(async () => {
+    console.log('[LiuYaoPage] handleTossingComplete called');
+    console.log('[LiuYaoPage] question:', question);
+    console.log('[LiuYaoPage] coins:', coins);
+    console.log('[LiuYaoPage] settings?.ai_provider:', settings?.ai_provider);
+    
     try {
       const apiKey = settings?.ai_provider === 'gemini' ? geminiApiKey || undefined : undefined;
       
+      console.log('[LiuYaoPage] Calling api.divinate...');
       const response = await api.divinate({
         question,
         coins,
       }, apiKey);
+      
+      console.log('[LiuYaoPage] Response received:', response);
 
       setResultData({
         result: response.result,

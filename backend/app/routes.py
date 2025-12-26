@@ -258,6 +258,8 @@ def register_routes(app):
         ai_provider = get_setting('ai_provider', 'local')
         user_gemini_key = request.headers.get('X-Gemini-Api-Key')
         
+        print(f"[Routes] About to call AI, provider='{ai_provider}'")
+        
         try:
             interpretation, ai_model = call_ai(
                 prompt=full_payload,

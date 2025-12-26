@@ -223,6 +223,8 @@ def call_ai(prompt: str, provider: str = 'local', user_gemini_key: str = None) -
     Returns:
         tuple: (AI 回應內容, 使用的模型名稱)
     """
+    print(f"[AI Service] call_ai() called with provider='{provider}'")
+    
     if provider == 'gemini':
         if not user_gemini_key:
             raise Exception("使用 Gemini 需要提供 API Key，請在設定中填入您的 API Key")
