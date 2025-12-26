@@ -1,21 +1,56 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/contexts/AppContext';
 import { api } from '@/lib/api';
-import { HistoryItem } from '@/types';
+import { HistoryItem, User } from '@/types';
+import { AppLayout } from '@/components/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Home, Star, Trash2, Clock } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Star,
+  Trash2,
+  Clock,
+  Copy,
+  Search,
+  Eye,
+  Filter,
+  Users,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function HistoryPage() {
   const router = useRouter();
   const { user, isLoading } = useApp();
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [filteredHistory, setFilteredHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterFavorite, setFilterFavorite] = useState<'all' | 'favorite'>('all');
+  
+  // Admin specific
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>('all');
+  
+  // View detail modal
+  const [viewItem, setViewItem] = useState<HistoryItem | null>(null);
+
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -23,29 +58,63 @@ export default function HistoryPage() {
     }
   }, [user, isLoading, router]);
 
+  // Load users for admin
   useEffect(() => {
-    if (user) {
-      loadHistory();
+    if (user && isAdmin) {
+      api.getAllUsers().then(setUsers).catch(() => {});
     }
-  }, [user]);
+  }, [user, isAdmin]);
 
-  const loadHistory = async () => {
+  // Load history
+  const loadHistory = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
     try {
-      const data = await api.getHistory();
+      const userId = isAdmin ? (selectedUserId === 'all' ? 'all' : parseInt(selectedUserId)) : undefined;
+      const data = await api.getHistory(userId as number | 'all' | undefined);
       setHistory(data);
-    } catch (error) {
+    } catch {
       toast.error('載入歷史記錄失敗');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, isAdmin, selectedUserId]);
+
+  useEffect(() => {
+    if (user) {
+      loadHistory();
+    }
+  }, [user, loadHistory]);
+
+  // Filter history
+  useEffect(() => {
+    let result = [...history];
+    
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(item =>
+        item.question.toLowerCase().includes(query) ||
+        item.interpretation?.toLowerCase().includes(query)
+      );
+    }
+    
+    // Favorite filter
+    if (filterFavorite === 'favorite') {
+      result = result.filter(item => item.is_favorite);
+    }
+    
+    setFilteredHistory(result);
+  }, [history, searchQuery, filterFavorite]);
 
   const handleToggleFavorite = async (id: number, isFavorite: boolean) => {
     try {
       await api.toggleFavorite(id, !isFavorite);
-      setHistory(prev => prev.map(item => 
-        item.id === id ? { ...item, is_favorite: !isFavorite } : item
-      ));
+      setHistory(prev =>
+        prev.map(item =>
+          item.id === id ? { ...item, is_favorite: !isFavorite } : item
+        )
+      );
     } catch {
       toast.error('操作失敗');
     }
@@ -62,93 +131,231 @@ export default function HistoryPage() {
     }
   };
 
+  const handleCopy = (item: HistoryItem) => {
+    const markdown = `## 問題\n${item.question}\n\n## 解卦結果\n${item.interpretation || '無解讀內容'}`;
+    navigator.clipboard.writeText(markdown);
+    toast.success('已複製到剪貼簿（Markdown 格式）');
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   if (isLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-4xl animate-spin">☯</div>
+        <div className="text-5xl animate-spin" style={{ animationDuration: '2s' }}>☯</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="bg-orb orb-1" />
-      <div className="bg-orb orb-2" />
-
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 glass-panel border-b border-border/50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-bold text-[var(--gold)]">歷史記錄</h1>
+    <AppLayout>
+      <div className="space-y-6">
+        {/* Page Title */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-[var(--gold)]">歷史記錄</h1>
+            <p className="text-muted-foreground mt-1">
+              共 {filteredHistory.length} 筆記錄
+            </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
-            <Home className="w-5 h-5" />
-          </Button>
         </div>
-      </header>
 
-      {/* Content */}
-      <main className="pt-20 pb-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="text-4xl animate-spin inline-block">☯</div>
+        {/* Filters */}
+        <Card className="glass-panel">
+          <CardContent className="p-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜尋問題或解讀內容..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-transparent border-border"
+                />
+              </div>
+
+              {/* Favorite Filter */}
+              <Select value={filterFavorite} onValueChange={(v) => setFilterFavorite(v as 'all' | 'favorite')}>
+                <SelectTrigger className="w-full lg:w-40 bg-transparent border-border">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部記錄</SelectItem>
+                  <SelectItem value="favorite">僅顯示收藏</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Admin: User Filter */}
+              {isAdmin && (
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger className="w-full lg:w-48 bg-transparent border-border">
+                    <Users className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="選擇用戶" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">所有用戶</SelectItem>
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id.toString()}>
+                        {u.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-          ) : history.length === 0 ? (
-            <Card className="glass-panel">
-              <CardContent className="py-12 text-center text-muted-foreground">
-                尚無占卜記錄
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {history.map((item) => (
-                <Card key={item.id} className="glass-panel hover:border-[var(--gold)]/30 transition-colors">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base font-medium truncate">
-                          {item.question}
-                        </CardTitle>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                          <Clock className="w-3 h-3" />
-                          <span>{new Date(item.created_at).toLocaleString('zh-TW')}</span>
-                        </div>
+          </CardContent>
+        </Card>
+
+        {/* History List */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="text-5xl animate-spin inline-block" style={{ animationDuration: '2s' }}>☯</div>
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <Card className="glass-panel">
+            <CardContent className="py-12 text-center text-muted-foreground">
+              {history.length === 0 ? '尚無占卜記錄' : '沒有符合條件的記錄'}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {filteredHistory.map(item => (
+              <Card
+                key={item.id}
+                className="glass-panel hover:border-[var(--gold)]/30 transition-colors cursor-pointer"
+                onClick={() => setViewItem(item)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    {/* Main Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 rounded-full text-xs bg-[var(--gold)]/20 text-[var(--gold)]">
+                          六爻
+                        </span>
+                        {item.is_favorite && (
+                          <Star className="w-4 h-4 fill-[var(--gold)] text-[var(--gold)]" />
+                        )}
+                        {isAdmin && item.username && (
+                          <span className="text-xs text-muted-foreground">
+                            by {item.username}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleFavorite(item.id, item.is_favorite)}
-                          className={item.is_favorite ? 'text-[var(--gold)]' : 'text-muted-foreground'}
-                        >
-                          <Star className={`w-4 h-4 ${item.is_favorite ? 'fill-current' : ''}`} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(item.id)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      <h3 className="font-medium text-base truncate mb-1">
+                        {item.question}
+                      </h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {item.interpretation?.replace(/<[^>]*>/g, '').slice(0, 150)}...
+                      </p>
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>{formatDate(item.created_at)}</span>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {item.interpretation?.replace(/<[^>]*>/g, '').slice(0, 200)}...
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setViewItem(item)}
+                        title="查看詳情"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleCopy(item)}
+                        title="複製 (Markdown)"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleToggleFavorite(item.id, item.is_favorite)}
+                        className={item.is_favorite ? 'text-[var(--gold)]' : ''}
+                        title={item.is_favorite ? '取消收藏' : '加入收藏'}
+                      >
+                        <Star className={`w-4 h-4 ${item.is_favorite ? 'fill-current' : ''}`} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(item.id)}
+                        className="hover:text-destructive"
+                        title="刪除"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* View Detail Modal */}
+      <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
+        <DialogContent className="glass-panel max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-[var(--gold)]">
+              {viewItem?.question}
+            </DialogTitle>
+          </DialogHeader>
+          {viewItem && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                <span>{formatDate(viewItem.created_at)}</span>
+                {viewItem.is_favorite && (
+                  <>
+                    <span>•</span>
+                    <Star className="w-4 h-4 fill-[var(--gold)] text-[var(--gold)]" />
+                    <span className="text-[var(--gold)]">已收藏</span>
+                  </>
+                )}
+              </div>
+              <div className="prose prose-invert max-w-none result-content">
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: viewItem.interpretation || '無解讀內容',
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                <Button variant="outline" onClick={() => handleCopy(viewItem)}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  複製結果
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleToggleFavorite(viewItem.id, viewItem.is_favorite)}
+                  className={viewItem.is_favorite ? 'text-[var(--gold)] border-[var(--gold)]' : ''}
+                >
+                  <Star className={`w-4 h-4 mr-2 ${viewItem.is_favorite ? 'fill-current' : ''}`} />
+                  {viewItem.is_favorite ? '取消收藏' : '加入收藏'}
+                </Button>
+              </div>
             </div>
           )}
-        </div>
-      </main>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </AppLayout>
   );
 }
+

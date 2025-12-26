@@ -297,6 +297,21 @@ def delete_user_route(user_id):
     auth.delete_user(user_id)
     return jsonify({"success": True})
 
+@app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
+@auth.admin_required
+def update_user_route(user_id):
+    data = request.json
+    role = data.get('role')
+    password = data.get('password')
+    
+    if role:
+        auth.update_user_role(user_id, role)
+    
+    if password and len(password) >= 6:
+        auth.update_user_password(user_id, password)
+    
+    return jsonify({"success": True})
+
 # ============= User Profile =============
 @app.route('/api/user/password', methods=['PUT'])
 @auth.login_required

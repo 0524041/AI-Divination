@@ -128,6 +128,13 @@ class ApiClient {
     });
   }
 
+  async updateUser(userId: number, data: { role?: string; password?: string }): Promise<{ success: boolean }> {
+    return this.request(`/api/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   // ========== API Key 管理 ==========
   async getUserApiKeys(): Promise<Array<{ provider: string; created_at: string }>> {
     return this.request('/api/user/api-keys');

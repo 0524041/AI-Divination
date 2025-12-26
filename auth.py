@@ -114,6 +114,13 @@ def update_user_password(user_id, new_password):
     conn.commit()
     conn.close()
 
+def update_user_role(user_id, role):
+    """Update user role"""
+    conn = get_db_connection()
+    conn.execute('UPDATE users SET role = ? WHERE id = ?', (role, user_id))
+    conn.commit()
+    conn.close()
+
 def delete_user(user_id):
     """Delete a user"""
     conn = get_db_connection()
