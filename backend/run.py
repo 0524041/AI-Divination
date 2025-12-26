@@ -63,7 +63,7 @@ def main():
     
     # 使用 use_reloader=False 避免 macOS 上的 semaphore 洩漏警告
     # 在開發時如果需要自動重載，可以改為 True
-    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=8080, debug=True, use_reloader=False, threaded=True)
 
 
 if __name__ == '__main__':
