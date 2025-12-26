@@ -26,8 +26,16 @@ app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
 # Initialize DB
 init_db()
 
-# Gemini Setup
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Gemini Setup (可選，如果沒有 API key 則使用 Local AI)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = None
+if GEMINI_API_KEY:
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        print(f"Warning: Failed to initialize Gemini client: {e}")
+        client = None
+
 # user wants gemini-3-flash
 MODEL_ID = "gemini-3-flash-preview"
 
@@ -418,10 +426,10 @@ def divinate():
     full_payload = prompt_template.replace('{question}', str(question)).replace('{divination_result}', str(raw_result_for_ai))
 
     # 4. Call AI (Switch Logic)
-    ai_provider = get_setting('ai_provider', 'gemini')
+    ai_provider = get_setting('ai_provider', 'local')  # 默認使用 local
     
     try:
-        if ai_provider == 'gemini':
+        if ai_provider == 'gemini' and client:
             config = types.GenerateContentConfig(
                 thinking_config=types.ThinkingConfig(thinking_level="high")
             )
@@ -434,14 +442,11 @@ def divinate():
             )
             interpretation = response.text
         
-        elif ai_provider == 'local':
-            local_url = get_setting('local_api_url', 'http://localhost:1234/v1')
+        else:  # Default to local AI
+            local_url = get_setting('local_api_url', 'http://192.168.1.163:1234/v1')
             local_model = get_setting('local_model_name', 'qwen/qwen3-8b')
             print(f"Calling Local AI: {local_model} at {local_url}")
             interpretation = call_local_ai(full_payload, local_url, local_model)
-            
-        else:
-             return jsonify({"error": "Unknown AI provider"}), 400
 
         
         # Save History
