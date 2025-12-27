@@ -10,7 +10,14 @@ interface AppState {
   settings: Settings | null;
   history: HistoryItem[];
   geminiApiKey: string | null;  // 儲存在 localStorage
-  backendApiKeys: { gemini: boolean; local: boolean }; // 儲存在後端資料庫
+  backendApiKeys: {
+    gemini: boolean;
+    local: boolean;
+    configs: {
+      gemini?: any;
+      local?: { url: string; model: string };
+    }
+  }; // 儲存在後端資料庫
 }
 
 interface AppContextType extends AppState {
@@ -36,7 +43,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     settings: null,
     history: [],
     geminiApiKey: null,
-    backendApiKeys: { gemini: false, local: false },
+    backendApiKeys: { gemini: false, local: false, configs: {} },
   });
 
   // 從 localStorage 讀取 Gemini API Key
@@ -96,8 +103,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const saveBackendApiKey = async (provider: 'gemini' | 'local', key: string) => {
-    await api.saveUserApiKey(provider, key);
+  const saveBackendApiKey = async (provider: 'gemini' | 'local', key?: string, config?: any) => {
+    await api.saveUserApiKey(provider, key, config);
     await refreshBackendKeys();
   };
 

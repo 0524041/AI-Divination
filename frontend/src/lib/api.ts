@@ -91,14 +91,14 @@ class ApiClient {
   }
 
   // User API Keys
-  async getUserApiKeys(): Promise<{ gemini: boolean; local: boolean }> {
+  async getUserApiKeys(): Promise<any> {
     return this.request('/api/user/api-keys');
   }
 
-  async saveUserApiKey(provider: 'gemini' | 'local', apiKey: string): Promise<{ success: boolean }> {
+  async saveUserApiKey(provider: 'gemini' | 'local', apiKey?: string, config?: any): Promise<{ success: boolean }> {
     return this.request('/api/user/api-keys', {
       method: 'POST',
-      body: JSON.stringify({ provider, api_key: apiKey }),
+      body: JSON.stringify({ provider, api_key: apiKey, config }),
     });
   }
 
@@ -169,23 +169,6 @@ class ApiClient {
     });
   }
 
-  // ========== API Key 管理 ==========
-  async getUserApiKeys(): Promise<Array<{ provider: string; created_at: string }>> {
-    return this.request('/api/user/api-keys');
-  }
-
-  async addApiKey(provider: string, apiKey: string): Promise<{ success: boolean }> {
-    return this.request('/api/user/api-keys', {
-      method: 'POST',
-      body: JSON.stringify({ provider, api_key: apiKey }),
-    });
-  }
-
-  async deleteApiKey(provider: string): Promise<{ success: boolean }> {
-    return this.request(`/api/user/api-keys/${provider}`, {
-      method: 'DELETE',
-    });
-  }
 
   // ========== Local AI 測試 ==========
   async testLocalAI(apiUrl: string): Promise<{ success: boolean; models: string[]; message: string }> {

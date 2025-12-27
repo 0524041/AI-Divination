@@ -39,6 +39,7 @@ def init_db():
             user_id INTEGER NOT NULL,
             provider TEXT NOT NULL CHECK(provider IN ('gemini', 'local')),
             api_key_encrypted TEXT,
+            config_json TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
@@ -93,6 +94,12 @@ def init_db():
     # 升級：新增 target 欄位 (占卜對象)
     try:
         c.execute('ALTER TABLE history ADD COLUMN target TEXT')
+    except sqlite3.OperationalError:
+        pass  # 欄位已存在
+
+    # 升級：新增 config_json 到 api_keys
+    try:
+        c.execute('ALTER TABLE api_keys ADD COLUMN config_json TEXT')
     except sqlite3.OperationalError:
         pass  # 欄位已存在
     

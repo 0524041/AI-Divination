@@ -253,7 +253,7 @@ def call_gemini(prompt: str, api_key: str) -> str:
     return response.text
 
 
-def call_ai(prompt: str, provider: str = 'local', user_gemini_key: str = None) -> tuple[str, str]:
+def call_ai(prompt: str, provider: str = 'local', user_gemini_key: str = None, user_local_config: dict = None) -> tuple[str, str]:
     """
     統一的 AI 調用入口
     
@@ -261,6 +261,7 @@ def call_ai(prompt: str, provider: str = 'local', user_gemini_key: str = None) -
         prompt: 完整的提示詞
         provider: AI 提供者 ('local' 或 'gemini')
         user_gemini_key: 用戶的 Gemini API Key
+        user_local_config: 用戶的 Local AI 配置 (url, model)
     
     Returns:
         tuple: (AI 回應內容, 使用的模型名稱)
@@ -281,8 +282,17 @@ def call_ai(prompt: str, provider: str = 'local', user_gemini_key: str = None) -
             raise e
     
     else:  # Default to local AI
-        local_url = get_setting('local_api_url', 'http://localhost:1234/v1')
-        local_model = get_setting('local_model_name', 'qwen/qwen3-8b')
-        print(f"Calling Local AI: {local_model} at {local_url}")
+        # 優先使用用戶配置
+        print(f"[AI Service] Checking User Local Config: {user_local_config}")
+        if user_local_config and user_local_config.get('url') and user_local_config.get('model'):
+            local_url = user_local_config['url']
+            local_model = user_local_config['model']
+            print(f"[AI Service] Using USER Local AI: {local_model} at {local_url}")
+        else:
+            # Fallback 到全域設定
+            local_url = get_setting('local_api_url', 'http://localhost:1234/v1')
+            local_model = get_setting('local_model_name', 'qwen/qwen3-8b')
+            print(f"[AI Service] Fallback to GLOBAL Local AI: {local_model} at {local_url}")
+            
         result = call_local_ai(prompt, local_url, local_model)
         return result, local_model

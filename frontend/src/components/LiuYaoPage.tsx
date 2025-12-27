@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CoinTossing } from '@/components/CoinTossing';
 import { DivinationResult } from '@/components/DivinationResult';
-import { HelpCircle, BookOpen, SendHorizonal, Bot, User, Users } from 'lucide-react';
+import { HelpCircle, BookOpen, SendHorizonal, Bot, User, Users, AlertTriangle, Settings as SettingsIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -47,7 +48,8 @@ const TARGET_OPTIONS: { id: '自己' | '父母' | '朋友' | '他人', label: st
 type Mode = 'input' | 'tossing' | 'result';
 
 export function LiuYaoPage() {
-  const { settings, geminiApiKey } = useApp();
+  const router = useRouter();
+  const { settings, geminiApiKey, backendApiKeys } = useApp();
   const [mode, setMode] = useState<Mode>('input');
   const [question, setQuestion] = useState('');
   const [gender, setGender] = useState<'男' | '女' | ''>('');
@@ -129,17 +131,39 @@ export function LiuYaoPage() {
     return () => clearTimeout(timeout);
   }, [placeholderIndex, isTyping]);
 
+  const checkConfig = () => {
+    if (activeProvider === 'gemini') {
+      const hasKey = !!geminiApiKey || backendApiKeys.gemini;
+      if (!hasKey) {
+        toast.error('尚未設定 Gemini API Key，請前往設定頁面配置');
+        router.push('/settings');
+        return false;
+      }
+    } else {
+      const hasLocalConfig = (settings?.local_api_url && settings?.local_model_name) ||
+        (backendApiKeys.configs.local?.url && backendApiKeys.configs.local?.model);
+      if (!hasLocalConfig) {
+        toast.error('尚未設定 Local AI 網址或模型，請前往設定頁面配置');
+        router.push('/settings');
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleSubmit = useCallback(async () => {
     if (!question.trim()) {
       toast.error('請輸入您想問的問題');
       return;
     }
 
+    if (!checkConfig()) return;
+
     // 生成六爻結果
     const newCoins = performDivination();
     setCoins(newCoins);
     setMode('tossing');
-  }, [question]);
+  }, [question, activeProvider, geminiApiKey, backendApiKeys, settings, router]);
 
   const handleTossingComplete = useCallback(async () => {
     try {
@@ -232,7 +256,7 @@ export function LiuYaoPage() {
                 : 'text-foreground/60 hover:text-foreground'
                 }`}
             >
-              Local AI ({settings?.local_model_name?.split('/').pop() || '本地'})
+              Local AI ({backendApiKeys.configs.local?.model?.split('/').pop() || settings?.local_model_name?.split('/').pop() || '本地'})
             </button>
             <button
               onClick={() => toggleProvider('gemini')}
@@ -246,6 +270,38 @@ export function LiuYaoPage() {
           </div>
         </div>
       </div>
+
+      {/* Configuration Status Alert */}
+      {(() => {
+        const isGemini = activeProvider === 'gemini';
+        const hasGeminiKey = !!geminiApiKey || backendApiKeys.gemini;
+        const hasLocalConfig = (settings?.local_api_url && settings?.local_model_name) ||
+          (backendApiKeys.configs.local?.url && backendApiKeys.configs.local?.model);
+
+        if ((isGemini && !hasGeminiKey) || (!isGemini && !hasLocalConfig)) {
+          return (
+            <div className="w-full max-w-2xl mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between animate-pulse">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+                <div>
+                  <p className="text-red-200 font-medium">目前的 AI 尚未配置</p>
+                  <p className="text-red-300/70 text-sm">請先前往設定頁面完成 AI 配置，否則將無法解卦</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-500/50 text-red-200 hover:bg-red-500/20"
+                onClick={() => router.push('/settings')}
+              >
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                去設定
+              </Button>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {/* Input Card */}
       <Card className="glass-panel w-full max-w-2xl">

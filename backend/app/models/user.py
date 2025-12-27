@@ -91,23 +91,33 @@ def delete_user(user_id: int) -> None:
 from ..utils.auth import encrypt_api_key, decrypt_api_key
 
 def get_user_api_keys(user_id: int) -> dict:
-    """獲取用戶的 API keys (只返回是否有設置)"""
+    """獲取用戶的 API keys (返回是否有設置以及相關配置)"""
     conn = get_db_connection()
     keys = conn.execute(
-        'SELECT provider FROM api_keys WHERE user_id = ?',
+        'SELECT provider, config_json FROM api_keys WHERE user_id = ?',
         (user_id,)
     ).fetchall()
     conn.close()
     
-    result = {'gemini': False, 'local': False}
+    result = {
+        'gemini': False, 
+        'local': False,
+        'configs': {}
+    }
     for k in keys:
-        result[k['provider']] = True
+        provider = k['provider']
+        result[provider] = True
+        if k['config_json']:
+            try:
+                result['configs'][provider] = json.loads(k['config_json'])
+            except:
+                result['configs'][provider] = {}
     
     return result
 
 
-def add_api_key(user_id: int, provider: str, api_key: str) -> None:
-    """新增或更新 API key"""
+def add_api_key(user_id: int, provider: str, api_key: str = None, config_json: str = None) -> None:
+    """新增或更新 API key 與配置"""
     encrypted = encrypt_api_key(api_key) if api_key else None
     
     conn = get_db_connection()
@@ -116,11 +126,11 @@ def add_api_key(user_id: int, provider: str, api_key: str) -> None:
         'DELETE FROM api_keys WHERE user_id = ? AND provider = ?',
         (user_id, provider)
     )
-    # 再新增
-    if encrypted:
+    # 再新增 (即使沒有 key 也可以有 config，例如 local AI)
+    if encrypted or config_json:
         conn.execute(
-            'INSERT INTO api_keys (user_id, provider, api_key_encrypted) VALUES (?, ?, ?)',
-            (user_id, provider, encrypted)
+            'INSERT INTO api_keys (user_id, provider, api_key_encrypted, config_json) VALUES (?, ?, ?, ?)',
+            (user_id, provider, encrypted, config_json)
         )
     conn.commit()
     conn.close()
@@ -149,3 +159,32 @@ def get_user_api_key(user_id: int, provider: str) -> str:
     if row and row['api_key_encrypted']:
         return decrypt_api_key(row['api_key_encrypted'])
     return None
+
+
+def get_user_api_key_info(user_id: int, provider: str) -> dict:
+    """獲取 API key 與配置詳情"""
+    conn = get_db_connection()
+    row = conn.execute(
+        'SELECT api_key_encrypted, config_json FROM api_keys WHERE user_id = ? AND provider = ?',
+        (user_id, provider)
+    ).fetchone()
+    conn.close()
+    
+    if not row:
+        return None
+        
+    api_key = None
+    if row['api_key_encrypted']:
+        api_key = decrypt_api_key(row['api_key_encrypted'])
+        
+    config = {}
+    if row['config_json']:
+        try:
+            config = json.loads(row['config_json'])
+        except:
+            config = {}
+            
+    return {
+        'api_key': api_key,
+        'config': config
+    }

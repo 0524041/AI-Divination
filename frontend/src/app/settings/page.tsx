@@ -102,9 +102,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (settings) {
-      setLocalSettings(settings);
+      // 始終合併個人 Local AI 設定到本地狀態，讓使用者（包含管理員）能看到自己目前的個人化選擇
+      setLocalSettings({
+        ...settings,
+        local_api_url: backendApiKeys.configs.local?.url || settings.local_api_url,
+        local_model_name: backendApiKeys.configs.local?.model || settings.local_model_name,
+      });
     }
-  }, [settings]);
+  }, [settings, backendApiKeys.configs.local]);
 
   useEffect(() => {
     if (geminiApiKey) {
@@ -171,11 +176,30 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteFromCloud = async () => {
-    if (!confirm('確定要從雲端刪除您的 API Key 嗎？')) return;
+  const handleSaveLocalToCloud = async () => {
+    if (!localSettings.local_api_url || !localSettings.local_model_name) {
+      toast.error('請先輸入 Local API URL 與模型名稱');
+      return;
+    }
+    setIsSavingToCloud(true);
+    try {
+      await saveBackendApiKey('local', undefined, {
+        url: localSettings.local_api_url,
+        model: localSettings.local_model_name
+      });
+      toast.success('Local AI 設定已儲存至雲端');
+    } catch (error) {
+      toast.error('儲存至雲端失敗');
+    } finally {
+      setIsSavingToCloud(false);
+    }
+  };
+
+  const handleDeleteFromCloud = async (provider: 'gemini' | 'local') => {
+    if (!confirm(`確定要從雲端刪除您的 ${provider === 'gemini' ? 'API Key' : 'Local AI 設定'} 嗎？`)) return;
     setIsDeletingFromCloud(true);
     try {
-      await deleteBackendApiKey('gemini');
+      await deleteBackendApiKey(provider);
       toast.success('已從雲端刪除');
     } catch (error) {
       toast.error('刪除失敗');
@@ -501,6 +525,36 @@ export default function SettingsPage() {
                         </p>
                       )}
                     </div>
+
+                    <div className="pt-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSaveLocalToCloud}
+                          disabled={isSavingToCloud || !localSettings.local_api_url || !localSettings.local_model_name}
+                        >
+                          {isSavingToCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
+                          儲存配置至雲端
+                        </Button>
+
+                        {backendApiKeys.local && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteFromCloud('local')}
+                            disabled={isDeletingFromCloud}
+                            className="text-destructive hover:bg-destructive/10"
+                          >
+                            {isDeletingFromCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Trash2 className="w-3 h-3 mr-1" />}
+                            刪除雲端備份
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        • 雲端狀態：{backendApiKeys.local ? <span className="text-[var(--gold)] font-medium">已儲存個人配置</span> : <span className="text-muted-foreground">使用全域預設</span>}
+                      </p>
+                    </div>
                   </>
                 )}
 
@@ -552,7 +606,7 @@ export default function SettingsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={handleDeleteFromCloud}
+                            onClick={() => handleDeleteFromCloud('gemini')}
                             disabled={isDeletingFromCloud}
                             className="text-destructive hover:bg-destructive/10"
                           >

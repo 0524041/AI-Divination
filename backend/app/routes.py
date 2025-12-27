@@ -25,7 +25,8 @@ from .models.user import (
     get_user_api_keys,
     add_api_key,
     delete_api_key,
-    get_user_api_key
+    get_user_api_key,
+    get_user_api_key_info
 )
 import json
 
@@ -170,11 +171,13 @@ def register_routes(app):
         data = request.json
         provider = data.get('provider')
         api_key = data.get('api_key')
+        config_dict = data.get('config')
         
         if provider not in ['gemini', 'local']:
             return jsonify({"error": "Invalid provider"}), 400
         
-        add_api_key(session['user_id'], provider, api_key)
+        config_json = json.dumps(config_dict) if config_dict else None
+        add_api_key(session['user_id'], provider, api_key, config_json)
         return jsonify({"success": True})
 
     @app.route('/api/user/api-keys/<provider>', methods=['DELETE'])
@@ -262,15 +265,23 @@ def register_routes(app):
         prompt_template = get_system_prompt()
         full_payload = prompt_template.replace('{question}', str(question)).replace('{divination_result}', str(raw_result_for_ai))
 
-        # Call AI
+        # Get AI config
         ai_provider = data.get('provider') or get_setting('ai_provider', 'local')
         user_gemini_key = request.headers.get('X-Gemini-Api-Key')
+        user_local_config = None
         
-        # 如果是 Gemini 且 header 沒給 Key，試著從資料庫抓
-        if ai_provider == 'gemini' and not user_gemini_key:
-            user_gemini_key = get_user_api_key(user_id, 'gemini')
-            if user_gemini_key:
-                print(f"[Routes] Found Gemini API Key in backend for user {user_id}")
+        # 試著從資料庫抓用戶個人的 API Key 或配置
+        key_info = get_user_api_key_info(user_id, ai_provider)
+        if key_info:
+            if ai_provider == 'gemini':
+                if not user_gemini_key:
+                    user_gemini_key = key_info.get('api_key')
+                    if user_gemini_key:
+                        print(f"[Routes] Found Gemini API Key in backend for user {user_id}")
+            elif ai_provider == 'local':
+                user_local_config = key_info.get('config')
+                if user_local_config:
+                    print(f"[Routes] Found Local AI config in backend for user {user_id}")
         
         print(f"[Routes] About to call AI, provider='{ai_provider}'")
         
@@ -286,13 +297,14 @@ def register_routes(app):
         )
 
         # 2. 定義背景任務函數
-        def run_ai_background(h_id, payload, provider, gemini_key):
+        def run_ai_background(h_id, payload, provider, gemini_key, local_config):
             try:
                 print(f"[Background] AI Thread starting for History ID: {h_id}")
                 content, used_model = call_ai(
                     prompt=payload,
                     provider=provider,
-                    user_gemini_key=gemini_key
+                    user_gemini_key=gemini_key,
+                    user_local_config=local_config
                 )
                 
                 # 更新資料庫
@@ -308,7 +320,7 @@ def register_routes(app):
         import threading
         thread = threading.Thread(
             target=run_ai_background, 
-            args=(history_id, full_payload, ai_provider, user_gemini_key)
+            args=(history_id, full_payload, ai_provider, user_gemini_key, user_local_config)
         )
         thread.daemon = True # 設為守護執行緒
         thread.start()
