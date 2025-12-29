@@ -284,16 +284,16 @@ start_services() {
     
     sleep 1
     
-    # 啟動後端
-    echo "啟動後端服務 (Port 8000)..."
+    # 啟動後端 (只監聽 localhost，透過 Next.js rewrites 代理訪問)
+    echo "啟動後端服務 (Port 8000, localhost only)..."
     cd "$BACKEND_DIR"
-    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
+    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
     
-    # 啟動前端
-    echo "啟動前端服務 (Port 3000)..."
+    # 啟動前端 (監聽所有網絡接口，接受外網連線)
+    echo "啟動前端服務 (Port 3000, 0.0.0.0)..."
     cd "$FRONTEND_DIR"
-    nohup npm run dev > "$PROJECT_DIR/frontend.log" 2>&1 &
+    nohup npm run dev -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
     
     sleep 3
