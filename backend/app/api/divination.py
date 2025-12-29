@@ -115,7 +115,7 @@ async def process_divination(history_id: int, db_url: str):
             result = await ai_service.generate(user_prompt, system_prompt)
             history.interpretation = result
             history.ai_provider = ai_config.provider
-            history.ai_model = ai_config.local_model if ai_config.provider == "local" else "gemini-2.0-flash"
+            history.ai_model = ai_config.local_model if ai_config.provider == "local" else "gemini-3-flash-preview"
             history.status = "completed"
         except Exception as e:
             history.status = "error"

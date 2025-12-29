@@ -473,18 +473,16 @@ export default function SettingsPage() {
         {/* 分頁選項 */}
         <div className="flex gap-2 border-b border-gray-700 pb-2 mb-6 overflow-x-auto">
           <button
-            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${
-              activeTab === 'ai' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'ai' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+              }`}
             onClick={() => setActiveTab('ai')}
           >
             <Server size={18} className="inline mr-2" />
             AI 設定
           </button>
           <button
-            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${
-              activeTab === 'user' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'user' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+              }`}
             onClick={() => setActiveTab('user')}
           >
             <User size={18} className="inline mr-2" />
@@ -492,9 +490,8 @@ export default function SettingsPage() {
           </button>
           {currentUser?.role === 'admin' && (
             <button
-              className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${
-                activeTab === 'admin' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'admin' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+                }`}
               onClick={() => setActiveTab('admin')}
             >
               <Users size={18} className="inline mr-2" />
@@ -526,11 +523,10 @@ export default function SettingsPage() {
                   {aiConfigs.map((config) => (
                     <div
                       key={config.id}
-                      className={`p-4 rounded-lg border transition ${
-                        config.is_active
+                      className={`p-4 rounded-lg border transition ${config.is_active
                           ? 'border-[var(--gold)] bg-[var(--gold)]/10'
                           : 'border-gray-700 bg-gray-800/50'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -590,8 +586,8 @@ export default function SettingsPage() {
                   <h2 className="text-lg font-bold">
                     {editingConfig ? '編輯 AI 設定' : '新增 AI 設定'}
                   </h2>
-                  <button 
-                    onClick={() => { setShowAddAI(false); setEditingConfig(null); resetAIForm(); }} 
+                  <button
+                    onClick={() => { setShowAddAI(false); setEditingConfig(null); resetAIForm(); }}
                     className="text-gray-400"
                   >
                     <X size={20} />
@@ -603,11 +599,10 @@ export default function SettingsPage() {
                   <label className="block text-sm text-gray-400 mb-2">類型</label>
                   <div className="flex gap-4">
                     <button
-                      className={`flex-1 py-3 rounded-lg border transition ${
-                        newAIProvider === 'gemini'
+                      className={`flex-1 py-3 rounded-lg border transition ${newAIProvider === 'gemini'
                           ? 'border-[var(--gold)] bg-[var(--gold)]/20'
                           : 'border-gray-600 text-gray-400'
-                      }`}
+                        }`}
                       onClick={() => setNewAIProvider('gemini')}
                       disabled={!!editingConfig}
                     >
@@ -615,11 +610,10 @@ export default function SettingsPage() {
                       Gemini
                     </button>
                     <button
-                      className={`flex-1 py-3 rounded-lg border transition ${
-                        newAIProvider === 'local'
+                      className={`flex-1 py-3 rounded-lg border transition ${newAIProvider === 'local'
                           ? 'border-[var(--gold)] bg-[var(--gold)]/20'
                           : 'border-gray-600 text-gray-400'
-                      }`}
+                        }`}
                       onClick={() => setNewAIProvider('local')}
                       disabled={!!editingConfig}
                     >
@@ -663,7 +657,7 @@ export default function SettingsPage() {
                           value={newLocalURL}
                           onChange={(e) => setNewLocalURL(e.target.value)}
                           className="input-dark flex-1"
-                          placeholder="http://localhost:11434"
+                          placeholder="http://localhost:1234"
                         />
                         <button
                           onClick={handleTestConnection}
@@ -699,8 +693,8 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <button 
-                  onClick={editingConfig ? handleUpdateAIConfig : handleAddAIConfig} 
+                <button
+                  onClick={editingConfig ? handleUpdateAIConfig : handleAddAIConfig}
                   className="btn-gold w-full mt-4"
                 >
                   {editingConfig ? '更新設定' : '儲存設定'}
@@ -795,9 +789,8 @@ export default function SettingsPage() {
                   <div key={user.id} className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          user.role === 'admin' ? 'bg-[var(--gold)]/20' : 'bg-gray-700'
-                        }`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-[var(--gold)]/20' : 'bg-gray-700'
+                          }`}>
                           {user.role === 'admin' ? <Shield size={18} className="text-[var(--gold)]" /> : <User size={18} />}
                         </div>
                         <div>
@@ -811,11 +804,10 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleToggleUserActive(user.id)}
-                            className={`text-xs px-2 py-1 rounded ${
-                              user.is_active
+                            className={`text-xs px-2 py-1 rounded ${user.is_active
                                 ? 'bg-green-500/20 text-green-400'
                                 : 'bg-red-500/20 text-red-400'
-                            }`}
+                              }`}
                           >
                             {user.is_active ? '啟用' : '停用'}
                           </button>
@@ -865,21 +857,19 @@ export default function SettingsPage() {
                     <label className="block text-sm text-gray-400 mb-2">角色</label>
                     <div className="flex gap-4">
                       <button
-                        className={`flex-1 py-2 rounded-lg border transition ${
-                          newUserRole === 'user'
+                        className={`flex-1 py-2 rounded-lg border transition ${newUserRole === 'user'
                             ? 'border-[var(--gold)] bg-[var(--gold)]/20'
                             : 'border-gray-600 text-gray-400'
-                        }`}
+                          }`}
                         onClick={() => setNewUserRole('user')}
                       >
                         一般用戶
                       </button>
                       <button
-                        className={`flex-1 py-2 rounded-lg border transition ${
-                          newUserRole === 'admin'
+                        className={`flex-1 py-2 rounded-lg border transition ${newUserRole === 'admin'
                             ? 'border-[var(--gold)] bg-[var(--gold)]/20'
                             : 'border-gray-600 text-gray-400'
-                        }`}
+                          }`}
                         onClick={() => setNewUserRole('admin')}
                       >
                         管理員
