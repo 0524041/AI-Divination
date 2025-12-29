@@ -113,9 +113,58 @@ export default function HistoryPage() {
   };
 
   const handleCopy = async (item: HistoryItem) => {
-    const text = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
-    await navigator.clipboard.writeText(text);
-    alert('已複製到剪貼簿');
+    try {
+      // 準備 Markdown 格式文本
+      const markdownText = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+
+      // 準備 HTML 格式（用於支援富文本的應用）
+      const htmlText = `
+<h2>問題</h2>
+<p>${item.question}</p>
+
+<h2>卦象</h2>
+<p>${item.chart_data.benguaming} → ${item.chart_data.bianguaming}</p>
+
+<h2>解盤</h2>
+<div>${item.interpretation?.replace(/\n/g, '<br>') || '無'}</div>
+    `.trim();
+
+      // 嘗試使用新的 Clipboard API（支援多種格式）
+      if (navigator.clipboard && navigator.clipboard.write) {
+        const blob = new Blob([htmlText], { type: 'text/html' });
+        const textBlob = new Blob([markdownText], { type: 'text/plain' });
+
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': blob,
+            'text/plain': textBlob
+          })
+        ]);
+        alert('已複製到剪貼簿（支援 Markdown 格式）');
+      } else {
+        // 降級方案：只複製純文字
+        await navigator.clipboard.writeText(markdownText);
+        alert('已複製到剪貼簿');
+      }
+    } catch (err) {
+      console.error('複製失敗:', err);
+
+      // 最終降級方案：使用舊的 execCommand 方法
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('已複製到剪貼簿');
+      } catch (fallbackErr) {
+        console.error('降級複製也失敗:', fallbackErr);
+        alert('複製失敗，請手動複製內容');
+      }
+    }
   };
 
   const toggleExpand = async (item: HistoryItem) => {
@@ -134,9 +183,9 @@ export default function HistoryPage() {
         setHtmlContents((prev) => ({ ...prev, [item.id]: result }));
       } catch (err) {
         console.error('Markdown parsing error:', err);
-        setHtmlContents((prev) => ({ 
-          ...prev, 
-          [item.id]: { mainHtml: `<p class="text-red-400">解析失敗: ${err}</p>`, thinkContent: '' } 
+        setHtmlContents((prev) => ({
+          ...prev,
+          [item.id]: { mainHtml: `<p class="text-red-400">解析失敗: ${err}</p>`, thinkContent: '' }
         }));
       }
     }
@@ -202,17 +251,15 @@ export default function HistoryPage() {
           {user?.role === 'admin' && (
             <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1">
               <button
-                className={`px-3 py-1 rounded text-sm transition ${
-                  viewMode === 'mine' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
-                }`}
+                className={`px-3 py-1 rounded text-sm transition ${viewMode === 'mine' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
+                  }`}
                 onClick={() => setViewMode('mine')}
               >
                 我的
               </button>
               <button
-                className={`px-3 py-1 rounded text-sm transition ${
-                  viewMode === 'all' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
-                }`}
+                className={`px-3 py-1 rounded text-sm transition ${viewMode === 'all' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
+                  }`}
                 onClick={() => setViewMode('all')}
               >
                 全部
@@ -329,7 +376,7 @@ export default function HistoryPage() {
                               </div>
                             </details>
                           )}
-                          
+
                           {/* 主要內容 */}
                           <div
                             className="markdown-content bg-gray-800/30 rounded-xl p-4"

@@ -255,13 +255,58 @@ export default function LiuYaoPage() {
     setResult(null);
   };
 
-  const handleCopy = async () => {
-    if (!interpretation) return;
+  const handleCopy = async (item: HistoryItem) => {
     try {
-      await navigator.clipboard.writeText(interpretation);
-      alert('已複製到剪貼簿');
-    } catch {
-      alert('複製失敗');
+      // 準備 Markdown 格式文本
+      const markdownText = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+
+      // 準備 HTML 格式（用於支援富文本的應用）
+      const htmlText = `
+<h2>問題</h2>
+<p>${item.question}</p>
+
+<h2>卦象</h2>
+<p>${item.chart_data.benguaming} → ${item.chart_data.bianguaming}</p>
+
+<h2>解盤</h2>
+<div>${item.interpretation?.replace(/\n/g, '<br>') || '無'}</div>
+    `.trim();
+
+      // 嘗試使用新的 Clipboard API（支援多種格式）
+      if (navigator.clipboard && navigator.clipboard.write) {
+        const blob = new Blob([htmlText], { type: 'text/html' });
+        const textBlob = new Blob([markdownText], { type: 'text/plain' });
+
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/html': blob,
+            'text/plain': textBlob
+          })
+        ]);
+        alert('已複製到剪貼簿（支援 Markdown 格式）');
+      } else {
+        // 降級方案：只複製純文字
+        await navigator.clipboard.writeText(markdownText);
+        alert('已複製到剪貼簿');
+      }
+    } catch (err) {
+      console.error('複製失敗:', err);
+
+      // 最終降級方案：使用舊的 execCommand 方法
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('已複製到剪貼簿');
+      } catch (fallbackErr) {
+        console.error('降級複製也失敗:', fallbackErr);
+        alert('複製失敗，請手動複製內容');
+      }
     }
   };
 
@@ -431,7 +476,7 @@ export default function LiuYaoPage() {
               {activeAI?.provider === 'local' && (
                 <div className="mt-3 flex items-start gap-2 text-xs text-amber-400/80 bg-amber-400/10 rounded-lg p-2">
                   <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                  <span>使用 Local AI 時，解盤最長可能需要等待 5 分鐘，取決於您的電腦性能。建議升級硬體以獲得更快的回應速度。</span>
+                  <span>使用 Local AI 時，解盤最長可能需要等待 5 分鐘，取決於您的電腦性能。建議升級硬體或是使用雲端 AI 解盤以獲得更快的回應速度。</span>
                 </div>
               )}
             </div>
@@ -444,8 +489,8 @@ export default function LiuYaoPage() {
                   <button
                     type="button"
                     className={`flex-1 py-3 rounded-lg border transition ${gender === 'male'
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
-                        : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                      ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
+                      : 'border-gray-600 text-gray-400 hover:border-gray-500'
                       }`}
                     onClick={() => setGender('male')}
                   >
@@ -454,8 +499,8 @@ export default function LiuYaoPage() {
                   <button
                     type="button"
                     className={`flex-1 py-3 rounded-lg border transition ${gender === 'female'
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
-                        : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                      ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
+                      : 'border-gray-600 text-gray-400 hover:border-gray-500'
                       }`}
                     onClick={() => setGender('female')}
                   >
@@ -478,8 +523,8 @@ export default function LiuYaoPage() {
                       key={opt.value}
                       type="button"
                       className={`py-2 rounded-lg border transition ${target === opt.value
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
-                          : 'border-gray-600 text-gray-400 hover:border-gray-500'
+                        ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
+                        : 'border-gray-600 text-gray-400 hover:border-gray-500'
                         }`}
                       onClick={() => setTarget(opt.value as typeof target)}
                     >
