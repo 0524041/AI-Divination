@@ -191,13 +191,34 @@ setup_python_env() {
     
     cd "$BACKEND_DIR"
     
-    # 檢查是否需要建立虛擬環境
+    # 檢查虛擬環境是否存在且 Python 版本正確
+    NEED_CREATE_VENV=false
+    
     if [ ! -d "$VENV_DIR" ]; then
+        NEED_CREATE_VENV=true
+    else
+        # 檢查現有虛擬環境的 Python 版本
+        ACTUAL_VERSION=$("$VENV_DIR/bin/python" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+        if [ "$ACTUAL_VERSION" != "$PYTHON_VERSION" ]; then
+            echo -e "${YELLOW}⚠ 虛擬環境 Python 版本不符 (目前: $ACTUAL_VERSION, 需要: $PYTHON_VERSION)${NC}"
+            echo "移除舊的虛擬環境..."
+            rm -rf "$VENV_DIR"
+            NEED_CREATE_VENV=true
+        fi
+    fi
+    
+    if [ "$NEED_CREATE_VENV" = true ]; then
         echo "建立虛擬環境 (Python $PYTHON_VERSION)..."
         uv venv --python $PYTHON_VERSION "$VENV_DIR"
         echo -e "${GREEN}✓ 虛擬環境已建立${NC}"
+        
+        # 新建環境後需要重新安裝依賴
+        if [ -f "requirements.txt" ]; then
+            echo "安裝 Python 依賴..."
+            uv pip install -r requirements.txt --quiet
+        fi
     else
-        echo -e "${GREEN}✓ 虛擬環境已存在${NC}"
+        echo -e "${GREEN}✓ 虛擬環境已存在 (Python $PYTHON_VERSION)${NC}"
     fi
     
     # 顯示 Python 版本
