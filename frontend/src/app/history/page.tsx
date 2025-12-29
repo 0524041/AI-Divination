@@ -1,202 +1,150 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/contexts/AppContext';
-import { api } from '@/lib/api';
-import { HistoryItem, User } from '@/types';
-import { AppLayout } from '@/components/AppLayout';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import Link from 'next/link';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Star,
+  ArrowLeft,
+  Compass,
+  History as HistoryIcon,
+  Settings,
   Trash2,
-  Clock,
   Copy,
-  Search,
-  Filter,
-  Users,
   ChevronDown,
-  Brain,
-  Bot,
+  ChevronUp,
+  User,
+  Filter,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
-// 提取並處理內容的 hook
-function useProcessedContent(interpretation: string | undefined) {
-  const [htmlContent, setHtmlContent] = useState('');
-  
-  const { thinkContent, mainContent } = useMemo(() => {
-    if (!interpretation) return { thinkContent: '', mainContent: '' };
-    
-    let think = '';
-    let main = interpretation;
-
-    // 提取 <think> 標籤內容
-    const thinkMatch = interpretation.match(/<think>([\s\S]*?)<\/think>/i);
-    if (thinkMatch) {
-      think = thinkMatch[1].trim();
-      main = interpretation.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
-    }
-
-    // 移除 markdown code fence
-    main = main.replace(/^```[\s\S]*?\n/, '').replace(/\n```$/, '').trim();
-
-    return { thinkContent: think, mainContent: main };
-  }, [interpretation]);
-
-  useEffect(() => {
-    const renderMarkdown = async () => {
-      if (typeof window === 'undefined' || !mainContent) {
-        setHtmlContent('');
-        return;
-      }
-      
-      const { marked } = await import('marked');
-      const DOMPurify = (await import('dompurify')).default;
-      
-      marked.setOptions({
-        breaks: true,
-        gfm: true,
-      });
-      
-      const rawHtml = await marked.parse(mainContent);
-      const cleanHtml = DOMPurify.sanitize(rawHtml);
-      setHtmlContent(cleanHtml);
-    };
-    
-    renderMarkdown();
-  }, [mainContent]);
-
-  return { thinkContent, htmlContent };
+interface HistoryItem {
+  id: number;
+  divination_type: string;
+  question: string;
+  gender: string | null;
+  target: string | null;
+  chart_data: {
+    benguaming: string;
+    bianguaming: string;
+    [key: string]: unknown;
+  };
+  interpretation: string | null;
+  ai_provider: string | null;
+  ai_model: string | null;
+  status: string;
+  created_at: string;
+  username?: string;
 }
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { user, isLoading } = useApp();
+  const [user, setUser] = useState<{ role: string } | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [filteredHistory, setFilteredHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterFavorite, setFilterFavorite] = useState<'all' | 'favorite'>('all');
-  
-  // Admin specific
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string>('all');
-  
-  // View detail modal
-  const [viewItem, setViewItem] = useState<HistoryItem | null>(null);
-
-  const isAdmin = user?.role === 'admin';
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
+  const [htmlContents, setHtmlContents] = useState<Record<number, { mainHtml: string; thinkContent: string }>>({});
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/');
-    }
-  }, [user, isLoading, router]);
-
-  // Load users for admin
-  useEffect(() => {
-    if (user && isAdmin) {
-      api.getAllUsers().then(setUsers).catch(() => {});
-    }
-  }, [user, isAdmin]);
-
-  // Load history
-  const loadHistory = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const userId = isAdmin ? (selectedUserId === 'all' ? 'all' : parseInt(selectedUserId)) : undefined;
-      const data = await api.getHistory(userId as number | 'all' | undefined);
-      setHistory(data);
-    } catch {
-      toast.error('載入歷史記錄失敗');
-    } finally {
-      setLoading(false);
-    }
-  }, [user, isAdmin, selectedUserId]);
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     if (user) {
-      loadHistory();
+      fetchHistory();
     }
-  }, [user, loadHistory]);
+  }, [user, viewMode]);
 
-  // Filter history
-  useEffect(() => {
-    let result = [...history];
-    
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(item =>
-        item.question.toLowerCase().includes(query) ||
-        item.interpretation?.toLowerCase().includes(query)
-      );
+  const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
     }
-    
-    // Favorite filter
-    if (filterFavorite === 'favorite') {
-      result = result.filter(item => item.is_favorite);
-    }
-    
-    setFilteredHistory(result);
-  }, [history, searchQuery, filterFavorite]);
 
-  const handleToggleFavorite = async (id: number, isFavorite: boolean) => {
     try {
-      await api.toggleFavorite(id, !isFavorite);
-      setHistory(prev =>
-        prev.map(item =>
-          item.id === id ? { ...item, is_favorite: !isFavorite } : item
-        )
-      );
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setUser(await res.json());
+      } else {
+        router.push('/login');
+      }
     } catch {
-      toast.error('操作失敗');
+      router.push('/login');
+    }
+  };
+
+  const fetchHistory = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const endpoint = viewMode === 'all' && user?.role === 'admin' ? '/api/history/admin/all' : '/api/history';
+
+    try {
+      const res = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data.items || []);
+      }
+    } catch (err) {
+      console.error('Fetch history error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('確定要刪除此記錄嗎？')) return;
+    if (!confirm('確定要刪除這筆紀錄嗎？')) return;
+
+    const token = localStorage.getItem('token');
     try {
-      await api.deleteHistory(id);
-      setHistory(prev => prev.filter(item => item.id !== id));
-      toast.success('已刪除');
-    } catch {
-      toast.error('刪除失敗');
+      const res = await fetch(`/api/history/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setHistory((prev) => prev.filter((item) => item.id !== id));
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
     }
   };
 
-  const handleCopy = (item: HistoryItem) => {
-    // 清理 interpretation 內容
-    let content = item.interpretation || '無解讀內容';
-    // 移除 think 標籤
-    content = content.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
-    // 移除 code fence
-    content = content.replace(/^```[\s\S]*?\n/, '').replace(/\n```$/, '').trim();
-    
-    const markdown = `## 問題\n${item.question}\n\n## 解卦結果\n${content}`;
-    navigator.clipboard.writeText(markdown);
-    toast.success('已複製到剪貼簿（Markdown 格式）');
+  const handleCopy = async (item: HistoryItem) => {
+    const text = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+    await navigator.clipboard.writeText(text);
+    alert('已複製到剪貼簿');
+  };
+
+  const toggleExpand = async (item: HistoryItem) => {
+    if (expandedId === item.id) {
+      setExpandedId(null);
+      return;
+    }
+
+    setExpandedId(item.id);
+
+    // 渲染 Markdown
+    if (item.interpretation && !htmlContents[item.id]) {
+      try {
+        const { parseMarkdown } = await import('@/lib/markdown');
+        const result = await parseMarkdown(item.interpretation);
+        setHtmlContents((prev) => ({ ...prev, [item.id]: result }));
+      } catch (err) {
+        console.error('Markdown parsing error:', err);
+        setHtmlContents((prev) => ({ 
+          ...prev, 
+          [item.id]: { mainHtml: `<p class="text-red-400">解析失敗: ${err}</p>`, thinkContent: '' } 
+        }));
+      }
+    }
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString('zh-TW', {
+    const date = new Date(dateStr);
+    return date.toLocaleString('zh-TW', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -205,276 +153,205 @@ export default function HistoryPage() {
     });
   };
 
-  if (isLoading || !user) {
+  const getDivinationTypeName = (type: string) => {
+    const types: Record<string, string> = {
+      liuyao: '六爻占卜',
+      ziwei: '紫微斗數',
+      bazi: '八字命盤',
+    };
+    return types[type] || type;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      completed: 'bg-green-500/20 text-green-400',
+      processing: 'bg-yellow-500/20 text-yellow-400',
+      pending: 'bg-blue-500/20 text-blue-400',
+      error: 'bg-red-500/20 text-red-400',
+      cancelled: 'bg-gray-500/20 text-gray-400',
+    };
+    const labels: Record<string, string> = {
+      completed: '已完成',
+      processing: '處理中',
+      pending: '等待中',
+      error: '錯誤',
+      cancelled: '已取消',
+    };
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-5xl animate-spin" style={{ animationDuration: '2s' }}>☯</div>
-      </div>
+      <span className={`text-xs px-2 py-1 rounded ${styles[status] || styles.pending}`}>
+        {labels[status] || status}
+      </span>
     );
-  }
+  };
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* Page Title */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-[var(--gold)]">歷史記錄</h1>
-            <p className="text-muted-foreground mt-1">
-              共 {filteredHistory.length} 筆記錄
-            </p>
+    <div className="min-h-screen">
+      {/* 導航欄 */}
+      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-gray-400 hover:text-[var(--gold)]">
+            <ArrowLeft size={24} />
+          </Link>
+          <div className="flex items-center gap-3">
+            <HistoryIcon className="text-[var(--gold)]" size={24} />
+            <h1 className="text-xl font-bold text-[var(--gold)]">歷史紀錄</h1>
           </div>
         </div>
 
-        {/* Filters */}
-        <Card className="glass-panel">
-          <CardContent className="p-4">
-            <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="搜尋問題或解讀內容..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-transparent border-border"
-                />
-              </div>
-
-              {/* Favorite Filter */}
-              <Select value={filterFavorite} onValueChange={(v) => setFilterFavorite(v as 'all' | 'favorite')}>
-                <SelectTrigger className="w-full lg:w-40 bg-transparent border-border">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部記錄</SelectItem>
-                  <SelectItem value="favorite">僅顯示收藏</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Admin: User Filter */}
-              {isAdmin && (
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <SelectTrigger className="w-full lg:w-48 bg-transparent border-border">
-                    <Users className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="選擇用戶" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">所有用戶</SelectItem>
-                    {users.map(u => (
-                      <SelectItem key={u.id} value={u.id.toString()}>
-                        {u.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+        <div className="flex items-center gap-4">
+          {user?.role === 'admin' && (
+            <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1">
+              <button
+                className={`px-3 py-1 rounded text-sm transition ${
+                  viewMode === 'mine' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
+                }`}
+                onClick={() => setViewMode('mine')}
+              >
+                我的
+              </button>
+              <button
+                className={`px-3 py-1 rounded text-sm transition ${
+                  viewMode === 'all' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
+                }`}
+                onClick={() => setViewMode('all')}
+              >
+                全部
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          )}
 
-        {/* History List */}
+          <div className="hidden md:flex items-center gap-4">
+            <Link href="/" className="text-gray-300 hover:text-[var(--gold)]">
+              <Compass size={20} />
+            </Link>
+            <Link href="/settings" className="text-gray-300 hover:text-[var(--gold)]">
+              <Settings size={20} />
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* 主內容 */}
+      <main className="max-w-4xl mx-auto px-4 py-6">
         {loading ? (
           <div className="text-center py-12">
-            <div className="text-5xl animate-spin inline-block" style={{ animationDuration: '2s' }}>☯</div>
+            <div className="text-4xl mb-4 animate-spin-slow">☯</div>
+            <p className="text-gray-400">載入中...</p>
           </div>
-        ) : filteredHistory.length === 0 ? (
-          <Card className="glass-panel">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              {history.length === 0 ? '尚無占卜記錄' : '沒有符合條件的記錄'}
-            </CardContent>
-          </Card>
+        ) : history.length === 0 ? (
+          <div className="text-center py-12">
+            <HistoryIcon className="mx-auto mb-4 text-gray-600" size={48} />
+            <p className="text-gray-400">還沒有任何紀錄</p>
+            <Link href="/liuyao" className="btn-gold inline-block mt-4">
+              開始占卜
+            </Link>
+          </div>
         ) : (
-          <div className="space-y-3">
-            {filteredHistory.map(item => (
-              <Card
-                key={item.id}
-                className="glass-panel hover:border-[var(--gold)]/30 transition-colors cursor-pointer"
-                onClick={() => setViewItem(item)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Main Content */}
+          <div className="space-y-4">
+            {history.map((item) => (
+              <div key={item.id} className="glass-card overflow-hidden">
+                {/* 摘要行 */}
+                <div
+                  className="p-4 cursor-pointer hover:bg-white/5 transition"
+                  onClick={() => toggleExpand(item)}
+                >
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-[var(--gold)]/20 text-[var(--gold)]">
-                          六爻
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <span className="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-2 py-1 rounded">
+                          {getDivinationTypeName(item.divination_type)}
                         </span>
-                        {Boolean(item.is_favorite) && (
-                          <Star className="w-4 h-4 fill-[var(--gold)] text-[var(--gold)]" />
-                        )}
-                        {isAdmin && item.username && (
-                          <span className="text-xs text-muted-foreground">
-                            by {item.username}
+                        {getStatusBadge(item.status)}
+                        {viewMode === 'all' && item.username && (
+                          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded flex items-center gap-1">
+                            <User size={12} />
+                            {item.username}
                           </span>
                         )}
                       </div>
-                      <h3 className="font-medium text-base truncate mb-1">
-                        {item.question}
-                      </h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {item.interpretation?.replace(/<[^>]*>/g, '').slice(0, 150)}...
+                      <p className="text-gray-200 truncate">{item.question}</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {item.chart_data.benguaming} → {item.chart_data.bianguaming}
                       </p>
-                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span>{formatDate(item.created_at)}</span>
-                        {item.ai_model && (
-                          <>
-                            <span className="mx-1">•</span>
-                            <Bot className="w-3 h-3" />
-                            <span>{item.ai_model}</span>
-                          </>
-                        )}
-                      </div>
                     </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleCopy(item)}
-                        title="複製 (Markdown)"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleToggleFavorite(item.id, item.is_favorite)}
-                        className={item.is_favorite ? 'text-[var(--gold)]' : ''}
-                        title={item.is_favorite ? '取消收藏' : '加入收藏'}
-                      >
-                        <Star className={`w-4 h-4 ${item.is_favorite ? 'fill-current' : ''}`} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(item.id)}
-                        className="hover:text-destructive"
-                        title="刪除"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-xs text-gray-500">{formatDate(item.created_at)}</span>
+                      {expandedId === item.id ? (
+                        <ChevronUp size={20} className="text-gray-400" />
+                      ) : (
+                        <ChevronDown size={20} className="text-gray-400" />
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* 展開內容 */}
+                {expandedId === item.id && (
+                  <div className="border-t border-gray-700 p-4 space-y-4 fade-in">
+                    {/* 操作按鈕 */}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => handleCopy(item)}
+                        className="text-gray-400 hover:text-[var(--gold)] flex items-center gap-1 text-sm"
+                      >
+                        <Copy size={16} />
+                        複製
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="text-gray-400 hover:text-red-400 flex items-center gap-1 text-sm"
+                      >
+                        <Trash2 size={16} />
+                        刪除
+                      </button>
+                    </div>
+
+                    {/* AI 資訊 */}
+                    {item.ai_provider && (
+                      <div className="text-sm text-gray-500">
+                        AI: {item.ai_provider} {item.ai_model && `(${item.ai_model})`}
+                      </div>
+                    )}
+
+                    {/* 解盤內容 */}
+                    {item.interpretation ? (
+                      htmlContents[item.id] ? (
+                        <div className="space-y-4">
+                          {/* Think 內容（可摺疊） */}
+                          {htmlContents[item.id].thinkContent && (
+                            <details className="bg-gray-800/50 rounded-lg border border-gray-700">
+                              <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
+                                <span className="text-lg">🧠</span>
+                                <span>AI 思考過程（點擊展開）</span>
+                              </summary>
+                              <div className="px-4 pb-4 text-gray-400 text-sm whitespace-pre-wrap border-t border-gray-700 pt-3">
+                                {htmlContents[item.id].thinkContent}
+                              </div>
+                            </details>
+                          )}
+                          
+                          {/* 主要內容 */}
+                          <div
+                            className="markdown-content bg-gray-800/30 rounded-xl p-4"
+                            dangerouslySetInnerHTML={{ __html: htmlContents[item.id].mainHtml }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          <div className="text-2xl animate-spin-slow">☯</div>
+                          <p className="text-gray-500 text-sm mt-2">解析中...</p>
+                        </div>
+                      )
+                    ) : (
+                      <p className="text-gray-500">暫無解盤結果</p>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
-      </div>
-
-      {/* View Detail Modal */}
-      <Dialog open={!!viewItem} onOpenChange={() => setViewItem(null)}>
-        <DialogContent className="glass-panel max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl text-[var(--gold)]">
-              {viewItem?.question}
-            </DialogTitle>
-          </DialogHeader>
-          {viewItem && (
-            <HistoryDetailView
-              item={viewItem}
-              formatDate={formatDate}
-              onCopy={handleCopy}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </AppLayout>
-  );
-}
-
-// 詳情視圖組件
-function HistoryDetailView({
-  item,
-  formatDate,
-  onCopy,
-  onToggleFavorite,
-}: {
-  item: HistoryItem;
-  formatDate: (date: string) => string;
-  onCopy: (item: HistoryItem) => void;
-  onToggleFavorite: (id: number, isFavorite: boolean) => void;
-}) {
-  const { thinkContent, htmlContent } = useProcessedContent(item.interpretation);
-  const [showThinking, setShowThinking] = useState(false);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Clock className="w-4 h-4" />
-        <span>{formatDate(item.created_at)}</span>
-        {item.ai_model && (
-          <>
-            <span>•</span>
-            <Bot className="w-4 h-4" />
-            <span>{item.ai_model}</span>
-          </>
-        )}
-        {item.is_favorite && (
-          <>
-            <span>•</span>
-            <Star className="w-4 h-4 fill-[var(--gold)] text-[var(--gold)]" />
-            <span className="text-[var(--gold)]">已收藏</span>
-          </>
-        )}
-      </div>
-
-      {/* 思考過程折疊區 */}
-      {thinkContent && (
-        <div className="border border-border rounded-lg overflow-hidden">
-          <button
-            onClick={() => setShowThinking(!showThinking)}
-            className="w-full flex items-center gap-2 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors"
-          >
-            <Brain className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground flex-1 text-left">
-              AI 思考過程
-            </span>
-            <ChevronDown
-              className={`w-4 h-4 text-muted-foreground transition-transform ${
-                showThinking ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
-          {showThinking && (
-            <div className="px-4 py-3 bg-muted/10 border-t border-border">
-              <pre className="text-sm text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">
-                {thinkContent}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 解讀內容 */}
-      <div className="result-content">
-        {htmlContent ? (
-          <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-        ) : (
-          <p className="text-muted-foreground">載入中...</p>
-        )}
-      </div>
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button variant="outline" onClick={() => onCopy(item)}>
-          <Copy className="w-4 h-4 mr-2" />
-          複製結果
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => onToggleFavorite(item.id, item.is_favorite)}
-          className={item.is_favorite ? 'text-[var(--gold)] border-[var(--gold)]' : ''}
-        >
-          <Star className={`w-4 h-4 mr-2 ${item.is_favorite ? 'fill-current' : ''}`} />
-          {item.is_favorite ? '取消收藏' : '加入收藏'}
-        </Button>
-      </div>
+      </main>
     </div>
   );
 }
-

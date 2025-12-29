@@ -1,866 +1,901 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/contexts/AppContext';
-import { api } from '@/lib/api';
-import { Settings, User } from '@/types';
-import { AppLayout } from '@/components/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import Link from 'next/link';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  User as UserIcon,
-  Bot,
-  Save,
+  ArrowLeft,
+  Settings as SettingsIcon,
+  Compass,
+  History,
   Key,
-  AlertCircle,
-  Shield,
+  Server,
+  User,
   Users,
-  Settings2,
-  Trash2,
-  Edit,
-  UserPlus,
   LogOut,
-  Loader2,
-  CheckCircle2,
-  XCircle,
+  X,
+  Trash2,
+  Plus,
+  Eye,
+  EyeOff,
   RefreshCw,
+  Shield,
+  Edit2,
 } from 'lucide-react';
-import { toast } from 'sonner';
+
+interface AIConfig {
+  id: number;
+  provider: string;
+  has_api_key: boolean;
+  local_url: string | null;
+  local_model: string | null;
+  is_active: boolean;
+}
+
+interface UserItem {
+  id: number;
+  username: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+type SettingsTab = 'ai' | 'user' | 'admin';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const {
-    user,
-    isLoading,
-    settings,
-    updateSettings,
-    geminiApiKey,
-    setGeminiApiKey,
-    logout,
-    backendApiKeys,
-    saveBackendApiKey,
-    deleteBackendApiKey
-  } = useApp();
-  const [localSettings, setLocalSettings] = useState<Partial<Settings>>({});
+  const [currentUser, setCurrentUser] = useState<{ id: number; username: string; role: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('ai');
+  const [loading, setLoading] = useState(true);
+
+  // AI 設定
+  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
+  const [showAddAI, setShowAddAI] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<AIConfig | null>(null);
+  const [newAIProvider, setNewAIProvider] = useState<'gemini' | 'local'>('gemini');
+  const [newAPIKey, setNewAPIKey] = useState('');
+  const [newLocalURL, setNewLocalURL] = useState('');
+  const [newLocalModel, setNewLocalModel] = useState('');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [showAPIKey, setShowAPIKey] = useState(false);
+
+  // 用戶設定
+  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [localGeminiKey, setLocalGeminiKey] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSavingToCloud, setIsSavingToCloud] = useState(false);
-  const [isDeletingFromCloud, setIsDeletingFromCloud] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  // Admin state
-  const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [editUser, setEditUser] = useState<User | null>(null);
-  const [editUserPassword, setEditUserPassword] = useState('');
-  const [editUserRole, setEditUserRole] = useState<'user' | 'admin'>('user');
-  const [showCreateUser, setShowCreateUser] = useState(false);
+  // 用戶管理 (Admin)
+  const [users, setUsers] = useState<UserItem[]>([]);
+  const [showAddUser, setShowAddUser] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
 
-  // Local AI test state
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-
-  const isAdmin = user?.role === 'admin';
+  useEffect(() => {
+    checkAuth();
+  }, []);
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/');
-    }
-  }, [user, isLoading, router]);
-
-  useEffect(() => {
-    if (settings) {
-      // 始終合併個人 Local AI 設定到本地狀態，讓使用者（包含管理員）能看到自己目前的個人化選擇
-      setLocalSettings({
-        ...settings,
-        local_api_url: backendApiKeys.configs.local?.url || settings.local_api_url,
-        local_model_name: backendApiKeys.configs.local?.model || settings.local_model_name,
-      });
-    }
-  }, [settings, backendApiKeys.configs.local]);
-
-  useEffect(() => {
-    if (geminiApiKey) {
-      setLocalGeminiKey('••••••••••••' + geminiApiKey.slice(-4));
-    }
-  }, [geminiApiKey]);
-
-  // Load users for admin
-  useEffect(() => {
-    if (user && isAdmin) {
-      loadUsers();
-    }
-  }, [user, isAdmin]);
-
-  const loadUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const data = await api.getAllUsers();
-      setUsers(data);
-    } catch {
-      toast.error('載入用戶列表失敗');
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    setIsSaving(true);
-    try {
-      // 只有管理員可以儲存全域設定
-      if (isAdmin) {
-        await updateSettings(localSettings);
+    if (currentUser) {
+      fetchAIConfigs();
+      if (currentUser.role === 'admin') {
+        fetchUsers();
       }
+    }
+  }, [currentUser]);
 
-      // 儲存本地 Gemini API Key
-      if (localGeminiKey && !localGeminiKey.startsWith('••••')) {
-        setGeminiApiKey(localGeminiKey);
-      } else if (!localGeminiKey) {
-        setGeminiApiKey(null);
+  const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setCurrentUser(await res.json());
+      } else {
+        router.push('/login');
       }
-
-      toast.success('本地設定已儲存');
-    } catch (error) {
-      console.error('Save settings failed:', error);
-      toast.error('儲存失敗');
+    } catch {
+      router.push('/login');
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
 
-  const handleSaveToCloud = async () => {
-    if (!localGeminiKey || localGeminiKey.startsWith('••••')) {
-      toast.error('請先輸入有效的 API Key');
-      return;
-    }
-    setIsSavingToCloud(true);
+  const fetchAIConfigs = async () => {
+    const token = localStorage.getItem('token');
     try {
-      await saveBackendApiKey('gemini', localGeminiKey);
-      toast.success('API Key 已加密上傳至雲端');
-    } catch (error) {
-      toast.error('上傳雲端失敗');
-    } finally {
-      setIsSavingToCloud(false);
-    }
-  };
-
-  const handleSaveLocalToCloud = async () => {
-    if (!localSettings.local_api_url || !localSettings.local_model_name) {
-      toast.error('請先輸入 Local API URL 與模型名稱');
-      return;
-    }
-    setIsSavingToCloud(true);
-    try {
-      await saveBackendApiKey('local', undefined, {
-        url: localSettings.local_api_url,
-        model: localSettings.local_model_name
+      const res = await fetch('/api/settings/ai', {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      toast.success('Local AI 設定已儲存至雲端');
-    } catch (error) {
-      toast.error('儲存至雲端失敗');
-    } finally {
-      setIsSavingToCloud(false);
+      if (res.ok) {
+        setAiConfigs(await res.json());
+      }
+    } catch (err) {
+      console.error('Fetch AI configs error:', err);
     }
   };
 
-  const handleDeleteFromCloud = async (provider: 'gemini' | 'local') => {
-    if (!confirm(`確定要從雲端刪除您的 ${provider === 'gemini' ? 'API Key' : 'Local AI 設定'} 嗎？`)) return;
-    setIsDeletingFromCloud(true);
+  const fetchUsers = async () => {
+    const token = localStorage.getItem('token');
     try {
-      await deleteBackendApiKey(provider);
-      toast.success('已從雲端刪除');
-    } catch (error) {
-      toast.error('刪除失敗');
-    } finally {
-      setIsDeletingFromCloud(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      toast.error('兩次密碼不一致');
-      return;
-    }
-    if (newPassword.length < 6) {
-      toast.error('密碼至少需要 6 個字元');
-      return;
-    }
-    try {
-      await api.updatePassword(newPassword);
-      toast.success('密碼已更新');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch {
-      toast.error('密碼更新失敗');
-    }
-  };
-
-  const handleEditUser = async () => {
-    if (!editUser) return;
-    try {
-      await api.updateUser(editUser.id, {
-        role: editUserRole,
-        password: editUserPassword || undefined,
+      const res = await fetch('/api/admin/users', {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      toast.success('用戶已更新');
-      setEditUser(null);
-      setEditUserPassword('');
-      loadUsers();
-    } catch {
-      toast.error('更新失敗');
-    }
-  };
-
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm('確定要刪除此用戶嗎？此操作無法復原。')) return;
-    try {
-      await api.deleteUser(userId);
-      toast.success('用戶已刪除');
-      loadUsers();
-    } catch {
-      toast.error('刪除失敗');
-    }
-  };
-
-  const handleCreateUser = async () => {
-    if (!newUsername || !newUserPassword) {
-      toast.error('請填寫用戶名和密碼');
-      return;
-    }
-    if (newUserPassword.length < 6) {
-      toast.error('密碼至少需要 6 個字元');
-      return;
-    }
-    try {
-      await api.createUser(newUsername, newUserPassword, newUserRole);
-      toast.success('用戶已建立');
-      setShowCreateUser(false);
-      setNewUsername('');
-      setNewUserPassword('');
-      setNewUserRole('user');
-      loadUsers();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '建立失敗');
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.push('/');
-    } catch {
-      toast.error('登出失敗');
+      if (res.ok) {
+        setUsers(await res.json());
+      }
+    } catch (err) {
+      console.error('Fetch users error:', err);
     }
   };
 
   const handleTestConnection = async () => {
-    const apiUrl = localSettings.local_api_url;
-    if (!apiUrl) {
-      toast.error('請先填寫 API URL');
-      return;
-    }
-
+    if (!newLocalURL) return;
     setTestingConnection(true);
-    setConnectionStatus('idle');
     setAvailableModels([]);
 
     try {
-      const result = await api.testLocalAI(apiUrl);
-      if (result.success) {
-        setConnectionStatus('success');
-        setAvailableModels(result.models);
-        toast.success(result.message);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/settings/ai/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url: newLocalURL }),
+      });
 
-        // 如果目前沒有選擇模型，自動選擇第一個
-        if (!localSettings.local_model_name && result.models.length > 0) {
-          setLocalSettings({ ...localSettings, local_model_name: result.models[0] });
+      const data = await res.json();
+      if (data.success) {
+        setAvailableModels(data.models || []);
+        if (data.models?.length > 0 && !newLocalModel) {
+          setNewLocalModel(data.models[0]);
         }
+      } else {
+        alert(`連線失敗: ${data.error}`);
       }
-    } catch (error) {
-      setConnectionStatus('error');
-      toast.error(error instanceof Error ? error.message : '連線測試失敗');
+    } catch (err) {
+      alert('連線測試失敗');
     } finally {
       setTestingConnection(false);
     }
   };
 
-  if (isLoading || !user) {
+  const handleAddAIConfig = async () => {
+    const token = localStorage.getItem('token');
+    const body: Record<string, string> = { provider: newAIProvider };
+
+    if (newAIProvider === 'gemini') {
+      if (!newAPIKey) {
+        alert('請輸入 API Key');
+        return;
+      }
+      body.api_key = newAPIKey;
+    } else {
+      if (!newLocalURL || !newLocalModel) {
+        alert('請填寫 URL 和選擇模型');
+        return;
+      }
+      body.local_url = newLocalURL;
+      body.local_model = newLocalModel;
+    }
+
+    try {
+      const res = await fetch('/api/settings/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        await fetchAIConfigs();
+        setShowAddAI(false);
+        resetAIForm();
+      } else {
+        const data = await res.json();
+        alert(data.detail || '新增失敗');
+      }
+    } catch {
+      alert('新增失敗');
+    }
+  };
+
+  const handleEditAIConfig = (config: AIConfig) => {
+    setEditingConfig(config);
+    setNewAIProvider(config.provider as 'gemini' | 'local');
+    setNewAPIKey('');
+    setNewLocalURL(config.local_url || '');
+    setNewLocalModel(config.local_model || '');
+    if (config.local_url) {
+      // 自動測試連線以取得可用模型
+      handleTestConnectionForEdit(config.local_url);
+    }
+  };
+
+  const handleTestConnectionForEdit = async (url: string) => {
+    setTestingConnection(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/settings/ai/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setAvailableModels(data.models || []);
+      }
+    } catch (err) {
+      console.error('Test connection error:', err);
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
+  const handleUpdateAIConfig = async () => {
+    if (!editingConfig) return;
+
+    const token = localStorage.getItem('token');
+    const body: Record<string, string> = { provider: newAIProvider };
+
+    if (newAIProvider === 'gemini') {
+      if (newAPIKey) {
+        body.api_key = newAPIKey;
+      }
+    } else {
+      if (!newLocalURL || !newLocalModel) {
+        alert('請填寫 URL 和選擇模型');
+        return;
+      }
+      body.local_url = newLocalURL;
+      body.local_model = newLocalModel;
+    }
+
+    try {
+      const res = await fetch(`/api/settings/ai/${editingConfig.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        await fetchAIConfigs();
+        setEditingConfig(null);
+        resetAIForm();
+      } else {
+        const data = await res.json();
+        alert(data.detail || '更新失敗');
+      }
+    } catch {
+      alert('更新失敗');
+    }
+  };
+
+  const handleActivateAI = async (configId: number) => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`/api/settings/ai/${configId}/activate`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchAIConfigs();
+    } catch (err) {
+      console.error('Activate error:', err);
+    }
+  };
+
+  const handleDeleteAI = async (configId: number) => {
+    if (!confirm('確定要刪除此設定？')) return;
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`/api/settings/ai/${configId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchAIConfigs();
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
+  };
+
+  const resetAIForm = () => {
+    setNewAIProvider('gemini');
+    setNewAPIKey('');
+    setNewLocalURL('');
+    setNewLocalModel('');
+    setAvailableModels([]);
+    setShowAPIKey(false);
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('新密碼與確認密碼不符');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('/api/auth/password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword,
+          confirm_password: confirmPassword,
+        }),
+      });
+
+      if (res.ok) {
+        setPasswordSuccess(true);
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        const data = await res.json();
+        setPasswordError(data.detail || '修改失敗');
+      }
+    } catch {
+      setPasswordError('修改失敗');
+    }
+  };
+
+  const handleAddUser = async () => {
+    if (!newUsername || !newUserPassword) {
+      alert('請填寫完整資訊');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          username: newUsername,
+          password: newUserPassword,
+          role: newUserRole,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchUsers();
+        setShowAddUser(false);
+        setNewUsername('');
+        setNewUserPassword('');
+        setNewUserRole('user');
+      } else {
+        const data = await res.json();
+        alert(data.detail || '新增失敗');
+      }
+    } catch {
+      alert('新增失敗');
+    }
+  };
+
+  const handleToggleUserActive = async (userId: number) => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`/api/admin/users/${userId}/toggle-active`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchUsers();
+    } catch (err) {
+      console.error('Toggle active error:', err);
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm('確定要刪除此用戶？')) return;
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchUsers();
+    } catch (err) {
+      console.error('Delete user error:', err);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-5xl animate-spin" style={{ animationDuration: '2s' }}>☯</div>
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-spin-slow">☯</div>
+          <p className="text-gray-400">載入中...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6 max-w-4xl mx-auto">
-        {/* Page Title */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-[var(--gold)]">設定</h1>
-            <p className="text-muted-foreground mt-1">
-              管理您的帳戶和系統設定
-            </p>
+    <div className="min-h-screen">
+      {/* 導航欄 */}
+      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-gray-400 hover:text-[var(--gold)]">
+            <ArrowLeft size={24} />
+          </Link>
+          <div className="flex items-center gap-3">
+            <SettingsIcon className="text-[var(--gold)]" size={24} />
+            <h1 className="text-xl font-bold text-[var(--gold)]">設定</h1>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            登出
-          </Button>
         </div>
 
-        <Tabs defaultValue="account" className="space-y-6">
-          <TabsList className="glass-panel">
-            <TabsTrigger value="account" className="data-[state=active]:text-[var(--gold)]">
-              <UserIcon className="w-4 h-4 mr-2" />
-              帳戶
-            </TabsTrigger>
-            <TabsTrigger value="ai" className="data-[state=active]:text-[var(--gold)]">
-              <Bot className="w-4 h-4 mr-2" />
-              AI 設定
-            </TabsTrigger>
-            {isAdmin && (
-              <>
-                <TabsTrigger value="system" className="data-[state=active]:text-[var(--gold)]">
-                  <Settings2 className="w-4 h-4 mr-2" />
-                  系統
-                </TabsTrigger>
-                <TabsTrigger value="users" className="data-[state=active]:text-[var(--gold)]">
-                  <Users className="w-4 h-4 mr-2" />
-                  用戶管理
-                </TabsTrigger>
-              </>
-            )}
-          </TabsList>
+        <div className="hidden md:flex items-center gap-4">
+          <Link href="/" className="text-gray-300 hover:text-[var(--gold)]">
+            <Compass size={20} />
+          </Link>
+          <Link href="/history" className="text-gray-300 hover:text-[var(--gold)]">
+            <History size={20} />
+          </Link>
+        </div>
+      </nav>
 
-          {/* Account Tab */}
-          <TabsContent value="account" className="space-y-6">
-            <Card className="glass-panel">
-              <CardHeader>
-                <CardTitle className="text-[var(--gold)]">帳戶資訊</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">用戶名</Label>
-                    <p className="text-lg font-medium">{user.username}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">角色</Label>
-                    <p className="text-lg font-medium flex items-center gap-2">
-                      {user.role === 'admin' && <Shield className="w-4 h-4 text-[var(--gold)]" />}
-                      {user.role === 'admin' ? '管理員' : '一般用戶'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      {/* 主內容 */}
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        {/* 分頁選項 */}
+        <div className="flex gap-2 border-b border-gray-700 pb-2 mb-6 overflow-x-auto">
+          <button
+            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${
+              activeTab === 'ai' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+            }`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Server size={18} className="inline mr-2" />
+            AI 設定
+          </button>
+          <button
+            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${
+              activeTab === 'user' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+            }`}
+            onClick={() => setActiveTab('user')}
+          >
+            <User size={18} className="inline mr-2" />
+            用戶設定
+          </button>
+          {currentUser?.role === 'admin' && (
+            <button
+              className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${
+                activeTab === 'admin' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+              }`}
+              onClick={() => setActiveTab('admin')}
+            >
+              <Users size={18} className="inline mr-2" />
+              用戶管理
+            </button>
+          )}
+        </div>
 
-            <Card className="glass-panel">
-              <CardHeader>
-                <CardTitle className="text-[var(--gold)]">變更密碼</CardTitle>
-                <CardDescription>更新您的登入密碼</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label>新密碼</Label>
-                    <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="輸入新密碼 (至少 6 字)"
-                      className="mt-1 bg-transparent border-border"
-                    />
-                  </div>
-                  <div>
-                    <Label>確認密碼</Label>
-                    <Input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="再次輸入新密碼"
-                      className="mt-1 bg-transparent border-border"
-                    />
-                  </div>
-                </div>
-                <Button
-                  onClick={handleChangePassword}
-                  disabled={!newPassword || !confirmPassword}
+        {/* AI 設定頁面 */}
+        {activeTab === 'ai' && (
+          <div className="space-y-6">
+            {/* 現有設定 */}
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">AI 服務設定</h2>
+                <button
+                  onClick={() => { setShowAddAI(true); setEditingConfig(null); resetAIForm(); }}
+                  className="btn-gold text-sm flex items-center gap-1"
                 >
-                  更新密碼
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  <Plus size={16} />
+                  新增
+                </button>
+              </div>
 
-          {/* AI Tab */}
-          <TabsContent value="ai" className="space-y-6">
-            <Card className="glass-panel">
-              <CardHeader>
-                <CardTitle className="text-[var(--gold)]">AI 模型設定</CardTitle>
-                <CardDescription>選擇占卜解讀使用的 AI 模型</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>AI 模型來源</Label>
-                  <Select
-                    value={localSettings.ai_provider}
-                    onValueChange={(v) => setLocalSettings({ ...localSettings, ai_provider: v as 'local' | 'gemini' })}
+              {aiConfigs.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">尚未設定任何 AI 服務</p>
+              ) : (
+                <div className="space-y-3">
+                  {aiConfigs.map((config) => (
+                    <div
+                      key={config.id}
+                      className={`p-4 rounded-lg border transition ${
+                        config.is_active
+                          ? 'border-[var(--gold)] bg-[var(--gold)]/10'
+                          : 'border-gray-700 bg-gray-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {config.provider === 'gemini' ? (
+                            <Key className="text-blue-400" size={20} />
+                          ) : (
+                            <Server className="text-green-400" size={20} />
+                          )}
+                          <div>
+                            <p className="font-medium">
+                              {config.provider === 'gemini' ? 'Google Gemini' : 'Local AI'}
+                            </p>
+                            {config.provider === 'local' && (
+                              <p className="text-sm text-gray-500">
+                                {config.local_url} - {config.local_model}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {config.is_active ? (
+                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
+                              使用中
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleActivateAI(config.id)}
+                              className="text-xs text-gray-400 hover:text-[var(--gold)]"
+                            >
+                              啟用
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEditAIConfig(config)}
+                            className="text-gray-500 hover:text-[var(--gold)]"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAI(config.id)}
+                            className="text-gray-500 hover:text-red-400"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 新增 / 編輯 AI 設定表單 */}
+            {(showAddAI || editingConfig) && (
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold">
+                    {editingConfig ? '編輯 AI 設定' : '新增 AI 設定'}
+                  </h2>
+                  <button 
+                    onClick={() => { setShowAddAI(false); setEditingConfig(null); resetAIForm(); }} 
+                    className="text-gray-400"
                   >
-                    <SelectTrigger className="mt-1 bg-transparent border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="local">Local AI (本地) - 預設</SelectItem>
-                      <SelectItem value="gemini">Google Gemini (雲端)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <X size={20} />
+                  </button>
                 </div>
 
-                {localSettings.ai_provider === 'local' && (
-                  <>
-                    <Separator />
+                {/* Provider 選擇 */}
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-400 mb-2">類型</label>
+                  <div className="flex gap-4">
+                    <button
+                      className={`flex-1 py-3 rounded-lg border transition ${
+                        newAIProvider === 'gemini'
+                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                          : 'border-gray-600 text-gray-400'
+                      }`}
+                      onClick={() => setNewAIProvider('gemini')}
+                      disabled={!!editingConfig}
+                    >
+                      <Key className="inline mr-2" size={18} />
+                      Gemini
+                    </button>
+                    <button
+                      className={`flex-1 py-3 rounded-lg border transition ${
+                        newAIProvider === 'local'
+                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                          : 'border-gray-600 text-gray-400'
+                      }`}
+                      onClick={() => setNewAIProvider('local')}
+                      disabled={!!editingConfig}
+                    >
+                      <Server className="inline mr-2" size={18} />
+                      Local AI
+                    </button>
+                  </div>
+                </div>
+
+                {newAIProvider === 'gemini' ? (
+                  <div className="space-y-4">
                     <div>
-                      <Label>Local API URL</Label>
-                      <div className="flex gap-2 mt-1">
-                        <Input
-                          value={localSettings.local_api_url || ''}
-                          onChange={(e) => {
-                            setLocalSettings({ ...localSettings, local_api_url: e.target.value });
-                            setConnectionStatus('idle');
-                            setAvailableModels([]);
-                          }}
-                          placeholder="http://localhost:1234/v1"
-                          className="flex-1 bg-transparent border-border"
+                      <label className="block text-sm text-gray-400 mb-2">
+                        API Key {editingConfig && '(留空保持原設定)'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showAPIKey ? 'text' : 'password'}
+                          value={newAPIKey}
+                          onChange={(e) => setNewAPIKey(e.target.value)}
+                          className="input-dark w-full pr-10"
+                          placeholder={editingConfig ? '輸入新 API Key 或留空' : '輸入 Gemini API Key'}
                         />
-                        <Button
-                          variant="outline"
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                          onClick={() => setShowAPIKey(!showAPIKey)}
+                        >
+                          {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">API URL</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newLocalURL}
+                          onChange={(e) => setNewLocalURL(e.target.value)}
+                          className="input-dark flex-1"
+                          placeholder="http://localhost:11434"
+                        />
+                        <button
                           onClick={handleTestConnection}
-                          disabled={testingConnection || !localSettings.local_api_url}
-                          className="shrink-0"
+                          disabled={testingConnection || !newLocalURL}
+                          className="btn-gold flex items-center gap-1"
                         >
                           {testingConnection ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : connectionStatus === 'success' ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          ) : connectionStatus === 'error' ? (
-                            <XCircle className="w-4 h-4 text-red-500" />
+                            <RefreshCw className="animate-spin" size={16} />
                           ) : (
-                            <RefreshCw className="w-4 h-4" />
+                            <RefreshCw size={16} />
                           )}
-                          <span className="ml-2">測試連線</span>
-                        </Button>
+                          測試
+                        </button>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        支援 LM Studio、Ollama 等 OpenAI 相容 API
-                      </p>
                     </div>
-                    <div>
-                      <Label>Model Name</Label>
-                      {availableModels.length > 0 ? (
-                        <Select
-                          value={localSettings.local_model_name || ''}
-                          onValueChange={(v) => setLocalSettings({ ...localSettings, local_model_name: v })}
+
+                    {availableModels.length > 0 && (
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">模型</label>
+                        <select
+                          value={newLocalModel}
+                          onChange={(e) => setNewLocalModel(e.target.value)}
+                          className="input-dark w-full"
                         >
-                          <SelectTrigger className="mt-1 bg-transparent border-border">
-                            <SelectValue placeholder="選擇模型" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableModels.map((model) => (
-                              <SelectItem key={model} value={model}>
-                                {model}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          value={localSettings.local_model_name || ''}
-                          onChange={(e) => setLocalSettings({ ...localSettings, local_model_name: e.target.value })}
-                          placeholder="qwen/qwen3-8b"
-                          className="mt-1 bg-transparent border-border"
-                        />
-                      )}
-                      {availableModels.length > 0 && (
-                        <p className="text-xs text-green-500 mt-1">
-                          ✓ 已從伺服器取得 {availableModels.length} 個可用模型
-                        </p>
-                      )}
-                      {availableModels.length === 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          點擊「測試連線」自動取得可用模型列表
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="pt-2">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSaveLocalToCloud}
-                          disabled={isSavingToCloud || !localSettings.local_api_url || !localSettings.local_model_name}
-                        >
-                          {isSavingToCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
-                          儲存配置至雲端
-                        </Button>
-
-                        {backendApiKeys.local && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteFromCloud('local')}
-                            disabled={isDeletingFromCloud}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            {isDeletingFromCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Trash2 className="w-3 h-3 mr-1" />}
-                            刪除雲端備份
-                          </Button>
-                        )}
+                          {availableModels.map((model) => (
+                            <option key={model} value={model}>
+                              {model}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        • 雲端狀態：{backendApiKeys.local ? <span className="text-[var(--gold)] font-medium">已儲存個人配置</span> : <span className="text-muted-foreground">使用全域預設</span>}
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {localSettings.ai_provider === 'gemini' && (
-                  <div className="space-y-4">
-                    <Separator />
-                    <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                      <div className="text-sm text-amber-200 space-y-2">
-                        <p>
-                          使用 Gemini 需要提供您自己的 API Key。
-                          請前往 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-[var(--gold)] underline">Google AI Studio</a> 免費取得。
-                        </p>
-                        <p className="text-amber-300/80">
-                          💡 建議：Gemini API 有免費額度限制，建議設定每日占卜上限（如 10 次）以避免超額。
-                          {isAdmin ? '可在「系統」分頁調整。' : '如需調整請聯繫管理員。'}
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="flex items-center gap-2">
-                        <Key className="w-4 h-4" />
-                        Gemini API Key
-                      </Label>
-                      <Input
-                        type="password"
-                        value={localGeminiKey}
-                        onChange={(e) => setLocalGeminiKey(e.target.value)}
-                        placeholder="AIza..."
-                        className="mt-1 bg-transparent border-border"
-                        onFocus={() => {
-                          if (localGeminiKey.startsWith('••••')) {
-                            setLocalGeminiKey('');
-                          }
-                        }}
-                      />
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSaveToCloud}
-                          disabled={isSavingToCloud || !localGeminiKey || localGeminiKey.startsWith('••••')}
-                        >
-                          {isSavingToCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
-                          上傳加密至雲端
-                        </Button>
-
-                        {backendApiKeys.gemini && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteFromCloud('gemini')}
-                            disabled={isDeletingFromCloud}
-                            className="text-destructive hover:bg-destructive/10"
-                          >
-                            {isDeletingFromCloud ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Trash2 className="w-3 h-3 mr-1" />}
-                            刪除雲端備份
-                          </Button>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-1 mt-2">
-                        <p className="text-xs text-muted-foreground">
-                          • 本地狀態：{geminiApiKey ? <span className="text-green-500 font-medium">已儲存</span> : <span className="text-muted-foreground">未設定</span>}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          • 雲端狀態：{backendApiKeys.gemini ? <span className="text-[var(--gold)] font-medium">已加密備份</span> : <span className="text-muted-foreground">未備份</span>}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          💡 提示：上傳至雲端後，更換裝置或瀏覽器也能量自動套用
-                        </p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
 
-            <div className="flex justify-end">
-              <Button className="btn-gold" onClick={handleSaveSettings} disabled={isSaving}>
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? '儲存中...' : '儲存設定'}
-              </Button>
-            </div>
-          </TabsContent>
-
-          {/* System Tab (Admin only) */}
-          {isAdmin && (
-            <TabsContent value="system" className="space-y-6">
-              <Card className="glass-panel">
-                <CardHeader>
-                  <CardTitle className="text-[var(--gold)]">系統設定</CardTitle>
-                  <CardDescription>管理全域系統參數</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>每日卦數限制</Label>
-                    <Select
-                      value={localSettings.daily_limit}
-                      onValueChange={(v) => setLocalSettings({ ...localSettings, daily_limit: v })}
-                    >
-                      <SelectTrigger className="mt-1 bg-transparent border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">每日 3 卦</SelectItem>
-                        <SelectItem value="5">每日 5 卦</SelectItem>
-                        <SelectItem value="10">每日 10 卦</SelectItem>
-                        <SelectItem value="unlimited">無限制</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end">
-                <Button className="btn-gold" onClick={handleSaveSettings} disabled={isSaving}>
-                  <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? '儲存中...' : '儲存設定'}
-                </Button>
+                <button 
+                  onClick={editingConfig ? handleUpdateAIConfig : handleAddAIConfig} 
+                  className="btn-gold w-full mt-4"
+                >
+                  {editingConfig ? '更新設定' : '儲存設定'}
+                </button>
               </div>
-            </TabsContent>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* Users Tab (Admin only) */}
-          {isAdmin && (
-            <TabsContent value="users" className="space-y-6">
-              <Card className="glass-panel">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-[var(--gold)]">用戶管理</CardTitle>
-                    <CardDescription>管理系統用戶帳戶</CardDescription>
+        {/* 用戶設定頁面 */}
+        {activeTab === 'user' && (
+          <div className="space-y-6">
+            {/* 修改密碼 */}
+            <div className="glass-card p-6">
+              <h2 className="text-lg font-bold mb-4">修改密碼</h2>
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">舊密碼</label>
+                  <input
+                    type="password"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    className="input-dark w-full"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">新密碼</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input-dark w-full"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">確認新密碼</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-dark w-full"
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">
+                    {passwordError}
                   </div>
-                  <Button onClick={() => setShowCreateUser(true)}>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    新增用戶
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {loadingUsers ? (
-                    <div className="text-center py-8">
-                      <div className="text-4xl animate-spin inline-block" style={{ animationDuration: '2s' }}>☯</div>
+                )}
+                {passwordSuccess && (
+                  <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-3 text-green-400 text-sm">
+                    密碼已更新
+                  </div>
+                )}
+
+                <button type="submit" className="btn-gold w-full">
+                  更新密碼
+                </button>
+              </form>
+            </div>
+
+            {/* 登出 */}
+            <div className="glass-card p-6">
+              <h2 className="text-lg font-bold mb-4">登出</h2>
+              <button onClick={handleLogout} className="w-full py-3 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/10 transition flex items-center justify-center gap-2">
+                <LogOut size={18} />
+                登出帳號
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 用戶管理頁面 (Admin) */}
+        {activeTab === 'admin' && currentUser?.role === 'admin' && (
+          <div className="space-y-6">
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">用戶管理</h2>
+                <button onClick={() => setShowAddUser(true)} className="btn-gold text-sm flex items-center gap-1">
+                  <Plus size={16} />
+                  新增用戶
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {users.map((user) => (
+                  <div key={user.id} className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          user.role === 'admin' ? 'bg-[var(--gold)]/20' : 'bg-gray-700'
+                        }`}>
+                          {user.role === 'admin' ? <Shield size={18} className="text-[var(--gold)]" /> : <User size={18} />}
+                        </div>
+                        <div>
+                          <p className="font-medium">{user.username}</p>
+                          <p className="text-sm text-gray-500">
+                            {user.role === 'admin' ? '管理員' : '一般用戶'}
+                          </p>
+                        </div>
+                      </div>
+                      {user.id !== currentUser.id && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleToggleUserActive(user.id)}
+                            className={`text-xs px-2 py-1 rounded ${
+                              user.is_active
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                          >
+                            {user.is_active ? '啟用' : '停用'}
+                          </button>
+                          <button onClick={() => handleDeleteUser(user.id)} className="text-gray-500 hover:text-red-400">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>用戶名</TableHead>
-                          <TableHead>角色</TableHead>
-                          <TableHead>建立時間</TableHead>
-                          <TableHead>最後登入</TableHead>
-                          <TableHead className="text-right">操作</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.map((u) => (
-                          <TableRow key={u.id}>
-                            <TableCell className="font-medium">{u.username}</TableCell>
-                            <TableCell>
-                              {u.role === 'admin' ? (
-                                <span className="flex items-center gap-1 text-[var(--gold)]">
-                                  <Shield className="w-4 h-4" />
-                                  管理員
-                                </span>
-                              ) : (
-                                '一般用戶'
-                              )}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {u.created_at
-                                ? new Date(u.created_at).toLocaleDateString('zh-TW')
-                                : '-'}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {u.last_login
-                                ? new Date(u.last_login).toLocaleDateString('zh-TW')
-                                : '-'}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setEditUser(u);
-                                    setEditUserRole(u.role);
-                                  }}
-                                  disabled={u.id === user.id}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteUser(u.id)}
-                                  disabled={u.id === user.id}
-                                  className="hover:text-destructive"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-        </Tabs>
-      </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-      {/* Edit User Dialog */}
-      <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
-        <DialogContent className="glass-panel">
-          <DialogHeader>
-            <DialogTitle className="text-[var(--gold)]">
-              編輯用戶：{editUser?.username}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>角色</Label>
-              <Select value={editUserRole} onValueChange={(v) => setEditUserRole(v as 'user' | 'admin')}>
-                <SelectTrigger className="mt-1 bg-transparent border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">一般用戶</SelectItem>
-                  <SelectItem value="admin">管理員</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>新密碼（留空則不變更）</Label>
-              <Input
-                type="password"
-                value={editUserPassword}
-                onChange={(e) => setEditUserPassword(e.target.value)}
-                placeholder="輸入新密碼"
-                className="mt-1 bg-transparent border-border"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditUser(null)}>
-              取消
-            </Button>
-            <Button onClick={handleEditUser}>
-              儲存變更
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {/* 新增用戶表單 */}
+            {showAddUser && (
+              <div className="glass-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold">新增用戶</h2>
+                  <button onClick={() => setShowAddUser(false)} className="text-gray-400">
+                    <X size={20} />
+                  </button>
+                </div>
 
-      {/* Create User Dialog */}
-      <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
-        <DialogContent className="glass-panel">
-          <DialogHeader>
-            <DialogTitle className="text-[var(--gold)]">新增用戶</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>用戶名</Label>
-              <Input
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                placeholder="輸入用戶名"
-                className="mt-1 bg-transparent border-border"
-              />
-            </div>
-            <div>
-              <Label>密碼</Label>
-              <Input
-                type="password"
-                value={newUserPassword}
-                onChange={(e) => setNewUserPassword(e.target.value)}
-                placeholder="輸入密碼（至少 6 字）"
-                className="mt-1 bg-transparent border-border"
-              />
-            </div>
-            <div>
-              <Label>角色</Label>
-              <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as 'user' | 'admin')}>
-                <SelectTrigger className="mt-1 bg-transparent border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">一般用戶</SelectItem>
-                  <SelectItem value="admin">管理員</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">用戶名</label>
+                    <input
+                      type="text"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      className="input-dark w-full"
+                      placeholder="輸入用戶名"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">密碼</label>
+                    <input
+                      type="password"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="input-dark w-full"
+                      placeholder="輸入密碼"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">角色</label>
+                    <div className="flex gap-4">
+                      <button
+                        className={`flex-1 py-2 rounded-lg border transition ${
+                          newUserRole === 'user'
+                            ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                            : 'border-gray-600 text-gray-400'
+                        }`}
+                        onClick={() => setNewUserRole('user')}
+                      >
+                        一般用戶
+                      </button>
+                      <button
+                        className={`flex-1 py-2 rounded-lg border transition ${
+                          newUserRole === 'admin'
+                            ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                            : 'border-gray-600 text-gray-400'
+                        }`}
+                        onClick={() => setNewUserRole('admin')}
+                      >
+                        管理員
+                      </button>
+                    </div>
+                  </div>
+
+                  <button onClick={handleAddUser} className="btn-gold w-full">
+                    建立用戶
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateUser(false)}>
-              取消
-            </Button>
-            <Button onClick={handleCreateUser}>
-              建立用戶
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </AppLayout>
+        )}
+      </main>
+    </div>
   );
 }
-

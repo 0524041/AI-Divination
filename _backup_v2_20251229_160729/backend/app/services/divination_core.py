@@ -117,6 +117,44 @@ BAGUA_BITS = {
 # 反向映射
 BITS_TO_BAGUA = {v: k for k, v in BAGUA_BITS.items()}
 
+# 卦辭爻辭數據（易經原文）
+GUA_CI = {
+    '乾為天': {
+        'gua_ci': '乾：元，亨，利，貞。',
+        'yao_ci': {
+            1: '初九：潛龍，勿用。',
+            2: '九二：見龍在田，利見大人。',
+            3: '九三：君子終日乾乾，夕惕若，厲無咎。',
+            4: '九四：或躍在淵，無咎。',
+            5: '九五：飛龍在天，利見大人。',
+            6: '上九：亢龍有悔。'
+        }
+    },
+    '坤為地': {
+        'gua_ci': '坤：元，亨，利牝馬之貞。君子有攸往，先迷後得主，利西南得朋，東北喪朋。安貞，吉。',
+        'yao_ci': {
+            1: '初六：履霜，堅冰至。',
+            2: '六二：直，方，大，不習無不利。',
+            3: '六三：含章可貞。或從王事，無成有終。',
+            4: '六四：括囊；無咎，無譽。',
+            5: '六五：黃裳，元吉。',
+            6: '上六：龍戰于野，其血玄黃。'
+        }
+    },
+    '水雷屯': {
+        'gua_ci': '屯：元，亨，利，貞，勿用，有攸往，利建侯。',
+        'yao_ci': {
+            1: '初九：磐桓；利居貞，利建侯。',
+            2: '六二：屯如邅如，乘馬班如。匪寇婚媾，女子貞不字，十年乃字。',
+            3: '六三：既鹿無虞，惟入于林中，君子幾不如舍，往吝。',
+            4: '六四：乘馬班如，求婚媾，往吉，無不利。',
+            5: '九五：屯其膏，小貞吉，大貞凶。',
+            6: '上六：乘馬班如，泣血漣如。'
+        }
+    },
+    # 其他卦可以逐步補充，這裡先提供核心三卦作為示例
+}
+
 
 # ========== 工具函數 ==========
 
@@ -234,7 +272,7 @@ class LiuYaoChart:
     def _find_gong_and_shi(self, upper_name: str, lower_name: str) -> tuple:
         """
         尋宮安世：根據上下卦名確定所屬卦宮和世爻位置
-        返回: (卦宮名, 世爻位置 1-6)
+        返回: (卦宮名, 世爻位置 1-6, 卦類型)
         
         注意：傳入的 upper_name 是外卦（4-6爻），lower_name 是內卦（1-3爻）
         但在傳統卦序中，外卦是上卦，內卦是下卦
@@ -244,7 +282,7 @@ class LiuYaoChart:
         
         # 1. 八純卦 (上下相同) -> 六世卦
         if up == low:
-            return upper_name, 6
+            return upper_name, 6, '本宮卦'
             
         # 2. 遍歷八宮的世系表尋找匹配
         # 每個宮的生成順序：
@@ -295,12 +333,14 @@ class LiuYaoChart:
             seq.append(((curr_up, curr_low), 3))
             
             # 檢查是否匹配
-            # seq 中的格式是 ((外卦值, 內卦值), 世爻位置)
-            for (outer, inner), shi in seq:
+            # seq 中的格式是 ((外卦值, 內卦值), 世爻位置, 卦類型)
+            gua_types = ['本宮卦', '一世卦', '二世卦', '三世卦', '四世卦', '五世卦', '遊魂卦', '歸魂卦']
+            for idx, ((outer, inner), shi) in enumerate(seq):
                 if outer == up and inner == low:
-                    return gong_name, shi
+                    gua_type = gua_types[idx]
+                    return gong_name, shi, gua_type
                     
-        return '乾', 6  # Fallback
+        return '乾', 6, '本宮卦'  # Fallback
 
     def _build_chart(self):
         """構建卦盤"""
@@ -337,7 +377,7 @@ class LiuYaoChart:
             self.biangua_name = None
         
         # 尋宮安世 (修正：使用正確的尋宮算法)
-        self.gong, self.shi_pos = self._find_gong_and_shi(self.upper_gua, self.lower_gua)
+        self.gong, self.shi_pos, self.gua_type = self._find_gong_and_shi(self.upper_gua, self.lower_gua)
         self.gong_wuxing = BAGUA[self.gong]['wuxing']
         
         # 安應爻 (世爻對面)
@@ -447,8 +487,14 @@ class LiuYaoChart:
             'guashen': self.gong,
             'benguaming': self.bengua_name,
             'bianguaming': self.biangua_name or '無變卦',
+            'gua_type': self.gua_type,  # 新增：卦類型
             'shensha': self.get_shensha(),
         }
+        
+        # 添加卦辭爻辭（如果有的話）
+        if self.bengua_name in GUA_CI:
+            result['gua_ci'] = GUA_CI[self.bengua_name]['gua_ci']
+            result['yao_ci'] = GUA_CI[self.bengua_name]['yao_ci']
         
         # 六爻詳情
         yao_names = ['yao_1', 'yao_2', 'yao_3', 'yao_4', 'yao_5', 'yao_6']

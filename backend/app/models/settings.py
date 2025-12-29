@@ -1,30 +1,22 @@
 """
-Settings model - 系統設定資料模型
+AI 設定模型
 """
-from ..core.database import get_db_connection
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy.orm import relationship
+from app.core.database import Base
 
-def get_setting(key: str, default: str = None) -> str:
-    """取得設定值"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('SELECT value FROM settings WHERE key = ?', (key,))
-    row = c.fetchone()
-    conn.close()
-    return row['value'] if row else default
 
-def set_setting(key: str, value: str) -> None:
-    """設定值"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
-    conn.commit()
-    conn.close()
-
-def get_all_settings() -> dict:
-    """取得所有設定"""
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('SELECT key, value FROM settings')
-    rows = c.fetchall()
-    conn.close()
-    return {row['key']: row['value'] for row in rows}
+class AIConfig(Base):
+    """AI 設定表"""
+    __tablename__ = "ai_configs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider = Column(String(20), nullable=False)  # 'gemini' | 'local'
+    api_key_encrypted = Column(Text, nullable=True)  # Gemini API Key (加密)
+    local_url = Column(String(255), nullable=True)  # Local AI URL
+    local_model = Column(String(100), nullable=True)  # Local AI Model
+    is_active = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

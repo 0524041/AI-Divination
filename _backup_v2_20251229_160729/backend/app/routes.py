@@ -10,8 +10,7 @@ from .core.database import (
     add_history,
     get_history,
     delete_history,
-    toggle_favorite,
-    get_daily_usage_count
+    toggle_favorite
 )
 from .services.divination import perform_divination, get_current_time
 from .services.ai import call_ai, format_divination_result, get_system_prompt
@@ -185,6 +184,84 @@ def register_routes(app):
     def delete_user_key(provider):
         delete_api_key(session['user_id'], provider)
         return jsonify({"success": True})
+    
+    @app.route('/api/check-ai-availability', methods=['POST'])
+    @login_required
+    def check_ai_availability():
+        """檢查 AI 可用性（不浪費請求次數）"""
+        data = request.json
+        provider = data.get('provider')
+        user_id = session['user_id']
+        
+        if not provider or provider not in ['local', 'gemini']:
+            return jsonify({"error": "請選擇 AI 提供者 (local 或 gemini)"}), 400
+        
+        key_info = get_user_api_key_info(user_id, provider)
+        
+        if provider == 'gemini':
+            # 檢查是否有 Gemini API Key
+            if not key_info or not key_info.get('api_key'):
+                return jsonify({
+                    "available": False,
+                    "error": "請先在設定中配置 Gemini API Key",
+                    "error_type": "missing_api_key"
+                })
+            
+            return jsonify({
+                "available": True,
+                "message": "Gemini API Key 已配置"
+            })
+            
+        elif provider == 'local':
+            # 檢查是否有 Local AI 配置
+            if not key_info or not key_info.get('config'):
+                return jsonify({
+                    "available": False,
+                    "error": "請先在設定中配置 Local AI (API URL 和模型)",
+                    "error_type": "missing_config"
+                })
+            
+            config = key_info.get('config')
+            api_url = config.get('api_url')
+            model_name = config.get('model_name')
+            
+            if not api_url or not model_name:
+                return jsonify({
+                    "available": False,
+                    "error": "Local AI 配置不完整，請在設定中重新配置",
+                    "error_type": "invalid_config"
+                })
+            
+            # 測試連線 (可選，如果用戶要求不測試則跳過)
+            test_connection = data.get('test_connection', False)
+            if test_connection:
+                import urllib.request
+                import urllib.error
+                
+                models_url = f"{api_url.rstrip('/')}/models"
+                try:
+                    req = urllib.request.Request(models_url, headers={"Content-Type": "application/json"})
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        result = json.loads(response.read().decode('utf-8'))
+                        return jsonify({
+                            "available": True,
+                            "message": f"Local AI 連線成功",
+                            "config": {"api_url": api_url, "model_name": model_name}
+                        })
+                except Exception as e:
+                    return jsonify({
+                        "available": False,
+                        "error": f"無法連線到 Local AI: {str(e)}",
+                        "error_type": "connection_failed",
+                        "config": {"api_url": api_url, "model_name": model_name}
+                    })
+            else:
+                # 不測試連線，只檢查配置是否存在
+                return jsonify({
+                    "available": True,
+                    "message": "Local AI 已配置",
+                    "config": {"api_url": api_url, "model_name": model_name}
+                })
 
     # ============= Main App Routes =============
     @app.route('/')
@@ -218,17 +295,6 @@ def register_routes(app):
         
         if not question:
             return jsonify({"error": "Question is required"}), 400
-            
-        # Check Limits
-        limit_str = get_setting('daily_limit', '5')
-        if limit_str != 'unlimited':
-            try:
-                limit = int(limit_str)
-                count = get_daily_usage_count(user_id)
-                if count >= limit:
-                    return jsonify({"error": f"Daily limit of {limit} divinations reached."}), 403
-            except ValueError:
-                pass 
         
         # Pre-execute Tools
         tool_status = {
@@ -265,23 +331,48 @@ def register_routes(app):
         prompt_template = get_system_prompt()
         full_payload = prompt_template.replace('{question}', str(question)).replace('{divination_result}', str(raw_result_for_ai))
 
-        # Get AI config
-        ai_provider = data.get('provider') or get_setting('ai_provider', 'local')
-        user_gemini_key = request.headers.get('X-Gemini-Api-Key')
-        user_local_config = None
+        # Get AI provider from request (frontend must specify)
+        ai_provider = data.get('provider')
+        if not ai_provider or ai_provider not in ['local', 'gemini']:
+            return jsonify({"error": "請選擇 AI 提供者 (local 或 gemini)"}), 400
         
-        # 試著從資料庫抓用戶個人的 API Key 或配置
+        # Get user's AI configuration
         key_info = get_user_api_key_info(user_id, ai_provider)
-        if key_info:
-            if ai_provider == 'gemini':
-                if not user_gemini_key:
-                    user_gemini_key = key_info.get('api_key')
-                    if user_gemini_key:
-                        print(f"[Routes] Found Gemini API Key in backend for user {user_id}")
-            elif ai_provider == 'local':
-                user_local_config = key_info.get('config')
-                if user_local_config:
-                    print(f"[Routes] Found Local AI config in backend for user {user_id}")
+        
+        # Check AI availability
+        if ai_provider == 'gemini':
+            # Check if user has Gemini API Key
+            if not key_info or not key_info.get('api_key'):
+                return jsonify({
+                    "error": "請先在設定中配置 Gemini API Key",
+                    "error_type": "missing_api_key"
+                }), 400
+            user_gemini_key = key_info.get('api_key')
+            user_local_config = None
+            print(f"[Routes] Using Gemini with user {user_id}'s API Key")
+            
+        elif ai_provider == 'local':
+            # Check if user has Local AI configuration
+            if not key_info or not key_info.get('config'):
+                return jsonify({
+                    "error": "請先在設定中配置 Local AI (API URL 和模型)",
+                    "error_type": "missing_config"
+                }), 400
+            
+            user_local_config = key_info.get('config')
+            user_gemini_key = None
+            
+            # Validate required fields
+            api_url = user_local_config.get('api_url')
+            model_name = user_local_config.get('model_name')
+            
+            if not api_url or not model_name:
+                return jsonify({
+                    "error": "Local AI 配置不完整，請在設定中重新配置",
+                    "error_type": "invalid_config"
+                }), 400
+            
+            print(f"[Routes] Using Local AI for user {user_id}: {api_url} / {model_name}")
         
         print(f"[Routes] About to call AI, provider='{ai_provider}'")
         
@@ -394,7 +485,6 @@ def register_routes(app):
         if request.method == 'GET':
             # GET 不需要登入，公開訪問（首頁需要顯示當前 AI 模型）
             return jsonify({
-                "daily_limit": get_setting('daily_limit', '5'),
                 "system_prompt": get_setting('system_prompt', default_prompt),
                 "default_prompt": default_prompt,
                 "ai_provider": get_setting('ai_provider', 'local'),
@@ -410,8 +500,6 @@ def register_routes(app):
                 return jsonify({"error": "Admin access required"}), 403
             
             data = request.json
-            if 'daily_limit' in data:
-                set_setting('daily_limit', data['daily_limit'])
             if 'system_prompt' in data:
                 set_setting('system_prompt', data['system_prompt'])
             if 'ai_provider' in data:

@@ -141,7 +141,7 @@ export function LiuYaoPage() {
       }
     } else {
       const hasLocalConfig = (settings?.local_api_url && settings?.local_model_name) ||
-        (backendApiKeys.configs.local?.url && backendApiKeys.configs.local?.model);
+        (backendApiKeys.configs.local?.api_url && backendApiKeys.configs.local?.model_name);
       if (!hasLocalConfig) {
         toast.error('尚未設定 Local AI 網址或模型，請前往設定頁面配置');
         router.push('/settings');
@@ -256,7 +256,7 @@ export function LiuYaoPage() {
                 : 'text-foreground/60 hover:text-foreground'
                 }`}
             >
-              Local AI ({backendApiKeys.configs.local?.model?.split('/').pop() || settings?.local_model_name?.split('/').pop() || '本地'})
+              Local AI ({backendApiKeys.configs.local?.model_name?.split('/').pop() || settings?.local_model_name?.split('/').pop() || '本地'})
             </button>
             <button
               onClick={() => toggleProvider('gemini')}
@@ -276,7 +276,7 @@ export function LiuYaoPage() {
         const isGemini = activeProvider === 'gemini';
         const hasGeminiKey = !!geminiApiKey || backendApiKeys.gemini;
         const hasLocalConfig = (settings?.local_api_url && settings?.local_model_name) ||
-          (backendApiKeys.configs.local?.url && backendApiKeys.configs.local?.model);
+          (backendApiKeys.configs.local?.api_url && backendApiKeys.configs.local?.model_name);
 
         if ((isGemini && !hasGeminiKey) || (!isGemini && !hasLocalConfig)) {
           return (

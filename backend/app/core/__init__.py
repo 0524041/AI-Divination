@@ -1,7 +1,7 @@
 """
-Core module - 核心配置與設定
+核心模組
 """
-from .config import Config, get_config
-from .database import get_db_connection, init_db
+from .config import get_settings, Settings
+from .database import get_db, init_db, Base, engine
 
-__all__ = ['Config', 'get_config', 'get_db_connection', 'init_db']
+__all__ = ['get_settings', 'Settings', 'get_db', 'init_db', 'Base', 'engine']

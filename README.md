@@ -1,284 +1,199 @@
-# 🔮 靈機一動 - AI 易經占卜系統 
+# ☯ AI 算命網頁 v5.0
 
-**AI Divination App** - 結合現代 AI 技術與傳統六爻占卜的智慧算卦系統
+結合傳統易經智慧與現代 AI 技術的智能算命網站。透過六爻占卜排盤，搭配 AI 大師進行專業解讀。
 
-![Home Page Screenshot](img/homepage_screenshot.png)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+![Node.js](https://img.shields.io/badge/node.js-18+-green.svg)
 
-## ✨ V2.0 重大更新
+## ✨ 功能特色
 
-### 🎨 全新前端架構
-- **Next.js 16 + React** - 現代化單頁應用
-- **shadcn/ui** - 精美 UI 元件庫
-- **Tailwind CSS v4** - 原子化 CSS
-- **響應式側邊欄** - 簡潔導航設計
-- **玻璃擬態設計** - 深色主題 + 金色點綴
+- 🔮 **六爻占卜**：傳統易經六爻排盤 + AI 智慧解讀
+- 🤖 **多 AI 支援**：支援 Google Gemini 和本地 AI（LM Studio、Ollama 等 OpenAI 兼容 API）
+- 📜 **歷史紀錄**：完整保存占卜紀錄，支援 Markdown 渲染
+- 🧠 **思考過程**：展示 AI 思考過程（可摺疊），了解解盤邏輯
+- 👥 **用戶系統**：多用戶支援，管理員可管理所有用戶
+- ⚙️ **AI 設定**：可新增、編輯、切換多個 AI 配置
+- 📱 **響應式設計**：支援手機、平板、電腦
+- ⏱️ **超時處理**：5 分鐘 AI 超時保護，可隨時取消
 
-### 🧠 AI 功能
-- **Google Gemini** - 雲端 AI 解卦 (gemini-3-flash-preview + high thinking)
-- **本地 LLM** - 支援 OpenAI 兼容 API (預設)
-- **思維過程可視化** - 展開/收合 AI 思考過程
-- **模型追蹤** - 顯示占卜使用的 AI 模型、歷史記錄保存模型名稱
+## 🖼️ 截圖預覽
 
-### 👥 多用戶系統
-- 用戶註冊/登入（密碼確認功能）
-- 管理員後台（新增用戶密碼確認）
-- 獨立歷史記錄
-- API Key 管理
+（待補充）
 
----
+## 🛠️ 技術架構
 
-## 📁 專案結構
+### 前端
+- **框架**：Next.js 14 (App Router)
+- **語言**：TypeScript
+- **樣式**：Tailwind CSS
+- **圖標**：Lucide React
+- **Markdown**：marked + DOMPurify
 
-```
-AI-Divination/
-├── backend/                    # 後端模組 (Python 標準結構)
-│   ├── app/
-│   │   ├── api/               # API 藍圖
-│   │   ├── core/              # 核心配置
-│   │   │   ├── config.py      # 應用配置
-│   │   │   └── database.py    # 資料庫操作
-│   │   ├── models/            # 資料模型
-│   │   │   ├── user.py        # 用戶模型
-│   │   │   ├── history.py     # 歷史記錄
-│   │   │   └── settings.py    # 系統設定
-│   │   ├── services/          # 業務邏輯
-│   │   │   ├── ai.py          # AI 服務 (Gemini/Local)
-│   │   │   ├── divination.py  # 占卜計算
-│   │   │   └── divination_core.py  # 六爻排盤核心
-│   │   ├── utils/             # 工具函數
-│   │   │   └── auth.py        # 認證裝飾器
-│   │   └── routes.py          # API 路由
-│   ├── prompts/               # AI Prompt 模板
-│   │   └── system_prompt.md
-│   └── run.py                 # 後端啟動入口
-│
-├── frontend/                   # 前端應用 (Next.js)
-│   ├── src/
-│   │   ├── app/               # 頁面路由
-│   │   │   ├── page.tsx       # 首頁 (六爻占卜)
-│   │   │   ├── history/       # 歷史記錄
-│   │   │   ├── settings/      # 設定頁面
-│   │   │   └── admin/         # 管理員頁面
-│   │   ├── components/        # React 元件
-│   │   │   ├── AppLayout.tsx  # 主佈局
-│   │   │   ├── AppSidebar.tsx # 側邊欄
-│   │   │   ├── LiuYaoPage.tsx # 六爻主頁面
-│   │   │   ├── DivinationResult.tsx  # 占卜結果
-│   │   │   ├── AuthForm.tsx   # 登入/註冊表單
-│   │   │   └── ui/            # shadcn/ui 元件
-│   │   ├── contexts/          # React Context
-│   │   ├── lib/               # 工具函數
-│   │   └── types/             # TypeScript 類型定義
-│   └── package.json
-│
-├── _legacy_backup/            # 舊版檔案備份
-├── docs/                       # 專案文件
-├── start.sh                    # 一鍵啟動腳本
-└── README.md
-```
+### 後端
+- **框架**：FastAPI (Python 3.10+)
+- **資料庫**：SQLite + SQLAlchemy ORM
+- **認證**：JWT (python-jose) + bcrypt
+- **套件管理**：uv
 
----
+### AI 服務
+- **Google Gemini**：雲端 AI，需要 API Key
+- **Local AI**：本地 AI，支援 OpenAI 兼容 API（LM Studio、Ollama 等）
 
 ## 🚀 快速開始
 
 ### 系統需求
-- Python 3.10+
-- Node.js 18+
-- npm 或 pnpm
 
-### 1. 安裝與啟動
+- Node.js 18+
+- Python 3.10+（由 uv 自動管理）
+- uv 套件管理器
+
+### 安裝 uv（如尚未安裝）
 
 ```bash
-# 克隆專案
-git clone <repo-url>
-cd AI-Divination
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-# 一鍵啟動 (自動安裝依賴)
-chmod +x start.sh
+### 啟動服務
+
+```bash
+# 一鍵啟動
 ./start.sh
+
+# 查看狀態
+./start.sh --status
+
+# 查看日誌
+./start.sh --logs
+
+# 停止服務
+./start.sh --stop
+
+# 重置資料庫（清除所有數據）
+./start.sh --reset
+
+# 清除快取
+./start.sh --clean-cache
 ```
 
-### 2. 訪問應用
+啟動後訪問：
+- **前端**：http://localhost:3000
+- **後端 API**：http://localhost:8000
+- **API 文檔**：http://localhost:8000/docs
 
-- **前端**: http://localhost:3000
-- **後端 API**: http://localhost:8080
+## 📖 首次使用
 
-### 3. 預設帳號
+1. 訪問 http://localhost:3000
+2. 系統會引導你建立**管理員帳號**（記住密碼！）
+3. 登入後前往**設定頁面**配置 AI 服務：
+   - **Gemini**：填入你的 Google AI API Key
+   - **Local AI**：填入本地 AI 服務的 URL 和模型名稱
+4. 回到首頁，開始**六爻占卜**！
+
+## �� 目錄結構
 
 ```
-用戶名: admin
-密碼: admin123
+AI-Divination/
+├── backend/                    # 後端 (FastAPI)
+│   ├── app/
+│   │   ├── api/               # API 路由
+│   │   │   ├── auth.py        # 認證 API
+│   │   │   ├── divination.py  # 占卜 API
+│   │   │   ├── history.py     # 歷史紀錄 API
+│   │   │   ├── settings.py    # 設定 API
+│   │   │   └── admin.py       # 管理員 API
+│   │   ├── core/              # 核心配置
+│   │   ├── models/            # 資料模型
+│   │   ├── services/          # 服務邏輯
+│   │   │   ├── ai.py          # AI 服務
+│   │   │   └── liuyao.py      # 六爻排盤
+│   │   └── utils/             # 工具函數
+│   ├── prompts/               # AI Prompt 模板
+│   └── requirements.txt       # Python 依賴
+├── frontend/                   # 前端 (Next.js)
+│   └── src/
+│       ├── app/               # 頁面
+│       │   ├── page.tsx       # 首頁
+│       │   ├── login/         # 登入頁
+│       │   ├── liuyao/        # 六爻占卜頁
+│       │   ├── history/       # 歷史紀錄頁
+│       │   └── settings/      # 設定頁
+│       └── lib/
+│           └── markdown.ts    # Markdown 解析
+├── docs/                       # 文檔
+├── _legacy_backup/             # 舊版備份 (v1-v4)
+├── start.sh                    # 啟動腳本
+└── README.md
 ```
-
----
 
 ## 🔧 設定說明
 
-### AI 模型設定
+### AI 設定
 
-進入「設定」頁面可以選擇：
+#### Google Gemini
+1. 前往 [Google AI Studio](https://aistudio.google.com/) 取得 API Key
+2. 在設定頁面新增 Gemini 配置，填入 API Key
 
-| 設定項 | 說明 |
-|--------|------|
-| **AI 提供者** | `local` (預設) 或 `gemini` |
-| **Local API URL** | 本地 LLM 服務地址 (預設: `http://localhost:1234/v1`) |
-| **Local Model** | 模型名稱 (預設: `qwen/qwen3-8b`) |
-| **Gemini API Key** | 使用 Gemini 時需要填入 |
+#### Local AI（LM Studio）
+1. 下載並安裝 [LM Studio](https://lmstudio.ai/)
+2. 下載一個模型（建議 Qwen 或 DeepSeek）
+3. 啟動本地伺服器（預設 http://localhost:1234/v1）
+4. 在設定頁面新增 Local AI 配置，填入 URL 和模型名稱
 
-> **目前 AI 模型**
-> - Gemini: `gemini-3-flash-preview` (high thinking mode)
-> - Local: 可自定義 (預設 `qwen/qwen3-8b`)
+### 環境變數（可選）
 
-占卜頁面會顯示當前使用的 AI 模型，歷史記錄也會保存使用的模型名稱。
+創建 `.env` 文件：
 
-### 本地 AI 設定
+```env
+# JWT 密鑰（可選，預設自動生成）
+JWT_SECRET_KEY=your-secret-key
 
-推薦使用 [LM Studio](https://lmstudio.ai/) 或 [Ollama](https://ollama.ai/) 運行本地模型：
-
-```bash
-# LM Studio - 啟動後選擇模型，開啟 Local Server (port 1234)
-
-# Ollama
-ollama run qwen2.5:7b
+# 資料庫路徑（可選）
+DATABASE_URL=sqlite:///./divination.db
 ```
 
----
+## �� 版本歷史
 
-## 🛡️ 功能特色
+### v5.0 (2025-12-29)
+- 🔄 完全重構前後端架構
+- ✨ 新增 AI 配置編輯功能
+- ✨ 新增占卜頁面 AI 切換器
+- ✨ 新增 AI 思考過程摺疊顯示
+- ✨ 新增 5 分鐘超時保護
+- ✨ 新增取消占卜功能
+- 🐛 修復 Markdown 解析問題（處理 code block 包裝）
+- 🐛 修復登入頁面圖標重疊問題
+- 🔧 使用 uv 管理 Python 環境
+- 🔧 改進 start.sh 腳本（支援多種命令）
 
-### 六爻占卜
-- 🎲 互動式搖卦動畫
-- 📊 專業六爻排盤
-- 🧠 AI 智能解卦
-- 📝 思維過程可視化
+### v4.0 (之前版本)
+- 基礎六爻占卜功能
+- 用戶認證系統
+- AI 服務整合
 
-### 歷史記錄
-- 📂 查看過往占卜
-- ⭐ 收藏重要記錄
-- 📋 複製為 Markdown
-- 🗑️ 刪除記錄
+## 🗺️ 開發計劃
 
-### 管理功能 (Admin)
-- 👥 用戶管理
-- 📊 查看所有用戶歷史
-- ⚙️ 系統設定
+- [x] 六爻占卜核心功能
+- [x] 用戶認證系統
+- [x] AI 服務整合（Gemini + Local）
+- [x] 歷史紀錄 + Markdown 渲染
+- [x] AI 思考過程顯示
+- [ ] 紫微斗數 (Coming Soon)
+- [ ] 八字命盤 (Coming Soon)
+- [ ] 流年運勢 (Coming Soon)
+- [ ] Docker 部署支援
 
----
+## 🤝 貢獻
 
-## 📡 API 端點
+歡迎提交 Issue 和 Pull Request！
 
-| 方法 | 路徑 | 說明 |
-|------|------|------|
-| POST | `/api/login` | 用戶登入 |
-| POST | `/api/logout` | 用戶登出 |
-| POST | `/api/register` | 用戶註冊 |
-| GET | `/api/current-user` | 獲取當前用戶 |
-| POST | `/api/divinate` | 執行占卜 |
-| GET | `/api/history` | 獲取歷史記錄 |
-| PUT | `/api/history/:id/favorite` | 切換收藏 |
-| DELETE | `/api/history/:id` | 刪除記錄 |
-| GET/POST | `/api/settings` | 系統設定 |
-| GET | `/api/admin/users` | 用戶列表 (Admin) |
-
----
-
-## 🔄 更新日誌
-
-### v2.3.0 (2025-12-26)
-**🔮 六爻排盤算法大修正**
-- ✨ 修正八卦卦象對應 (BAGUA_PATTERN)，符合傳統六爻標準
-- ✨ 實現正確的「尋宮安世」算法，支援八宮卦序
-- ✨ 修正納甲規則：內卦用內卦本宮納甲，外卦用外卦本宮納甲
-- ✨ 修正硬幣轉爻邏輯 (老陽=陽爻動，老陰=陰爻動)
-- ✨ 新增完整測試套件 (8 個測試案例全部通過)
-
-**📝 AI Prompt 優化**
-- ✨ 新增「核心判斷法則」：動爻優先、日月權威、空亡解讀
-- ✨ 新增「Input Data Explanation」說明區塊
-- ✨ 優化解卦工作流程，強調吉凶掃描步驟
-- ✨ 豐富的六爻排盤輸出格式（表格化顯示）
-
-**🎨 前端功能增強**
-- ✨ 新增「性別」選擇欄位（男/女）
-- ✨ 新增「占卜對象」選擇欄位（算自己/父母/朋友/他人）
-- ✨ 性別與對象資訊存入資料庫，並帶入 AI Prompt
-
-**🛠️ 技術改進**
-- 🔧 Local AI timeout 增加至 5 分鐘 (300秒)
-- 🔧 資料庫新增 `gender` 和 `target` 欄位
-
-### v2.2.0 (2025-12-26)
-**🔒 安全性增強**
-- ✨ SECRET_KEY 和 ENCRYPTION_KEY 持久化存儲（避免重啟後 session 失效）
-- ✨ Session Cookie 加入 SameSite=Lax 防護 CSRF 攻擊
-- ✨ 生產環境自動啟用 Secure Cookie
-- ✨ `/api/settings` POST 操作需要管理員權限
-- ✨ 歷史記錄刪除增加權限檢查（只能刪除自己的記錄）
-- 🔧 API Key 加密金鑰使用一致的來源
-
-**🛠️ 性能修復**
-- ✨ Local AI 連線測試功能（可獲取模型列表）
-- ✨ 設定頁面新增模型下拉選單
-- ✨ 占卜過程可取消
-- 🐛 修復 CoinTossing useEffect cleanup 導致 AI 請求無法發出的問題
-- 🐛 修復中文輸入法 Enter 鍵誤觸發送出的問題
-- 🐛 修復 macOS 上的 semaphore 洩漏警告
-
-**📖 使用說明**
-- ✨ Gemini 使用小技巧：API 配額限制說明
-
-### v2.1.0 (2025-06-XX)
-**🛠️ 功能增強**
-- ✨ 占卜頁面顯示當前 AI 模型
-- ✨ 歷史記錄保存並顯示使用的 AI 模型
-- ✨ 註冊/管理員新增用戶需輸入兩次密碼確認
-- 🔧 Gemini 模型更新為 `gemini-3-flash-preview` (high thinking)
-- 🔧 後端重構為標準 Python 專案結構
-- 🔧 側邊欄導航簡化
-
-### v2.0.0 (2025-12-26)
-**🎨 前端大改版**
-- ✨ 全新 Next.js + React 前端
-- ✨ shadcn/ui 側邊欄
-- ✨ 歷史記錄 Markdown 渲染
-- ✨ AI 思考過程折疊顯示
-- 🔧 修復 is_favorite 顯示問題
-
-### v0.4.0 (2024-12-24)
-- ✨ 多用戶系統
-- ✨ Admin 管理面板
-- ✨ 雙 AI 模型支援
-
-### v0.3.0
-- 空靈玄學 UI 主題
-- 歷史記錄管理
-
-### v0.2.0
-- 基礎占卜功能
-- Gemini AI 整合
-
----
-
-## 🛠️ 技術棧
-
-| 類型 | 技術 |
-|------|------|
-| **前端** | Next.js 16, React 19, TypeScript, Tailwind CSS v4 |
-| **UI 庫** | shadcn/ui, Lucide Icons |
-| **後端** | Flask, SQLite |
-| **AI** | Google Gemini, OpenAI Compatible API |
-| **占卜** | lunar-python (農曆計算) |
-
----
-
-## 📜 License
+## 📄 授權
 
 MIT License
 
----
+## 🙏 致謝
 
-## 🙏 鳴謝
-
-- [shadcn/ui](https://ui.shadcn.com/) - 精美 React 元件
-- [lunar-python](https://github.com/6tail/lunar-python) - 農曆計算庫
-- [Google Gemini](https://ai.google.dev/) - AI 解卦服務
+- [六爻排盤算法](https://github.com/ichingtao/ichingshifa) - 六爻排盤核心
+- [Google Gemini](https://ai.google.dev/) - AI 服務
+- [Next.js](https://nextjs.org/) - React 框架
+- [FastAPI](https://fastapi.tiangolo.com/) - Python API 框架

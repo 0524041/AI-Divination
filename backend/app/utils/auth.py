@@ -1,63 +1,106 @@
 """
-Authentication utilities - 認證工具
+認證工具模組
 """
-from functools import wraps
-from flask import session, jsonify
+from datetime import datetime, timedelta
+from typing import Optional
+from passlib.context import CryptContext
+from jose import JWTError, jwt
 from cryptography.fernet import Fernet
-import base64
-import hashlib
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 
-from ..core.database import get_db_connection
-from ..core.config import get_config
+from app.core.config import get_settings
+from app.core.database import get_db
+from app.models.user import User
 
-# 從 config 獲取加密金鑰並轉換為 Fernet 格式
-config = get_config()
-_raw_key = config.ENCRYPTION_KEY
+settings = get_settings()
 
-# Fernet 需要 32 bytes base64 編碼的金鑰
-# 將任意長度的 hex 金鑰轉換為 Fernet 格式
-def _get_fernet_key(raw_key: str) -> bytes:
-    """將 hex 金鑰轉換為 Fernet 格式"""
-    # 使用 SHA256 確保得到 32 bytes
-    key_bytes = hashlib.sha256(raw_key.encode()).digest()
-    return base64.urlsafe_b64encode(key_bytes)
+# 密碼加密
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-cipher = Fernet(_get_fernet_key(_raw_key))
+# JWT Bearer
+security = HTTPBearer()
 
-def login_required(f):
-    """裝飾器：需要登入"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return jsonify({"error": "Authentication required"}), 401
-        return f(*args, **kwargs)
-    return decorated_function
 
-def admin_required(f):
-    """裝飾器：需要管理員權限"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return jsonify({"error": "Authentication required"}), 401
-        
-        conn = get_db_connection()
-        user = conn.execute('SELECT role FROM users WHERE id = ?', (session['user_id'],)).fetchone()
-        conn.close()
-        
-        if not user or user['role'] != 'admin':
-            return jsonify({"error": "Admin access required"}), 403
-        
-        return f(*args, **kwargs)
-    return decorated_function
+def hash_password(password: str) -> str:
+    """密碼雜湊"""
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """驗證密碼"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """建立 JWT Token"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_token(token: str) -> Optional[dict]:
+    """解碼 JWT Token"""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
 
 def encrypt_api_key(api_key: str) -> str:
     """加密 API Key"""
-    if not api_key:
-        return None
-    return cipher.encrypt(api_key.encode()).decode()
+    f = Fernet(settings.ENCRYPTION_KEY.encode())
+    return f.encrypt(api_key.encode()).decode()
+
 
 def decrypt_api_key(encrypted_key: str) -> str:
     """解密 API Key"""
-    if not encrypted_key:
-        return None
-    return cipher.decrypt(encrypted_key.encode()).decode()
+    f = Fernet(settings.ENCRYPTION_KEY.encode())
+    return f.decrypt(encrypted_key.encode()).decode()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """取得當前用戶 (依賴注入)"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="無效的認證憑證",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    token = credentials.credentials
+    payload = decode_token(token)
+    
+    if payload is None:
+        raise credentials_exception
+    
+    username: str = payload.get("sub")
+    if username is None:
+        raise credentials_exception
+    
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise credentials_exception
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="帳戶已停用"
+        )
+    
+    return user
+
+
+async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    """取得管理員用戶 (依賴注入)"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理員權限"
+        )
+    return current_user

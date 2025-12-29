@@ -1,175 +1,408 @@
 #!/bin/bash
 
 # ============================================
-# AI-Divination V2 啟動腳本
-# 同時啟動 Flask 後端 (8080) + Next.js 前端 (3000)
+# AI-Divination 啟動腳本
+# 使用 uv 進行 Python 版本管理和虛擬環境
 # ============================================
-
-set -e
 
 # 顏色定義
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# 獲取腳本所在目錄的絕對路徑
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# 專案路徑
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$PROJECT_DIR/backend"
+FRONTEND_DIR="$PROJECT_DIR/frontend"
+VENV_DIR="$BACKEND_DIR/.venv"
+DB_FILE="$BACKEND_DIR/divination.db"
 
-# PID 文件
-BACKEND_PID_FILE="$SCRIPT_DIR/.backend.pid"
-FRONTEND_PID_FILE="$SCRIPT_DIR/.frontend.pid"
+# Python 版本要求 (使用 uv 管理)
+PYTHON_VERSION="3.10"
 
-# 清理函數：正確釋放資源
-cleanup() {
+# ============================================
+# 顯示幫助信息
+# ============================================
+show_help() {
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "${BLUE}       AI-Divination 啟動程序${NC}"
+    echo -e "${BLUE}============================================${NC}"
     echo ""
-    echo -e "${YELLOW}🛑 正在關閉服務...${NC}"
-    
-    # 關閉後端
-    if [ -f "$BACKEND_PID_FILE" ]; then
-        BACKEND_PID=$(cat "$BACKEND_PID_FILE")
-        if kill -0 "$BACKEND_PID" 2>/dev/null; then
-            echo -e "${BLUE}  → 關閉後端 (PID: $BACKEND_PID)${NC}"
-            kill "$BACKEND_PID" 2>/dev/null || true
-            wait "$BACKEND_PID" 2>/dev/null || true
-        fi
-        rm -f "$BACKEND_PID_FILE"
-    fi
-    
-    # 關閉前端
-    if [ -f "$FRONTEND_PID_FILE" ]; then
-        FRONTEND_PID=$(cat "$FRONTEND_PID_FILE")
-        if kill -0 "$FRONTEND_PID" 2>/dev/null; then
-            echo -e "${BLUE}  → 關閉前端 (PID: $FRONTEND_PID)${NC}"
-            kill "$FRONTEND_PID" 2>/dev/null || true
-            wait "$FRONTEND_PID" 2>/dev/null || true
-        fi
-        rm -f "$FRONTEND_PID_FILE"
-    fi
-    
-    # 確保殺死所有相關進程
-    pkill -f "python run.py" 2>/dev/null || true
-    pkill -f "next dev" 2>/dev/null || true
-    
-    echo -e "${GREEN}✅ 所有服務已關閉${NC}"
-    exit 0
+    echo -e "${YELLOW}用法:${NC} ./start.sh [選項]"
+    echo ""
+    echo -e "${YELLOW}選項:${NC}"
+    echo -e "  ${GREEN}(無參數)${NC}        正常啟動服務"
+    echo -e "  ${GREEN}--reset${NC}         重置資料庫 (清空所有資料回到初始狀態)"
+    echo -e "  ${GREEN}--clean-cache${NC}   清理所有快取 (包含 __pycache__, .next, node_modules/.cache)"
+    echo -e "  ${GREEN}--stop${NC}          停止所有服務"
+    echo -e "  ${GREEN}--status${NC}        查看服務狀態"
+    echo -e "  ${GREEN}--logs${NC}          查看服務日誌"
+    echo -e "  ${GREEN}--install${NC}       只安裝依賴，不啟動服務"
+    echo -e "  ${GREEN}--help, -h${NC}      顯示此幫助信息"
+    echo ""
+    echo -e "${YELLOW}範例:${NC}"
+    echo -e "  ./start.sh              # 啟動服務"
+    echo -e "  ./start.sh --reset      # 重置資料庫後啟動"
+    echo -e "  ./start.sh --clean-cache # 清理快取後啟動"
+    echo -e "  ./start.sh --stop       # 停止服務"
+    echo ""
 }
 
-# 捕獲信號
-trap cleanup SIGINT SIGTERM EXIT
+# ============================================
+# 重置資料庫
+# ============================================
+reset_database() {
+    echo -e "\n${YELLOW}[重置] 清空資料庫...${NC}"
+    
+    if [ -f "$DB_FILE" ]; then
+        rm -f "$DB_FILE"
+        echo -e "${GREEN}✓ 已刪除資料庫檔案${NC}"
+    else
+        echo -e "${CYAN}ℹ 資料庫檔案不存在${NC}"
+    fi
+    
+    # 刪除加密金鑰 (重置後需要重新初始化)
+    rm -f "$BACKEND_DIR/.secret_key" 2>/dev/null
+    rm -f "$BACKEND_DIR/.encryption_key" 2>/dev/null
+    echo -e "${GREEN}✓ 已清除金鑰檔案${NC}"
+    
+    echo -e "${GREEN}✓ 資料庫重置完成，下次啟動時將重新初始化${NC}"
+}
 
-# 打印 Banner
-echo -e "${YELLOW}"
-echo "╔═══════════════════════════════════════════╗"
-echo "║     🔮 靈機一動 - AI Divination V2 🔮     ║"
-echo "║         易經占卜 · 洞察天機               ║"
-echo "╚═══════════════════════════════════════════╝"
-echo -e "${NC}"
+# ============================================
+# 清理快取
+# ============================================
+clean_cache() {
+    echo -e "\n${YELLOW}[清理] 清除所有快取...${NC}"
+    
+    # 清理 Python 快取
+    find "$BACKEND_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find "$BACKEND_DIR" -type f -name "*.pyc" -delete 2>/dev/null || true
+    find "$BACKEND_DIR" -type f -name "*.pyo" -delete 2>/dev/null || true
+    echo -e "${GREEN}✓ Python 快取已清除${NC}"
+    
+    # 清理 Next.js 快取
+    if [ -d "$FRONTEND_DIR/.next" ]; then
+        rm -rf "$FRONTEND_DIR/.next"
+        echo -e "${GREEN}✓ Next.js 快取已清除${NC}"
+    fi
+    
+    # 清理 node_modules 快取
+    if [ -d "$FRONTEND_DIR/node_modules/.cache" ]; then
+        rm -rf "$FRONTEND_DIR/node_modules/.cache"
+        echo -e "${GREEN}✓ Node.js 快取已清除${NC}"
+    fi
+    
+    # 清理日誌檔案
+    rm -f "$PROJECT_DIR/backend.log" 2>/dev/null
+    rm -f "$PROJECT_DIR/frontend.log" 2>/dev/null
+    echo -e "${GREEN}✓ 日誌檔案已清除${NC}"
+    
+    echo -e "${GREEN}✓ 所有快取清理完成${NC}"
+}
 
-# 檢查必要目錄
-if [ ! -d "frontend" ]; then
-    echo -e "${RED}❌ 錯誤：找不到 frontend 目錄${NC}"
-    exit 1
-fi
+# ============================================
+# 停止服務
+# ============================================
+stop_services() {
+    echo -e "\n${YELLOW}[停止] 停止所有服務...${NC}"
+    
+    pkill -f "uvicorn app.main:app" 2>/dev/null && echo -e "${GREEN}✓ 後端服務已停止${NC}" || echo -e "${CYAN}ℹ 後端服務未運行${NC}"
+    pkill -f "next dev" 2>/dev/null && echo -e "${GREEN}✓ 前端服務已停止${NC}" || echo -e "${CYAN}ℹ 前端服務未運行${NC}"
+    
+    echo -e "${GREEN}✓ 服務停止完成${NC}"
+}
 
-if [ ! -d "backend" ]; then
-    echo -e "${RED}❌ 錯誤：找不到 backend 目錄${NC}"
-    exit 1
-fi
+# ============================================
+# 查看服務狀態
+# ============================================
+show_status() {
+    echo -e "\n${BLUE}============================================${NC}"
+    echo -e "${BLUE}       服務狀態${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    
+    # 檢查後端
+    if pgrep -f "uvicorn app.main:app" > /dev/null; then
+        BACKEND_PID=$(pgrep -f "uvicorn app.main:app")
+        echo -e "後端服務: ${GREEN}運行中${NC} (PID: $BACKEND_PID)"
+    else
+        echo -e "後端服務: ${RED}未運行${NC}"
+    fi
+    
+    # 檢查前端
+    if pgrep -f "next dev" > /dev/null; then
+        FRONTEND_PID=$(pgrep -f "next dev")
+        echo -e "前端服務: ${GREEN}運行中${NC} (PID: $FRONTEND_PID)"
+    else
+        echo -e "前端服務: ${RED}未運行${NC}"
+    fi
+    
+    echo -e "${BLUE}============================================${NC}"
+}
 
-# 檢查環境
-echo -e "${BLUE}📦 檢查環境...${NC}"
+# ============================================
+# 查看日誌
+# ============================================
+show_logs() {
+    echo -e "\n${BLUE}============================================${NC}"
+    echo -e "${BLUE}       最近日誌 (各 20 行)${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    
+    if [ -f "$PROJECT_DIR/backend.log" ]; then
+        echo -e "\n${YELLOW}=== 後端日誌 ===${NC}"
+        tail -20 "$PROJECT_DIR/backend.log"
+    else
+        echo -e "\n${CYAN}ℹ 後端日誌不存在${NC}"
+    fi
+    
+    if [ -f "$PROJECT_DIR/frontend.log" ]; then
+        echo -e "\n${YELLOW}=== 前端日誌 ===${NC}"
+        tail -20 "$PROJECT_DIR/frontend.log"
+    else
+        echo -e "\n${CYAN}ℹ 前端日誌不存在${NC}"
+    fi
+}
 
-# 檢查 uv
-if ! command -v uv &> /dev/null; then
-    echo -e "${RED}❌ 未找到 uv，請先安裝: curl -LsSf https://astral.sh/uv/install.sh | sh${NC}"
-    exit 1
-fi
-echo -e "${GREEN}   ✓ uv 已安裝${NC}"
+# ============================================
+# 檢查並安裝 uv
+# ============================================
+check_uv() {
+    if ! command -v uv &> /dev/null; then
+        echo -e "${YELLOW}uv 未安裝，正在安裝...${NC}"
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.local/bin:$PATH"
+        
+        if ! command -v uv &> /dev/null; then
+            echo -e "${RED}✗ uv 安裝失敗${NC}"
+            exit 1
+        fi
+    fi
+    echo -e "${GREEN}✓ uv $(uv --version | head -1)${NC}"
+}
 
+# ============================================
+# 設置 Python 環境 (使用 uv)
+# ============================================
+setup_python_env() {
+    echo -e "\n${YELLOW}[2/7] 設置 Python 環境 (使用 uv)...${NC}"
+    
+    cd "$BACKEND_DIR"
+    
+    # 檢查是否需要建立虛擬環境
+    if [ ! -d "$VENV_DIR" ]; then
+        echo "建立虛擬環境 (Python $PYTHON_VERSION)..."
+        uv venv --python $PYTHON_VERSION "$VENV_DIR"
+        echo -e "${GREEN}✓ 虛擬環境已建立${NC}"
+    else
+        echo -e "${GREEN}✓ 虛擬環境已存在${NC}"
+    fi
+    
+    # 顯示 Python 版本
+    ACTUAL_VERSION=$("$VENV_DIR/bin/python" --version 2>&1)
+    echo -e "${GREEN}✓ $ACTUAL_VERSION${NC}"
+}
+
+# ============================================
+# 安裝 Python 依賴 (使用 uv)
+# ============================================
+install_python_deps() {
+    echo -e "\n${YELLOW}[3/7] 安裝 Python 依賴 (使用 uv)...${NC}"
+    
+    cd "$BACKEND_DIR"
+    
+    if [ -f "requirements.txt" ]; then
+        uv pip install -r requirements.txt --quiet
+        echo -e "${GREEN}✓ Python 依賴已安裝${NC}"
+    else
+        echo -e "${RED}✗ requirements.txt 不存在${NC}"
+        exit 1
+    fi
+}
+
+# ============================================
+# 初始化資料庫
+# ============================================
+init_database() {
+    echo -e "\n${YELLOW}[4/7] 初始化資料庫...${NC}"
+    
+    cd "$BACKEND_DIR"
+    "$VENV_DIR/bin/python" -c "from app.core.database import init_db; init_db()"
+    echo -e "${GREEN}✓ 資料庫初始化完成${NC}"
+}
+
+# ============================================
 # 檢查 Node.js
-if ! command -v npm &> /dev/null; then
-    echo -e "${RED}❌ 未找到 npm，請先安裝 Node.js${NC}"
-    exit 1
-fi
-echo -e "${GREEN}   ✓ npm 已安裝${NC}"
+# ============================================
+check_nodejs() {
+    echo -e "\n${YELLOW}[5/7] 檢查 Node.js 版本...${NC}"
+    
+    if command -v node &> /dev/null; then
+        NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
+        if [ "$NODE_VERSION" -ge 18 ]; then
+            echo -e "${GREEN}✓ Node.js $(node -v)${NC}"
+        else
+            echo -e "${RED}✗ Node.js 版本需要 18+，當前版本: $(node -v)${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}✗ 未找到 Node.js${NC}"
+        exit 1
+    fi
+}
 
-echo ""
+# ============================================
+# 安裝前端依賴
+# ============================================
+install_frontend_deps() {
+    echo -e "\n${YELLOW}[6/7] 安裝前端依賴...${NC}"
+    
+    cd "$FRONTEND_DIR"
+    
+    if [ -f "package.json" ]; then
+        if [ ! -d "node_modules" ]; then
+            npm install --silent
+        fi
+        echo -e "${GREEN}✓ 前端依賴已安裝${NC}"
+    else
+        echo -e "${RED}✗ package.json 不存在${NC}"
+        exit 1
+    fi
+}
 
-# ====== 後端環境設置 ======
-echo -e "${BLUE}🐍 設置後端環境...${NC}"
+# ============================================
+# 啟動服務
+# ============================================
+start_services() {
+    echo -e "\n${YELLOW}[7/7] 啟動服務...${NC}"
+    
+    # 停止已存在的服務
+    pkill -f "uvicorn app.main:app" 2>/dev/null || true
+    pkill -f "next dev" 2>/dev/null || true
+    
+    sleep 1
+    
+    # 啟動後端
+    echo "啟動後端服務 (Port 8000)..."
+    cd "$BACKEND_DIR"
+    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 0.0.0.0 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
+    BACKEND_PID=$!
+    
+    # 啟動前端
+    echo "啟動前端服務 (Port 3000)..."
+    cd "$FRONTEND_DIR"
+    nohup npm run dev > "$PROJECT_DIR/frontend.log" 2>&1 &
+    FRONTEND_PID=$!
+    
+    sleep 3
+    
+    # 檢查服務狀態
+    echo -e "\n${BLUE}============================================${NC}"
+    echo -e "${GREEN}       服務已啟動！${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "前端:    ${GREEN}http://localhost:3000${NC}"
+    echo -e "後端:    ${GREEN}http://localhost:8000${NC}"
+    echo -e "API 文檔: ${GREEN}http://localhost:8000/docs${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "後端 PID: $BACKEND_PID"
+    echo -e "前端 PID: $FRONTEND_PID"
+    echo -e "日誌檔案: backend.log, frontend.log"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "\n${CYAN}提示: 使用 ${GREEN}./start.sh --stop${CYAN} 停止服務${NC}"
+    echo -e "${CYAN}      使用 ${GREEN}./start.sh --status${CYAN} 查看狀態${NC}"
+    echo -e "${CYAN}      使用 ${GREEN}./start.sh --logs${CYAN} 查看日誌${NC}"
+}
 
-cd backend
-if [ -f "pyproject.toml" ]; then
-    echo -e "   → 同步 Python 依賴..."
-    uv sync --quiet 2>/dev/null || uv sync
-    echo -e "${GREEN}   ✓ Python 依賴已同步${NC}"
-fi
-cd ..
+# ============================================
+# 主程序
+# ============================================
+main() {
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "${BLUE}       AI-Divination 啟動程序${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    
+    # 解析命令行參數
+    RESET_DB=false
+    CLEAN_CACHE=false
+    INSTALL_ONLY=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            --reset)
+                RESET_DB=true
+                shift
+                ;;
+            --clean-cache)
+                CLEAN_CACHE=true
+                shift
+                ;;
+            --stop)
+                stop_services
+                exit 0
+                ;;
+            --status)
+                show_status
+                exit 0
+                ;;
+            --logs)
+                show_logs
+                exit 0
+                ;;
+            --install)
+                INSTALL_ONLY=true
+                shift
+                ;;
+            *)
+                echo -e "${RED}未知選項: $1${NC}"
+                echo -e "使用 ${GREEN}--help${NC} 查看可用選項"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # 執行重置資料庫
+    if [ "$RESET_DB" = true ]; then
+        reset_database
+    fi
+    
+    # 執行清理快取
+    if [ "$CLEAN_CACHE" = true ]; then
+        clean_cache
+    fi
+    
+    # 1. 檢查 uv
+    echo -e "\n${YELLOW}[1/7] 檢查 uv 套件管理器...${NC}"
+    check_uv
+    
+    # 2. 設置 Python 環境
+    setup_python_env
+    
+    # 3. 安裝 Python 依賴
+    install_python_deps
+    
+    # 4. 初始化資料庫
+    init_database
+    
+    # 5. 檢查 Node.js
+    check_nodejs
+    
+    # 6. 安裝前端依賴
+    install_frontend_deps
+    
+    # 7. 啟動服務 (除非只安裝)
+    if [ "$INSTALL_ONLY" = true ]; then
+        echo -e "\n${GREEN}✓ 安裝完成！${NC}"
+        echo -e "${CYAN}使用 ${GREEN}./start.sh${CYAN} 啟動服務${NC}"
+    else
+        start_services
+    fi
+}
 
-# ====== 資料庫檢查 ======
-echo -e "${BLUE}🗄️  檢查資料庫...${NC}"
-
-if [ -f "divination.db" ]; then
-    echo -e "${GREEN}   ✓ 資料庫已存在${NC}"
-else
-    echo -e "   → 資料庫將在首次啟動時創建"
-fi
-
-# ====== 前端依賴 ======
-echo -e "${BLUE}📦 檢查前端依賴...${NC}"
-
-if [ ! -d "frontend/node_modules" ]; then
-    echo -e "   → 安裝前端依賴 (首次可能需要較長時間)..."
-    cd frontend && npm install --silent && cd ..
-    echo -e "${GREEN}   ✓ 前端依賴安裝完成${NC}"
-else
-    echo -e "${GREEN}   ✓ 前端依賴已存在${NC}"
-fi
-
-echo ""
-echo -e "${GREEN}✅ 環境檢查全部通過${NC}"
-echo ""
-
-# 啟動後端 (使用新的 backend 目錄)
-echo -e "${BLUE}🚀 啟動後端服務 (Port 8080)...${NC}"
-(cd "$SCRIPT_DIR/backend" && uv run python run.py) &
-BACKEND_PID=$!
-echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
-echo -e "${GREEN}   ✓ 後端已啟動 (PID: $BACKEND_PID)${NC}"
-
-# 等待後端啟動
-sleep 3
-
-# 檢查後端是否成功啟動
-if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-    echo -e "${RED}❌ 後端啟動失敗${NC}"
-    cleanup
-    exit 1
-fi
-
-# 啟動前端
-echo -e "${BLUE}🚀 啟動前端服務 (Port 3000)...${NC}"
-(cd "$SCRIPT_DIR/frontend" && npx next dev -H 0.0.0.0) &
-FRONTEND_PID=$!
-echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
-echo -e "${GREEN}   ✓ 前端已啟動 (PID: $FRONTEND_PID)${NC}"
-
-# 等待前端啟動
-sleep 3
-
-echo ""
-echo -e "${GREEN}═══════════════════════════════════════════${NC}"
-echo -e "${GREEN}🎉 服務已全部啟動！${NC}"
-echo ""
-echo -e "   ${YELLOW}前端地址:${NC} http://localhost:3000"
-echo -e "   ${YELLOW}後端地址:${NC} http://localhost:8080"
-echo ""
-echo -e "${BLUE}   按 Ctrl+C 關閉所有服務${NC}"
-echo -e "${GREEN}═══════════════════════════════════════════${NC}"
-echo ""
-
-# 等待進程
-wait
+# 執行主程序
+main "$@"

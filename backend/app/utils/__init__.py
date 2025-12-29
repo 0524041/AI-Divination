@@ -1,6 +1,24 @@
 """
-Utils module - 工具模組
+工具模組
 """
-from .auth import login_required, admin_required, encrypt_api_key, decrypt_api_key
+from .auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    decode_token,
+    encrypt_api_key,
+    decrypt_api_key,
+    get_current_user,
+    get_admin_user
+)
 
-__all__ = ['login_required', 'admin_required', 'encrypt_api_key', 'decrypt_api_key']
+__all__ = [
+    'hash_password',
+    'verify_password',
+    'create_access_token',
+    'decode_token',
+    'encrypt_api_key',
+    'decrypt_api_key',
+    'get_current_user',
+    'get_admin_user'
+]

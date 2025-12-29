@@ -1,14 +1,15 @@
 """
-Services module - 業務邏輯服務
+服務模組
 """
-from .divination import perform_divination, get_current_time, LiuYaoChart
-from .ai import call_ai, format_divination_result, get_system_prompt
+from .liuyao import perform_divination, LiuYaoChart, toss_coins
+from .ai import AIService, GeminiService, LocalAIService, get_ai_service
 
 __all__ = [
-    'perform_divination', 
-    'get_current_time', 
+    'perform_divination',
     'LiuYaoChart',
-    'call_ai',
-    'format_divination_result',
-    'get_system_prompt'
+    'toss_coins',
+    'AIService',
+    'GeminiService',
+    'LocalAIService',
+    'get_ai_service'
 ]
