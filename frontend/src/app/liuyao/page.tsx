@@ -352,27 +352,24 @@ export default function LiuYaoPage() {
       <div className="max-w-4xl mx-auto px-4 mt-6">
         <div className="flex gap-2 border-b border-gray-700 pb-2">
           <button
-            className={`px-4 py-2 rounded-t-lg transition ${
-              activeTab === 'divine' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'divine' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+              }`}
             onClick={() => setActiveTab('divine')}
           >
             <Compass size={18} className="inline mr-2" />
             占卜
           </button>
           <button
-            className={`px-4 py-2 rounded-t-lg transition ${
-              activeTab === 'intro' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'intro' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+              }`}
             onClick={() => setActiveTab('intro')}
           >
             <BookOpen size={18} className="inline mr-2" />
             說明
           </button>
           <button
-            className={`px-4 py-2 rounded-t-lg transition ${
-              activeTab === 'tutorial' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'tutorial' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+              }`}
             onClick={() => setActiveTab('tutorial')}
           >
             <HelpCircle size={18} className="inline mr-2" />
@@ -386,8 +383,8 @@ export default function LiuYaoPage() {
         {/* 占卜頁面 */}
         {activeTab === 'divine' && (
           <div className="space-y-6">
-            {/* 當前 AI 顯示與切換 */}
-            <div className="glass-card p-4">
+            {/* 當進 AI 顯示與切換 */}
+            <div className="glass-card p-4 relative z-20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Bot className="text-[var(--gold)]" size={20} />
@@ -412,9 +409,8 @@ export default function LiuYaoPage() {
                         <button
                           key={config.id}
                           onClick={() => handleSwitchAI(config.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg ${
-                            config.is_active ? 'text-[var(--gold)]' : 'text-gray-300'
-                          }`}
+                          className={`w-full text-left px-4 py-3 hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg ${config.is_active ? 'text-[var(--gold)]' : 'text-gray-300'
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <span>{getAIDisplayName(config)}</span>
@@ -447,22 +443,20 @@ export default function LiuYaoPage() {
                 <div className="flex gap-4">
                   <button
                     type="button"
-                    className={`flex-1 py-3 rounded-lg border transition ${
-                      gender === 'male'
+                    className={`flex-1 py-3 rounded-lg border transition ${gender === 'male'
                         ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
                         : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                    }`}
+                      }`}
                     onClick={() => setGender('male')}
                   >
                     ♂ 男
                   </button>
                   <button
                     type="button"
-                    className={`flex-1 py-3 rounded-lg border transition ${
-                      gender === 'female'
+                    className={`flex-1 py-3 rounded-lg border transition ${gender === 'female'
                         ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
                         : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                    }`}
+                      }`}
                     onClick={() => setGender('female')}
                   >
                     ♀ 女
@@ -483,11 +477,10 @@ export default function LiuYaoPage() {
                     <button
                       key={opt.value}
                       type="button"
-                      className={`py-2 rounded-lg border transition ${
-                        target === opt.value
+                      className={`py-2 rounded-lg border transition ${target === opt.value
                           ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
                           : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                      }`}
+                        }`}
                       onClick={() => setTarget(opt.value as typeof target)}
                     >
                       {opt.label}
@@ -695,7 +688,7 @@ export default function LiuYaoPage() {
                           </div>
                         </details>
                       )}
-                      
+
                       {/* 主要內容 */}
                       <div className="markdown-content bg-gray-800/30 rounded-xl p-6" dangerouslySetInnerHTML={{ __html: parsedContent.mainHtml }} />
                     </div>
