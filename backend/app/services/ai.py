@@ -2,9 +2,16 @@
 AI 服務模組
 """
 import httpx
-from typing import Optional, AsyncGenerator
+import logging
+import asyncio
+import random
+from typing import Optional, AsyncGenerator, Any, Callable
 from app.core.config import get_settings
 from app.utils.auth import decrypt_api_key
+from google import genai
+from google.genai import types
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -26,34 +33,47 @@ class GeminiService(AIService):
     
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base_url = "https://generativelanguage.googleapis.com/v1beta"
-        self.model = "gemini-2.0-flash"
+        self.model = "gemini-3-flash-preview"
+        self.client = genai.Client(api_key=api_key, http_options={'api_version': 'v1alpha'})
     
+    async def _retry_async(self, func: Callable, *args, max_retries: int = 3, base_delay: float = 2.0, **kwargs) -> Any:
+        """非同步重試邏輯"""
+        for attempt in range(max_retries):
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                error_str = str(e)
+                is_429 = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
+                is_503 = "503" in error_str or "Service Unavailable" in error_str
+                
+                if not (is_429 or is_503) or attempt == max_retries - 1:
+                    logger.error(f"Gemini API Error (Attempt {attempt+1}/{max_retries}): {error_str}")
+                    raise e
+                
+                sleep_time = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                logger.warning(f"Gemini API Limit/Error ({'429' if is_429 else '503'}). Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
+                await asyncio.sleep(sleep_time)
+
     async def generate(self, prompt: str, system_prompt: str) -> str:
-        """生成回應"""
-        url = f"{self.base_url}/models/{self.model}:generateContent?key={self.api_key}"
+        """生成回應 (使用 Thinking Config)"""
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            thinking_config=types.ThinkingConfig(thinking_level="high"),
+            temperature=1.0,
+            max_output_tokens=16384,
+        )
         
-        payload = {
-            "contents": [
-                {"role": "user", "parts": [{"text": prompt}]}
-            ],
-            "systemInstruction": {
-                "parts": [{"text": system_prompt}]
-            },
-            "generationConfig": {
-                "temperature": 0.7,
-                "maxOutputTokens": 8192,
-            }
-        }
-        
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            
-            if "candidates" in data and len(data["candidates"]) > 0:
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            return ""
+        try:
+            response = await self._retry_async(
+                self.client.aio.models.generate_content,
+                model=self.model,
+                contents=prompt,
+                config=config
+            )
+            return response.text
+        except Exception as e:
+            logger.error(f"Error in Gemini generate: {e}")
+            raise e
 
 
 class LocalAIService(AIService):
@@ -73,8 +93,8 @@ class LocalAIService(AIService):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.7,
-            "max_tokens": 8192,
+            "temperature": 1.0,
+            "max_tokens": 16384,
         }
         
         async with httpx.AsyncClient(timeout=300.0) as client:

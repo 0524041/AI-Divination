@@ -244,6 +244,30 @@ install_python_deps() {
 }
 
 # ============================================
+# 檢查關鍵依賴
+# ============================================
+check_dependencies() {
+    echo -e "\n${YELLOW}[依賴檢查] 驗證核心套件...${NC}"
+    
+    local packages=("fastapi" "uvicorn" "google.genai")
+    local missing=0
+    
+    for pkg in "${packages[@]}"; do
+        if ! "$VENV_DIR/bin/python" -c "import $pkg" &>/dev/null; then
+            echo -e "${RED}✗ 缺失關鍵套件: $pkg${NC}"
+            missing=$((missing + 1))
+        else
+            echo -e "${GREEN}✓ 已安裝: $pkg${NC}"
+        fi
+    done
+    
+    if [ $missing -gt 0 ]; then
+        echo -e "${YELLOW}正在嘗試自動修復缺失套件...${NC}"
+        install_python_deps
+    fi
+}
+
+# ============================================
 # 初始化資料庫
 # ============================================
 init_database() {
@@ -406,6 +430,9 @@ main() {
     
     # 3. 安裝 Python 依賴
     install_python_deps
+    
+    # 檢查依賴
+    check_dependencies
     
     # 4. 初始化資料庫
     init_database
