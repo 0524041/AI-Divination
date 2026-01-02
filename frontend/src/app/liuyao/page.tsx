@@ -51,6 +51,10 @@ interface AIConfig {
 }
 
 const AI_TIMEOUT = 5 * 60 * 1000; // 5 分鐘
+const TOSS_TIMEOUT_GEMINI = 5000;
+const TOSS_TIMEOUT_LOCAL = 20000;
+const TOTAL_ESTIMATED_GEMINI = 40000;
+const TOTAL_ESTIMATED_LOCAL = 160000;
 
 export default function LiuYaoPage() {
   const router = useRouter();
@@ -65,6 +69,14 @@ export default function LiuYaoPage() {
   const [error, setError] = useState('');
   const [waitingTime, setWaitingTime] = useState(0);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // 擲幣相關狀態
+  const [isTossing, setIsTossing] = useState(false);
+  const [tossIndex, setTossIndex] = useState(0);
+  const [tossStartTime, setTossStartTime] = useState(0);
+  const [currentTossStartTime, setCurrentTossStartTime] = useState(0);
+  const [aiProgressDuration, setAiProgressDuration] = useState(0);
+  const [aiProgress, setAiProgress] = useState(0);
 
   // AI 設定相關
   const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
@@ -138,11 +150,17 @@ export default function LiuYaoPage() {
 
   // 輪詢結果
   useEffect(() => {
-    if (!result || interpretation) return;
+    if (!result || interpretation || !showResult) return;
+
+    // 開始 AI 進度條動畫
+    if (aiProgress === 0 && aiProgressDuration > 0) {
+      // 給一點延遲讓 UI 渲染完成
+      setTimeout(() => setAiProgress(100), 100);
+    }
 
     const startTime = Date.now();
 
-    // 等待時間計時器
+    // 等待時間計時器 (保留用於顯示實際等待時間，如果需要的話，或者用於超時檢查)
     waitingTimerRef.current = setInterval(() => {
       setWaitingTime(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
@@ -187,6 +205,45 @@ export default function LiuYaoPage() {
     };
   }, [result, interpretation]);
 
+  // 自動擲幣計時器
+  useEffect(() => {
+    if (!isTossing || !result || tossIndex >= 6) return;
+
+    // 重置當前擲幣開始時間
+    setCurrentTossStartTime(Date.now());
+
+    const timeout = activeAI?.provider === 'local' ? TOSS_TIMEOUT_LOCAL : TOSS_TIMEOUT_GEMINI;
+    const timer = setTimeout(() => {
+      handleNextToss();
+    }, timeout);
+
+    return () => clearTimeout(timer);
+  }, [isTossing, result, tossIndex, activeAI]);
+
+  const handleNextToss = () => {
+    if (tossIndex < 6) {
+      setTossIndex((prev) => prev + 1);
+    }
+    
+    // 如果是最後一次擲幣（擲完第6次），結束擲幣流程
+    if (tossIndex === 5) {
+      finishTossing();
+    }
+  };
+
+  const finishTossing = () => {
+    setIsTossing(false);
+    setShowResult(true);
+    
+    // 計算 AI 解盤預估剩餘時間
+    const totalEstimated = activeAI?.provider === 'local' ? TOTAL_ESTIMATED_LOCAL : TOTAL_ESTIMATED_GEMINI;
+    const timeSpent = Date.now() - tossStartTime;
+    const remaining = Math.max(10000, totalEstimated - timeSpent); // 至少留 10 秒
+    
+    setAiProgressDuration(remaining);
+    setAiProgress(0);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) return;
@@ -196,6 +253,11 @@ export default function LiuYaoPage() {
     setResult(null);
     setInterpretation(null);
     setWaitingTime(0);
+    
+    // 擲幣初始化
+    setIsTossing(true);
+    setTossIndex(0);
+    setTossStartTime(Date.now());
 
     // 建立新的 AbortController
     abortControllerRef.current = new AbortController();
@@ -216,9 +278,10 @@ export default function LiuYaoPage() {
 
       if (res.ok) {
         setResult(data);
-        setShowResult(true);
+        // 注意：這裡不設定 setShowResult(true)，因為要先顯示擲幣動畫
       } else {
         setError(data.detail || '占卜失敗');
+        setIsTossing(false);
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -226,6 +289,7 @@ export default function LiuYaoPage() {
       } else {
         setError('無法連接伺服器');
       }
+      setIsTossing(false);
     } finally {
       setLoading(false);
     }
@@ -553,12 +617,12 @@ export default function LiuYaoPage() {
                 {loading ? (
                   <>
                     <Loader2 className="animate-spin" size={20} />
-                    占卜中...
+                    準備中...
                   </>
                 ) : (
                   <>
                     <Send size={20} />
-                    開始占卜
+                    開始擲幣
                   </>
                 )}
               </button>
@@ -650,6 +714,92 @@ export default function LiuYaoPage() {
         )}
       </main>
 
+      {/* 擲幣過程彈窗 */}
+      {isTossing && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+          <div className="glass-card w-full max-w-md p-8 text-center space-y-8 relative overflow-hidden">
+            {!result ? (
+              <div className="py-12">
+                <Loader2 className="animate-spin mx-auto mb-4 text-[var(--gold)]" size={48} />
+                <p className="text-xl text-gray-300">正在準備銅錢...</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold text-[var(--gold)]">心中默想 想問的事</h2>
+                  <p className="text-gray-400">心誠則靈</p>
+                </div>
+
+                {/* 卦象顯示區域 (從下往上堆疊) */}
+                <div className="min-h-[240px] flex flex-col-reverse justify-start gap-3 items-center py-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
+                  {Array.from({ length: 6 }).map((_, i) => {
+                    if (i >= tossIndex) {
+                      return (
+                        <div key={i} className="w-32 h-4 rounded opacity-10 border border-gray-600 border-dashed"></div>
+                      );
+                    }
+                    
+                    const coin = result.coins[i];
+                    const isYang = coin === 0 || coin === 1;
+                    const isMoving = coin === 0 || coin === 3;
+                    
+                    return (
+                      <div key={i} className="w-48 h-8 flex items-center justify-center relative animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="absolute left-0 text-xs text-gray-500">第 {i + 1} 擲</div>
+                        <div className={`flex gap-4 w-24 justify-center ${isMoving ? 'text-[var(--gold)]' : 'text-gray-300'}`}>
+                          {isYang ? (
+                            <div className="w-full h-3 bg-current rounded-full"></div>
+                          ) : (
+                            <>
+                              <div className="w-[45%] h-3 bg-current rounded-full"></div>
+                              <div className="w-[45%] h-3 bg-current rounded-full"></div>
+                            </>
+                          )}
+                        </div>
+                        {isMoving && <div className="absolute right-0 text-xs text-[var(--gold)]">動</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 操作按鈕 */}
+                <div className="relative">
+                  <button
+                    onClick={handleNextToss}
+                    className="w-full py-4 bg-[var(--gold)] text-black font-bold text-xl rounded-xl hover:bg-amber-400 transition relative overflow-hidden group"
+                  >
+                    <span className="relative z-10">
+                      {tossIndex === 0 ? '開始擲幣' : tossIndex === 5 ? '最後一次' : '再擲一次'}
+                    </span>
+                    {/* 進度條背景 */}
+                    <div 
+                      className="absolute bottom-0 left-0 h-1 bg-black/30 transition-all ease-linear"
+                      style={{
+                        width: '0%',
+                        animationName: 'progress',
+                        animationDuration: `${activeAI?.provider === 'local' ? TOSS_TIMEOUT_LOCAL : TOSS_TIMEOUT_GEMINI}ms`,
+                        animationTimingFunction: 'linear',
+                        animationFillMode: 'forwards'
+                      }}
+                      key={tossIndex}
+                    />
+                    <style jsx>{`
+                      @keyframes progress {
+                        from { width: 0%; }
+                        to { width: 100%; }
+                      }
+                    `}</style>
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {activeAI?.provider === 'local' ? '20' : '5'} 秒後自動擲幣
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 結果彈窗 */}
       {showResult && result && (
         <div className="fixed inset-0 z-50 bg-black/80 overflow-y-auto">
@@ -736,11 +886,17 @@ export default function LiuYaoPage() {
                   ) : (
                     <div className="text-center py-12">
                       <Loader2 className="animate-spin mx-auto mb-4 text-[var(--gold)]" size={40} />
-                      <p className="text-gray-400">AI 大師正在解讀卦象...</p>
-                      <p className="text-gray-500 text-sm mt-2">
-                        已等待 {formatWaitingTime(waitingTime)}
-                        {activeAI?.provider === 'local' && ' (Local AI 最長可能等待 5 分鐘)'}
-                      </p>
+                      <p className="text-gray-400">AI 解盤中 請耐心等待</p>
+                      
+                      <div className="w-full max-w-xs mx-auto mt-4 bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="h-full bg-[var(--gold)] transition-all ease-linear"
+                          style={{ 
+                            width: `${aiProgress}%`,
+                            transitionDuration: `${aiProgress === 100 ? aiProgressDuration : 0}ms`
+                          }}
+                        />
+                      </div>
 
                       {/* 取消按鈕 */}
                       <button
