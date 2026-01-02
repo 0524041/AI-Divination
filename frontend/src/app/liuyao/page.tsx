@@ -51,11 +51,10 @@ interface AIConfig {
   is_active: boolean;
 }
 
-const AI_TIMEOUT = 5 * 60 * 1000; // 5 分鐘
-const TOSS_TIMEOUT_GEMINI = 5000;
-const TOSS_TIMEOUT_LOCAL = 20000;
-const TOTAL_ESTIMATED_GEMINI = 40000;
-const TOTAL_ESTIMATED_LOCAL = 160000;
+// 最大等待時間常數
+const MAX_WAIT_GEMINI = 60 * 1000; // 1 分鐘
+const MAX_WAIT_LOCAL = 180 * 1000; // 3 分鐘
+const AI_TIMEOUT = 5 * 60 * 1000; // 5 分鐘超時
 
 export default function LiuYaoPage() {
   const router = useRouter();
@@ -73,10 +72,8 @@ export default function LiuYaoPage() {
 
   // 擲幣相關狀態
   const [isTossing, setIsTossing] = useState(false);
-  const [tossIndex, setTossIndex] = useState(0);
-  const [tossStartTime, setTossStartTime] = useState(0);
-  const [currentTossStartTime, setCurrentTossStartTime] = useState(0);
-  const [aiProgressDuration, setAiProgressDuration] = useState(0);
+  const [divinationStartTime, setDivinationStartTime] = useState(0); // 按下開始擲幣的時間
+  const [resultPageStartTime, setResultPageStartTime] = useState(0); // 回到結果頁面的時間
   const [aiProgress, setAiProgress] = useState(0);
 
   // AI 設定相關
@@ -149,26 +146,29 @@ export default function LiuYaoPage() {
     };
   }, []);
 
-  // 輪詢結果
+  // 輪詢結果 - 修復依賴問題
   useEffect(() => {
+    // 只有當顯示結果頁面且還沒有解讀結果時才開始輪詢
     if (!result || interpretation || !showResult) return;
 
-    // 開始 AI 進度條動畫
-    if (aiProgress === 0 && aiProgressDuration > 0) {
-      // 給一點延遲讓 UI 渲染完成
-      setTimeout(() => setAiProgress(100), 100);
-    }
+    const maxWait = activeAI?.provider === 'local' ? MAX_WAIT_LOCAL : MAX_WAIT_GEMINI;
+    const pollStartTime = Date.now();
 
-    const startTime = Date.now();
-
-    // 等待時間計時器 (保留用於顯示實際等待時間，如果需要的話，或者用於超時檢查)
+    // 每秒更新等待時間和進度條
     waitingTimerRef.current = setInterval(() => {
-      setWaitingTime(Math.floor((Date.now() - startTime) / 1000));
+      const elapsed = Date.now() - (resultPageStartTime || pollStartTime);
+      const elapsedSeconds = Math.floor(elapsed / 1000);
+      setWaitingTime(elapsedSeconds);
+
+      // 計算進度百分比（基於從按下開始擲幣開始的時間）
+      const totalElapsed = Date.now() - (divinationStartTime || pollStartTime);
+      const progressPercent = Math.min(100, (totalElapsed / maxWait) * 100);
+      setAiProgress(progressPercent);
     }, 1000);
 
     const pollResult = async () => {
       // 超時檢查
-      if (Date.now() - startTime > AI_TIMEOUT) {
+      if (Date.now() - (divinationStartTime || pollStartTime) > AI_TIMEOUT) {
         clearAllTimers();
         setInterpretation('AI 解盤超時，請稍後在歷史紀錄中查看結果');
         return;
@@ -198,25 +198,19 @@ export default function LiuYaoPage() {
       }
     };
 
-    pollIntervalRef.current = setInterval(pollResult, 3000);
+    // 每 2 秒輪詢一次，更快檢測結果
+    pollIntervalRef.current = setInterval(pollResult, 2000);
     pollResult(); // 立即執行一次
 
     return () => {
       clearAllTimers();
     };
-  }, [result, interpretation]);
+  }, [result, interpretation, showResult, activeAI, divinationStartTime, resultPageStartTime]);
 
   const finishTossing = () => {
     setIsTossing(false);
     setShowResult(true);
-    
-    // 計算 AI 解盤預估剩餘時間
-    const totalEstimated = activeAI?.provider === 'local' ? TOTAL_ESTIMATED_LOCAL : TOTAL_ESTIMATED_GEMINI;
-    const timeSpent = Date.now() - tossStartTime;
-    const remaining = Math.max(10000, totalEstimated - timeSpent); // 至少留 10 秒
-    
-    setAiProgressDuration(remaining);
-    setAiProgress(0);
+    setResultPageStartTime(Date.now()); // 記錄回到結果頁面的時間
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -228,11 +222,11 @@ export default function LiuYaoPage() {
     setResult(null);
     setInterpretation(null);
     setWaitingTime(0);
-    
+
     // 擲幣初始化
     setIsTossing(true);
-    setTossIndex(0);
-    setTossStartTime(Date.now());
+    setDivinationStartTime(Date.now()); // 記錄開始時間
+    setAiProgress(0);
 
     // 建立新的 AbortController
     abortControllerRef.current = new AbortController();
@@ -299,7 +293,7 @@ export default function LiuYaoPage() {
       alert('沒有可複製的內容');
       return;
     }
-    
+
     // 準備 Markdown 格式文本
     const markdownText = `## 問題\n${question}\n\n## 卦象\n${result.chart_data.benguaming} → ${result.chart_data.bianguaming}\n\n## 解盤\n${interpretation || '無'}`;
 
@@ -314,7 +308,7 @@ export default function LiuYaoPage() {
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      
+
       try {
         const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
@@ -691,10 +685,10 @@ export default function LiuYaoPage() {
 
       {/* 擲幣過程彈窗 */}
       {isTossing && result && (
-        <CoinTossing 
-          result={result} 
-          aiConfig={activeAI} 
-          onComplete={finishTossing} 
+        <CoinTossing
+          result={result}
+          aiConfig={activeAI}
+          onComplete={finishTossing}
         />
       )}
 
@@ -784,17 +778,27 @@ export default function LiuYaoPage() {
                   ) : (
                     <div className="text-center py-12">
                       <Loader2 className="animate-spin mx-auto mb-4 text-[var(--gold)]" size={40} />
-                      <p className="text-gray-400">AI 解盤中 請耐心等待</p>
-                      
+                      <p className="text-gray-400">AI 解盤中，請耐心等待</p>
+
+                      {/* 等待時間顯示 */}
+                      <div className="mt-4 text-2xl font-mono text-[var(--gold)]">
+                        {Math.floor(waitingTime / 60).toString().padStart(2, '0')}:{(waitingTime % 60).toString().padStart(2, '0')}
+                      </div>
+
+                      {/* 進度條 */}
                       <div className="w-full max-w-xs mx-auto mt-4 bg-gray-700 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="h-full bg-[var(--gold)] transition-all ease-linear"
-                          style={{ 
-                            width: `${aiProgress}%`,
-                            transitionDuration: `${aiProgress === 100 ? aiProgressDuration : 0}ms`
-                          }}
+                        <div
+                          className="h-full bg-[var(--gold)] transition-all duration-1000 ease-linear"
+                          style={{ width: `${Math.min(aiProgress, 100)}%` }}
                         />
                       </div>
+
+                      {/* 提示文字 */}
+                      <p className="text-gray-500 text-sm mt-3">
+                        {activeAI?.provider === 'local'
+                          ? '本地 AI 解盤最久可能需要 2~3 分鐘'
+                          : '雲端 AI 解盤最久約需 1 分鐘'}
+                      </p>
 
                       {/* 取消按鈕 */}
                       <button
