@@ -38,8 +38,9 @@ show_help() {
     echo -e "  ${GREEN}--reset${NC}         重置資料庫 (清空所有資料回到初始狀態)"
     echo -e "  ${GREEN}--clean-cache${NC}   清理所有快取 (包含 __pycache__, .next, node_modules/.cache)"
     echo -e "  ${GREEN}--stop${NC}          停止所有服務"
+    echo -e "  ${GREEN}--restart${NC}       重啟所有服務"
     echo -e "  ${GREEN}--status${NC}        查看服務狀態"
-    echo -e "  ${GREEN}--logs${NC}          查看服務日誌"
+    echo -e "  ${GREEN}--logs [-f]${NC}     查看服務日誌 (-f 可動態追蹤)"
     echo -e "  ${GREEN}--install${NC}       只安裝依賴，不啟動服務"
     echo -e "  ${GREEN}--help, -h${NC}      顯示此幫助信息"
     echo ""
@@ -108,12 +109,22 @@ clean_cache() {
 # 停止服務
 # ============================================
 stop_services() {
-    echo -e "\n${YELLOW}[停止] 停止所有服務...${NC}"
+    echo -e "\n${YELLOW}[停止] 正在停止所有服務...${NC}"
     
     pkill -f "uvicorn app.main:app" 2>/dev/null && echo -e "${GREEN}✓ 後端服務已停止${NC}" || echo -e "${CYAN}ℹ 後端服務未運行${NC}"
     pkill -f "next dev" 2>/dev/null && echo -e "${GREEN}✓ 前端服務已停止${NC}" || echo -e "${CYAN}ℹ 前端服務未運行${NC}"
     
     echo -e "${GREEN}✓ 服務停止完成${NC}"
+}
+
+# ============================================
+# 重啟服務
+# ============================================
+restart_services() {
+    echo -e "\n${YELLOW}[重啟] 正在重啟所有服務...${NC}"
+    stop_services
+    sleep 2
+    start_services
 }
 
 # ============================================
@@ -143,26 +154,34 @@ show_status() {
     echo -e "${BLUE}============================================${NC}"
 }
 
-# ============================================
 # 查看日誌
 # ============================================
 show_logs() {
-    echo -e "\n${BLUE}============================================${NC}"
-    echo -e "${BLUE}       最近日誌 (各 20 行)${NC}"
-    echo -e "${BLUE}============================================${NC}"
-    
-    if [ -f "$PROJECT_DIR/backend.log" ]; then
-        echo -e "\n${YELLOW}=== 後端日誌 ===${NC}"
-        tail -20 "$PROJECT_DIR/backend.log"
+    local FOLLOW=""
+    if [ "$1" == "-f" ]; then
+        FOLLOW="-f"
+        echo -e "\n${YELLOW}[日誌] 正在動態追蹤日誌 (按 Ctrl+C 退出)...${NC}"
     else
-        echo -e "\n${CYAN}ℹ 後端日誌不存在${NC}"
+        echo -e "\n${BLUE}============================================${NC}"
+        echo -e "${BLUE}       最近服務日誌 (最後 50 行)${NC}"
+        echo -e "${BLUE}============================================${NC}"
+        echo -e "${CYAN}完整日誌檔案位於: $PROJECT_DIR/backend.log, frontend.log${NC}"
+        echo -e "${CYAN}提示: 使用 ./start.sh --logs -f 可進行動態追蹤${NC}"
     fi
     
-    if [ -f "$PROJECT_DIR/frontend.log" ]; then
-        echo -e "\n${YELLOW}=== 前端日誌 ===${NC}"
-        tail -20 "$PROJECT_DIR/frontend.log"
+    if [ "$FOLLOW" == "-f" ]; then
+        # 如果是跟隨模式，合併輸出
+        tail -f "$PROJECT_DIR/backend.log" "$PROJECT_DIR/frontend.log"
     else
-        echo -e "\n${CYAN}ℹ 前端日誌不存在${NC}"
+        if [ -f "$PROJECT_DIR/backend.log" ]; then
+            echo -e "\n${YELLOW}=== 後端日誌 (backend.log) ===${NC}"
+            tail -50 "$PROJECT_DIR/backend.log"
+        fi
+        
+        if [ -f "$PROJECT_DIR/frontend.log" ]; then
+            echo -e "\n${YELLOW}=== 前端日誌 (frontend.log) ===${NC}"
+            tail -50 "$PROJECT_DIR/frontend.log"
+        fi
     fi
 }
 
@@ -391,12 +410,17 @@ main() {
                 stop_services
                 exit 0
                 ;;
+            --restart)
+                restart_services
+                exit 0
+                ;;
             --status)
                 show_status
                 exit 0
                 ;;
             --logs)
-                show_logs
+                shift
+                show_logs "$1"
                 exit 0
                 ;;
             --install)
