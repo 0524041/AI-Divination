@@ -27,7 +27,6 @@ class AIService:
         """串流生成回應"""
         raise NotImplementedError
 
-
 class GeminiService(AIService):
     """Google Gemini AI 服務"""
     
@@ -46,12 +45,23 @@ class GeminiService(AIService):
                 is_429 = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str
                 is_503 = "503" in error_str or "Service Unavailable" in error_str
                 
-                if not (is_429 or is_503) or attempt == max_retries - 1:
+                # 🔴 重點修改：遇到 429/503 立即終止，不重試
+                if is_429:
+                    logger.error(f"Gemini API 配額已用完 (429 RESOURCE_EXHAUSTED)")
+                    raise Exception("⚠️ Gemini API 配額已用完，請稍後再試或檢查 API 配額限制") from e
+                
+                if is_503:
+                    logger.error(f"Gemini API 服務不可用 (503 Service Unavailable)")
+                    raise Exception("⚠️ Gemini API 服務暫時不可用，請稍後再試") from e
+                
+                # 其他錯誤：如果是最後一次嘗試，直接拋出
+                if attempt == max_retries - 1:
                     logger.error(f"Gemini API Error (Attempt {attempt+1}/{max_retries}): {error_str}")
                     raise e
                 
+                # 其他錯誤：重試
                 sleep_time = base_delay * (2 ** attempt) + random.uniform(0, 1)
-                logger.warning(f"Gemini API Limit/Error ({'429' if is_429 else '503'}). Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
+                logger.warning(f"Gemini API Error. Retrying in {sleep_time:.2f}s... (Attempt {attempt+1}/{max_retries})")
                 await asyncio.sleep(sleep_time)
 
     async def generate(self, prompt: str, system_prompt: str) -> str:
@@ -74,7 +84,6 @@ class GeminiService(AIService):
         except Exception as e:
             logger.error(f"Error in Gemini generate: {e}")
             raise e
-
 
 class LocalAIService(AIService):
     """本地 AI 服務 (OpenAI 兼容)"""
