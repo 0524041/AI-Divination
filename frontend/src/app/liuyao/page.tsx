@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import CoinTossing from '@/components/CoinTossing';
 import {
   ArrowLeft,
   Compass,
@@ -204,32 +205,6 @@ export default function LiuYaoPage() {
       clearAllTimers();
     };
   }, [result, interpretation]);
-
-  // 自動擲幣計時器
-  useEffect(() => {
-    if (!isTossing || !result || tossIndex >= 6) return;
-
-    // 重置當前擲幣開始時間
-    setCurrentTossStartTime(Date.now());
-
-    const timeout = activeAI?.provider === 'local' ? TOSS_TIMEOUT_LOCAL : TOSS_TIMEOUT_GEMINI;
-    const timer = setTimeout(() => {
-      handleNextToss();
-    }, timeout);
-
-    return () => clearTimeout(timer);
-  }, [isTossing, result, tossIndex, activeAI]);
-
-  const handleNextToss = () => {
-    if (tossIndex < 6) {
-      setTossIndex((prev) => prev + 1);
-    }
-    
-    // 如果是最後一次擲幣（擲完第6次），結束擲幣流程
-    if (tossIndex === 5) {
-      finishTossing();
-    }
-  };
 
   const finishTossing = () => {
     setIsTossing(false);
@@ -715,89 +690,12 @@ export default function LiuYaoPage() {
       </main>
 
       {/* 擲幣過程彈窗 */}
-      {isTossing && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-          <div className="glass-card w-full max-w-md p-8 text-center space-y-8 relative overflow-hidden">
-            {!result ? (
-              <div className="py-12">
-                <Loader2 className="animate-spin mx-auto mb-4 text-[var(--gold)]" size={48} />
-                <p className="text-xl text-gray-300">正在準備銅錢...</p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-bold text-[var(--gold)]">心中默想 想問的事</h2>
-                  <p className="text-gray-400">心誠則靈</p>
-                </div>
-
-                {/* 卦象顯示區域 (從下往上堆疊) */}
-                <div className="min-h-[240px] flex flex-col-reverse justify-start gap-3 items-center py-4 bg-gray-800/30 rounded-xl border border-gray-700/50">
-                  {Array.from({ length: 6 }).map((_, i) => {
-                    if (i >= tossIndex) {
-                      return (
-                        <div key={i} className="w-32 h-4 rounded opacity-10 border border-gray-600 border-dashed"></div>
-                      );
-                    }
-                    
-                    const coin = result.coins[i];
-                    const isYang = coin === 0 || coin === 1;
-                    const isMoving = coin === 0 || coin === 3;
-                    
-                    return (
-                      <div key={i} className="w-48 h-8 flex items-center justify-center relative animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="absolute left-0 text-xs text-gray-500">第 {i + 1} 擲</div>
-                        <div className={`flex gap-4 w-24 justify-center ${isMoving ? 'text-[var(--gold)]' : 'text-gray-300'}`}>
-                          {isYang ? (
-                            <div className="w-full h-3 bg-current rounded-full"></div>
-                          ) : (
-                            <>
-                              <div className="w-[45%] h-3 bg-current rounded-full"></div>
-                              <div className="w-[45%] h-3 bg-current rounded-full"></div>
-                            </>
-                          )}
-                        </div>
-                        {isMoving && <div className="absolute right-0 text-xs text-[var(--gold)]">動</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* 操作按鈕 */}
-                <div className="relative">
-                  <button
-                    onClick={handleNextToss}
-                    className="w-full py-4 bg-[var(--gold)] text-black font-bold text-xl rounded-xl hover:bg-amber-400 transition relative overflow-hidden group"
-                  >
-                    <span className="relative z-10">
-                      {tossIndex === 0 ? '開始擲幣' : tossIndex === 5 ? '最後一次' : '再擲一次'}
-                    </span>
-                    {/* 進度條背景 */}
-                    <div 
-                      className="absolute bottom-0 left-0 h-1 bg-black/30 transition-all ease-linear"
-                      style={{
-                        width: '0%',
-                        animationName: 'progress',
-                        animationDuration: `${activeAI?.provider === 'local' ? TOSS_TIMEOUT_LOCAL : TOSS_TIMEOUT_GEMINI}ms`,
-                        animationTimingFunction: 'linear',
-                        animationFillMode: 'forwards'
-                      }}
-                      key={tossIndex}
-                    />
-                    <style jsx>{`
-                      @keyframes progress {
-                        from { width: 0%; }
-                        to { width: 100%; }
-                      }
-                    `}</style>
-                  </button>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {activeAI?.provider === 'local' ? '20' : '5'} 秒後自動擲幣
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+      {isTossing && result && (
+        <CoinTossing 
+          result={result} 
+          aiConfig={activeAI} 
+          onComplete={finishTossing} 
+        />
       )}
 
       {/* 結果彈窗 */}
