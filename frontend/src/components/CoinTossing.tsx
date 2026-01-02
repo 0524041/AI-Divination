@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, X } from 'lucide-react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 
 interface CoinTossingProps {
   result: {
@@ -12,6 +13,62 @@ interface CoinTossingProps {
   } | null;
   onComplete: () => void;
 }
+
+// Coin Component
+const Coin = ({ index, isSpinning, isHead }: { index: number, isSpinning: boolean, isHead: boolean }) => (
+  <div className={`relative w-24 h-24 transition-all duration-1000 ${isSpinning ? 'animate-toss' : ''}`} style={{ animationDelay: `${index * 100}ms` }}>
+    <div className={`w-full h-full rounded-full border-4 border-[#d4af37] bg-[#f4e4bc] shadow-lg flex items-center justify-center relative transform-style-3d transition-transform duration-500 ${!isSpinning && !isHead ? 'rotate-y-180' : ''}`}>
+      {/* Front (Head) - Yang */}
+      <div className={`absolute inset-0 backface-hidden flex items-center justify-center ${!isSpinning && !isHead ? 'opacity-0' : 'opacity-100'}`}>
+        <div className="w-12 h-12 border-2 border-[#d4af37] flex items-center justify-center">
+          <span className="text-[#d4af37] font-bold text-2xl">陽</span>
+        </div>
+        <div className="absolute top-1 left-1/2 -translate-x-1/2 text-[#8a7018] text-xs font-bold">乾隆</div>
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[#8a7018] text-xs font-bold">通寶</div>
+      </div>
+      
+      {/* Back (Tail) - Yin */}
+      <div className={`absolute inset-0 backface-hidden rotate-y-180 flex items-center justify-center bg-[#e6d5a8] ${!isSpinning && isHead ? 'opacity-0' : 'opacity-100'}`}>
+          <div className="w-12 h-12 border-2 border-[#8a7018] flex items-center justify-center">
+          <span className="text-[#8a7018] font-bold text-2xl">陰</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Line Component
+const HexagramLine = ({ value, isNew }: { value: number, isNew: boolean }) => {
+  // 0: Old Yang (Circle) - Moving
+  // 1: Young Yang (Solid) - Static
+  // 2: Young Yin (Broken) - Static
+  // 3: Old Yin (Cross) - Moving
+  
+  const isYang = value === 0 || value === 1;
+  const isMoving = value === 0 || value === 3;
+  
+  return (
+    <div className={`h-12 w-64 flex items-center justify-between bg-gray-800/50 rounded px-4 mb-2 transition-all duration-500 ${isNew ? 'animate-in fade-in slide-in-from-top-4 bg-[var(--gold)]/20' : ''}`}>
+      <div className="flex-1 flex justify-center gap-4">
+        {isYang ? (
+            <div className="w-full h-4 bg-[var(--gold)] rounded-full shadow-[0_0_10px_rgba(212,175,55,0.5)]"></div>
+        ) : (
+            <>
+              <div className="w-[45%] h-4 bg-[var(--gold)] rounded-full"></div>
+              <div className="w-[45%] h-4 bg-[var(--gold)] rounded-full"></div>
+            </>
+        )}
+      </div>
+      <div className="w-8 flex justify-end">
+        {isMoving && (
+          <span className="text-xs text-[var(--gold)] animate-pulse">
+            {value === 0 ? '○' : '✕'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default function CoinTossing({ result, aiConfig, onComplete }: CoinTossingProps) {
   const [currentLine, setCurrentLine] = useState(0); // 0-5
@@ -76,62 +133,6 @@ export default function CoinTossing({ result, aiConfig, onComplete }: CoinTossin
       return () => clearTimeout(timer);
     }
   }, [phase, currentLine]);
-
-  // Coin Component
-  const Coin = ({ index, isSpinning, isHead }: { index: number, isSpinning: boolean, isHead: boolean }) => (
-    <div className={`relative w-24 h-24 transition-all duration-1000 ${isSpinning ? 'animate-toss' : ''}`} style={{ animationDelay: `${index * 100}ms` }}>
-      <div className={`w-full h-full rounded-full border-4 border-[#d4af37] bg-[#f4e4bc] shadow-lg flex items-center justify-center relative transform-style-3d transition-transform duration-500 ${!isSpinning && !isHead ? 'rotate-y-180' : ''}`}>
-        {/* Front (Head) - Yang */}
-        <div className={`absolute inset-0 backface-hidden flex items-center justify-center ${!isSpinning && !isHead ? 'opacity-0' : 'opacity-100'}`}>
-          <div className="w-12 h-12 border-2 border-[#d4af37] flex items-center justify-center">
-            <span className="text-[#d4af37] font-bold text-2xl">陽</span>
-          </div>
-          <div className="absolute top-1 left-1/2 -translate-x-1/2 text-[#8a7018] text-xs font-bold">乾隆</div>
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[#8a7018] text-xs font-bold">通寶</div>
-        </div>
-        
-        {/* Back (Tail) - Yin */}
-        <div className={`absolute inset-0 backface-hidden rotate-y-180 flex items-center justify-center bg-[#e6d5a8] ${!isSpinning && isHead ? 'opacity-0' : 'opacity-100'}`}>
-           <div className="w-12 h-12 border-2 border-[#8a7018] flex items-center justify-center">
-            <span className="text-[#8a7018] font-bold text-2xl">陰</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Line Component
-  const HexagramLine = ({ value, isNew }: { value: number, isNew: boolean }) => {
-    // 0: Old Yang (Circle) - Moving
-    // 1: Young Yang (Solid) - Static
-    // 2: Young Yin (Broken) - Static
-    // 3: Old Yin (Cross) - Moving
-    
-    const isYang = value === 0 || value === 1;
-    const isMoving = value === 0 || value === 3;
-    
-    return (
-      <div className={`h-12 w-64 flex items-center justify-between bg-gray-800/50 rounded px-4 mb-2 transition-all duration-500 ${isNew ? 'animate-in fade-in slide-in-from-top-4 bg-[var(--gold)]/20' : ''}`}>
-        <div className="flex-1 flex justify-center gap-4">
-          {isYang ? (
-             <div className="w-full h-4 bg-[var(--gold)] rounded-full shadow-[0_0_10px_rgba(212,175,55,0.5)]"></div>
-          ) : (
-             <>
-               <div className="w-[45%] h-4 bg-[var(--gold)] rounded-full"></div>
-               <div className="w-[45%] h-4 bg-[var(--gold)] rounded-full"></div>
-             </>
-          )}
-        </div>
-        <div className="w-8 flex justify-end">
-          {isMoving && (
-            <span className="text-xs text-[var(--gold)] animate-pulse">
-              {value === 0 ? '○' : '✕'}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4">
