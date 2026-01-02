@@ -14,6 +14,7 @@ import {
   ChevronUp,
   User,
   Filter,
+  Users,
 } from 'lucide-react';
 
 interface HistoryItem {
@@ -35,14 +36,24 @@ interface HistoryItem {
   username?: string;
 }
 
+interface UserInfo {
+  id: number;
+  username: string;
+  role: string;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
-  const [user, setUser] = useState<{ role: string } | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
   const [htmlContents, setHtmlContents] = useState<Record<number, { mainHtml: string; thinkContent: string }>>({});
+  
+  // Admin 篩選功能
+  const [allUsers, setAllUsers] = useState<UserInfo[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null); // null = 自己, 0 = 全部
+  const [showUserFilter, setShowUserFilter] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -51,8 +62,25 @@ export default function HistoryPage() {
   useEffect(() => {
     if (user) {
       fetchHistory();
+      if (user.role === 'admin') {
+        fetchAllUsers();
+      }
     }
-  }, [user, viewMode]);
+  }, [user, selectedUserId]);
+
+  // 點擊外部關閉下拉選單
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.user-filter-dropdown')) {
+        setShowUserFilter(false);
+      }
+    };
+    if (showUserFilter) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showUserFilter]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
@@ -66,7 +94,8 @@ export default function HistoryPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        setUser(await res.json());
+        const userData = await res.json();
+        setUser(userData);
       } else {
         router.push('/login');
       }
@@ -75,10 +104,38 @@ export default function HistoryPage() {
     }
   };
 
+  const fetchAllUsers = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('/api/admin/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const users = await res.json();
+        setAllUsers(users);
+      }
+    } catch (err) {
+      console.error('Fetch users error:', err);
+    }
+  };
+
   const fetchHistory = async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
-    const endpoint = viewMode === 'all' && user?.role === 'admin' ? '/api/history/admin/all' : '/api/history';
+    
+    let endpoint = '/api/history';
+    
+    // Admin 用戶可以查看其他人的紀錄
+    if (user?.role === 'admin') {
+      if (selectedUserId === 0) {
+        // 查看全部
+        endpoint = '/api/history/admin/all';
+      } else if (selectedUserId !== null) {
+        // 查看特定用戶
+        endpoint = `/api/history/admin/all?user_id=${selectedUserId}`;
+      }
+      // selectedUserId === null 時查看自己的（使用預設 /api/history）
+    }
 
     try {
       const res = await fetch(endpoint, {
@@ -239,22 +296,83 @@ export default function HistoryPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Admin 用戶篩選器 */}
           {user?.role === 'admin' && (
-            <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1">
+            <div className="relative user-filter-dropdown">
               <button
-                className={`px-3 py-1 rounded text-sm transition ${viewMode === 'mine' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
-                  }`}
-                onClick={() => setViewMode('mine')}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg text-sm hover:bg-gray-700 transition"
+                onClick={() => setShowUserFilter(!showUserFilter)}
               >
-                我的
+                <Filter size={16} className="text-[var(--gold)]" />
+                <span className="text-gray-300">
+                  {selectedUserId === null
+                    ? '我的紀錄'
+                    : selectedUserId === 0
+                    ? '全部用戶'
+                    : allUsers.find(u => u.id === selectedUserId)?.username || '篩選用戶'}
+                </span>
+                <ChevronDown size={16} className={`text-gray-400 transition ${showUserFilter ? 'rotate-180' : ''}`} />
               </button>
-              <button
-                className={`px-3 py-1 rounded text-sm transition ${viewMode === 'all' ? 'bg-[var(--gold)] text-black' : 'text-gray-400'
-                  }`}
-                onClick={() => setViewMode('all')}
-              >
-                全部
-              </button>
+              
+              {showUserFilter && (
+                <div className="absolute top-full right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-2 z-50">
+                  {/* 我的紀錄 */}
+                  <button
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
+                      selectedUserId === null ? 'text-[var(--gold)]' : 'text-gray-300'
+                    }`}
+                    onClick={() => {
+                      setSelectedUserId(null);
+                      setShowUserFilter(false);
+                    }}
+                  >
+                    <User size={14} />
+                    我的紀錄
+                    {selectedUserId === null && <span className="ml-auto">✓</span>}
+                  </button>
+                  
+                  {/* 全部用戶 */}
+                  <button
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
+                      selectedUserId === 0 ? 'text-[var(--gold)]' : 'text-gray-300'
+                    }`}
+                    onClick={() => {
+                      setSelectedUserId(0);
+                      setShowUserFilter(false);
+                    }}
+                  >
+                    <Users size={14} />
+                    全部用戶
+                    {selectedUserId === 0 && <span className="ml-auto">✓</span>}
+                  </button>
+                  
+                  {/* 分隔線 */}
+                  {allUsers.length > 0 && (
+                    <div className="border-t border-gray-700 my-2"></div>
+                  )}
+                  
+                  {/* 用戶列表 */}
+                  {allUsers.map((u) => (
+                    <button
+                      key={u.id}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
+                        selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'
+                      }`}
+                      onClick={() => {
+                        setSelectedUserId(u.id);
+                        setShowUserFilter(false);
+                      }}
+                    >
+                      <User size={14} />
+                      <span className="truncate">{u.username}</span>
+                      {u.role === 'admin' && (
+                        <span className="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-1 rounded">Admin</span>
+                      )}
+                      {selectedUserId === u.id && <span className="ml-auto">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -300,7 +418,7 @@ export default function HistoryPage() {
                           {getDivinationTypeName(item.divination_type)}
                         </span>
                         {getStatusBadge(item.status)}
-                        {viewMode === 'all' && item.username && (
+                        {selectedUserId !== null && item.username && (
                           <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded flex items-center gap-1">
                             <User size={12} />
                             {item.username}
