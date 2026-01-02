@@ -113,57 +113,48 @@ export default function HistoryPage() {
   };
 
   const handleCopy = async (item: HistoryItem) => {
-    try {
-      // 準備 Markdown 格式文本
-      const markdownText = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+    // 準備 Markdown 格式文本
+    const markdownText = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
 
-      // 準備 HTML 格式（用於支援富文本的應用）
-      const htmlText = `
-<h2>問題</h2>
-<p>${item.question}</p>
+    // 優先使用 execCommand（相容性最好）
+    const fallbackCopy = () => {
+      const textArea = document.createElement('textarea');
+      textArea.value = markdownText;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return successful;
+      } catch (err) {
+        document.body.removeChild(textArea);
+        return false;
+      }
+    };
 
-<h2>卦象</h2>
-<p>${item.chart_data.benguaming} → ${item.chart_data.bianguaming}</p>
-
-<h2>解盤</h2>
-<div>${item.interpretation?.replace(/\n/g, '<br>') || '無'}</div>
-    `.trim();
-
-      // 嘗試使用新的 Clipboard API（支援多種格式）
-      if (navigator.clipboard && navigator.clipboard.write) {
-        const blob = new Blob([htmlText], { type: 'text/html' });
-        const textBlob = new Blob([markdownText], { type: 'text/plain' });
-
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            'text/html': blob,
-            'text/plain': textBlob
-          })
-        ]);
-        alert('已複製到剪貼簿（支援 Markdown 格式）');
-      } else {
-        // 降級方案：只複製純文字
+    // 嘗試使用 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
         await navigator.clipboard.writeText(markdownText);
         alert('已複製到剪貼簿');
+        return;
+      } catch (err) {
+        // Clipboard API 失敗，嘗試 fallback
+        console.warn('Clipboard API 失敗，嘗試 fallback:', err);
       }
-    } catch (err) {
-      console.error('複製失敗:', err);
+    }
 
-      // 最終降級方案：使用舊的 execCommand 方法
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        alert('已複製到剪貼簿');
-      } catch (fallbackErr) {
-        console.error('降級複製也失敗:', fallbackErr);
-        alert('複製失敗，請手動複製內容');
-      }
+    // Fallback 方法
+    if (fallbackCopy()) {
+      alert('已複製到剪貼簿');
+    } else {
+      alert('複製失敗，請手動複製內容');
     }
   };
 
