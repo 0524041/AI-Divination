@@ -255,9 +255,14 @@ export default function LiuYaoPage() {
     setResult(null);
   };
 
-  const handleCopy = async (item: HistoryItem) => {
+  const handleCopy = async () => {
+    if (!result) {
+      alert('沒有可複製的內容');
+      return;
+    }
+    
     // 準備 Markdown 格式文本
-    const markdownText = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+    const markdownText = `## 問題\n${question}\n\n## 卦象\n${result.chart_data.benguaming} → ${result.chart_data.bianguaming}\n\n## 解盤\n${interpretation || '無'}`;
 
     // 優先使用 execCommand（相容性最好）
     const fallbackCopy = () => {
