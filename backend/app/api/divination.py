@@ -22,8 +22,8 @@ router = APIRouter(prefix="/api/divination", tags=["占卜"])
 settings = get_settings()
 
 # 讀取 system prompt
-# SYSTEM_PROMPT_PATH = Path(BASE_DIR) / "prompts" / "system_prompt.md"
-SYSTEM_PROMPT_PATH = Path(BASE_DIR) / "prompts" / "system_prompt_v2.md"
+SYSTEM_PROMPT_PATH = Path(BASE_DIR) / "prompts" / "system_prompt.md"
+# SYSTEM_PROMPT_PATH = Path(BASE_DIR) / "prompts" / "system_prompt_v2.md"
 
 
 

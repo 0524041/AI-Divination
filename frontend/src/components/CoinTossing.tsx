@@ -237,7 +237,7 @@ export default function CoinTossing({ result, aiConfig, onComplete }: CoinTossin
             onClick={onComplete}
             className="text-gray-500 hover:text-[var(--gold)] text-sm transition-colors pt-2"
           >
-            跳過動畫 {`>>`}
+            Skip 電腦自動擲幣 {`>>`}
           </button>
         </div>
 
