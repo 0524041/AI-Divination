@@ -157,8 +157,11 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data.success) {
         setAvailableModels(data.models || []);
-        if (data.models?.length > 0 && !newLocalModel) {
-          setNewLocalModel(data.models[0]);
+        // 如果目前沒有選模型，或是選的模型不在新的列表內，就預設選第一個
+        if (data.models?.length > 0) {
+          if (!newLocalModel || !data.models.includes(newLocalModel)) {
+            setNewLocalModel(data.models[0]);
+          }
         }
       } else {
         alert(`連線失敗: ${data.error}`);
@@ -524,8 +527,8 @@ export default function SettingsPage() {
                     <div
                       key={config.id}
                       className={`p-4 rounded-lg border transition ${config.is_active
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/10'
-                          : 'border-gray-700 bg-gray-800/50'
+                        ? 'border-[var(--gold)] bg-[var(--gold)]/10'
+                        : 'border-gray-700 bg-gray-800/50'
                         }`}
                     >
                       <div className="flex items-center justify-between">
@@ -600,8 +603,8 @@ export default function SettingsPage() {
                   <div className="flex gap-4">
                     <button
                       className={`flex-1 py-3 rounded-lg border transition ${newAIProvider === 'gemini'
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                          : 'border-gray-600 text-gray-400'
+                        ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                        : 'border-gray-600 text-gray-400'
                         }`}
                       onClick={() => setNewAIProvider('gemini')}
                       disabled={!!editingConfig}
@@ -611,8 +614,8 @@ export default function SettingsPage() {
                     </button>
                     <button
                       className={`flex-1 py-3 rounded-lg border transition ${newAIProvider === 'local'
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                          : 'border-gray-600 text-gray-400'
+                        ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                        : 'border-gray-600 text-gray-400'
                         }`}
                       onClick={() => setNewAIProvider('local')}
                       disabled={!!editingConfig}
@@ -805,8 +808,8 @@ export default function SettingsPage() {
                           <button
                             onClick={() => handleToggleUserActive(user.id)}
                             className={`text-xs px-2 py-1 rounded ${user.is_active
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-red-500/20 text-red-400'
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-red-500/20 text-red-400'
                               }`}
                           >
                             {user.is_active ? '啟用' : '停用'}
@@ -858,8 +861,8 @@ export default function SettingsPage() {
                     <div className="flex gap-4">
                       <button
                         className={`flex-1 py-2 rounded-lg border transition ${newUserRole === 'user'
-                            ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                            : 'border-gray-600 text-gray-400'
+                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                          : 'border-gray-600 text-gray-400'
                           }`}
                         onClick={() => setNewUserRole('user')}
                       >
@@ -867,8 +870,8 @@ export default function SettingsPage() {
                       </button>
                       <button
                         className={`flex-1 py-2 rounded-lg border transition ${newUserRole === 'admin'
-                            ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                            : 'border-gray-600 text-gray-400'
+                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                          : 'border-gray-600 text-gray-400'
                           }`}
                         onClick={() => setNewUserRole('admin')}
                       >
