@@ -54,7 +54,7 @@ export default function SettingsPage() {
   const [editingConfig, setEditingConfig] = useState<AIConfig | null>(null);
   const [newAIProvider, setNewAIProvider] = useState<'gemini' | 'local'>('gemini');
   const [newAPIKey, setNewAPIKey] = useState('');
-  const [newLocalURL, setNewLocalURL] = useState('');
+  const [newLocalURL, setNewLocalURL] = useState('http://localhost:11434');
   const [newLocalModel, setNewLocalModel] = useState('');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -660,7 +660,7 @@ export default function SettingsPage() {
                           value={newLocalURL}
                           onChange={(e) => setNewLocalURL(e.target.value)}
                           className="input-dark flex-1"
-                          placeholder="http://localhost:1234"
+                          placeholder="http://localhost:11434"
                         />
                         <button
                           onClick={handleTestConnection}
