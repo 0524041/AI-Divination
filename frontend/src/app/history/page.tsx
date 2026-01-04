@@ -49,7 +49,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [htmlContents, setHtmlContents] = useState<Record<number, { mainHtml: string; thinkContent: string }>>({});
-  
+
   // Admin 篩選功能
   const [allUsers, setAllUsers] = useState<UserInfo[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null); // null = 自己, 0 = 全部
@@ -122,9 +122,9 @@ export default function HistoryPage() {
   const fetchHistory = async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
-    
+
     let endpoint = '/api/history';
-    
+
     // Admin 用戶可以查看其他人的紀錄
     if (user?.role === 'admin') {
       if (selectedUserId === 0) {
@@ -184,7 +184,7 @@ export default function HistoryPage() {
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      
+
       try {
         const successful = document.execCommand('copy');
         document.body.removeChild(textArea);
@@ -240,7 +240,11 @@ export default function HistoryPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    // 後端傳來的是 UTC 時間但沒有標記時區 (例如 "2024-01-01T12:00:00")
+    // 我們手動加上 'Z' 強制瀏覽器將其視為 UTC 時間
+    const utcDateStr = dateStr.endsWith('Z') ? dateStr : `${dateStr}Z`;
+    const date = new Date(utcDateStr);
+
     return date.toLocaleString('zh-TW', {
       year: 'numeric',
       month: '2-digit',
@@ -283,8 +287,8 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen">
-      {/* 導航欄 */}
-      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
+      {/* 導航欄 - 增加 z-index 防止下拉選單被遮擋 */}
+      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between relative z-50">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-gray-400 hover:text-[var(--gold)]">
             <ArrowLeft size={24} />
@@ -308,19 +312,18 @@ export default function HistoryPage() {
                   {selectedUserId === null
                     ? '我的紀錄'
                     : selectedUserId === 0
-                    ? '全部用戶'
-                    : allUsers.find(u => u.id === selectedUserId)?.username || '篩選用戶'}
+                      ? '全部用戶'
+                      : allUsers.find(u => u.id === selectedUserId)?.username || '篩選用戶'}
                 </span>
                 <ChevronDown size={16} className={`text-gray-400 transition ${showUserFilter ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {showUserFilter && (
                 <div className="absolute top-full right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-2 z-50">
                   {/* 我的紀錄 */}
                   <button
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
-                      selectedUserId === null ? 'text-[var(--gold)]' : 'text-gray-300'
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === null ? 'text-[var(--gold)]' : 'text-gray-300'
+                      }`}
                     onClick={() => {
                       setSelectedUserId(null);
                       setShowUserFilter(false);
@@ -330,12 +333,11 @@ export default function HistoryPage() {
                     我的紀錄
                     {selectedUserId === null && <span className="ml-auto">✓</span>}
                   </button>
-                  
+
                   {/* 全部用戶 */}
                   <button
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
-                      selectedUserId === 0 ? 'text-[var(--gold)]' : 'text-gray-300'
-                    }`}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === 0 ? 'text-[var(--gold)]' : 'text-gray-300'
+                      }`}
                     onClick={() => {
                       setSelectedUserId(0);
                       setShowUserFilter(false);
@@ -345,19 +347,18 @@ export default function HistoryPage() {
                     全部用戶
                     {selectedUserId === 0 && <span className="ml-auto">✓</span>}
                   </button>
-                  
+
                   {/* 分隔線 */}
                   {allUsers.length > 0 && (
                     <div className="border-t border-gray-700 my-2"></div>
                   )}
-                  
+
                   {/* 用戶列表 */}
                   {allUsers.map((u) => (
                     <button
                       key={u.id}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
-                        selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'
-                      }`}
+                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'
+                        }`}
                       onClick={() => {
                         setSelectedUserId(u.id);
                         setShowUserFilter(false);
