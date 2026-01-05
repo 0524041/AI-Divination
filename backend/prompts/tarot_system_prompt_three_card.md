@@ -36,8 +36,9 @@ Before generating the output, perform the following analysis internally:
 
 # Response Template (Markdown)
 
-## 🎯 卦象總覽
-(In short, this tarot spread's result relates to the question.)
+## 🎯 牌陣總覽
+
+> 一句話總結：{Use a short, concise sentence to clearly summarize the result of this card spread, addressing the specific question.}
 
 ---
 
