@@ -426,7 +426,25 @@ export default function HistoryPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-gray-200 truncate">{item.question}</p>
+                      <p className={`text-gray-200 ${expandedId === item.id ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                        {item.question}
+                      </p>
+                      
+                      {expandedId === item.id && (item.target || item.gender) && (
+                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-400">
+                          {item.target && (
+                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
+                              對象：<span className="text-gray-300">{item.target}</span>
+                            </span>
+                          )}
+                          {item.gender && (
+                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
+                              性別：<span className="text-gray-300">{item.gender}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <p className="text-sm text-gray-500 mt-1">
                         {item.chart_data.benguaming} → {item.chart_data.bianguaming}
                       </p>
@@ -445,23 +463,6 @@ export default function HistoryPage() {
                 {/* 展開內容 */}
                 {expandedId === item.id && (
                   <div className="border-t border-gray-700 p-4 space-y-4 fade-in">
-                    {/* 完整問題顯示 */}
-                    <div className="bg-gray-800/50 rounded-xl p-5 border border-[var(--gold)]/20 shadow-inner">
-                      <h3 className="text-[var(--gold)] text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[var(--gold)]"></span>
-                        完整提問
-                      </h3>
-                      <p className="text-gray-100 text-lg leading-relaxed whitespace-pre-wrap font-medium">
-                        {item.question}
-                      </p>
-                      {(item.target || item.gender) && (
-                        <div className="mt-3 pt-3 border-t border-gray-700/50 flex flex-wrap gap-4 text-sm text-gray-400">
-                          {item.target && <span>對象：<span className="text-gray-300">{item.target}</span></span>}
-                          {item.gender && <span>性別：<span className="text-gray-300">{item.gender}</span></span>}
-                        </div>
-                      )}
-                    </div>
-
                     {/* 操作按鈕 */}
                     <div className="flex justify-end gap-2">
                       <button
