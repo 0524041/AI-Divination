@@ -119,19 +119,38 @@ class LocalAIService(AIService):
     async def test_connection(base_url: str) -> dict:
         """測試連線"""
         try:
-            url = f"{base_url.rstrip('/')}/v1/models"
+            # 先嘗試 Ollama 原生 API
+            url = f"{base_url.rstrip('/')}/api/tags"
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url)
                 response.raise_for_status()
                 data = response.json()
                 
                 models = []
-                if "data" in data:
+                if "models" in data:
+                    # Ollama 原生 API 格式: {"models": [{"name": "qwen3:8b", ...}]}
+                    models = [m.get("name", "") for m in data["models"]]
+                elif "data" in data:
+                    # OpenAI 兼容 API 格式: {"data": [{"id": "model-name", ...}]}
                     models = [m.get("id", "") for m in data["data"]]
                 
                 return {"success": True, "models": models}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            # 如果 Ollama API 失敗，嘗試 OpenAI 兼容 API
+            try:
+                url = f"{base_url.rstrip('/')}/v1/models"
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    models = []
+                    if "data" in data:
+                        models = [m.get("id", "") for m in data["data"]]
+                    
+                    return {"success": True, "models": models}
+            except Exception as e2:
+                return {"success": False, "error": str(e2)}
 
 
 def get_ai_service(provider: str, **kwargs) -> AIService:
