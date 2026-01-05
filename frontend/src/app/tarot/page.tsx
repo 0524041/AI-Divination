@@ -77,9 +77,48 @@ const TarotCard = ({ card, isRevealed, onClick, positionLabel, size = "normal" }
   );
 };
 
+type SpreadType = 'three_card' | 'single' | 'celtic_cross';
+
+interface SpreadConfig {
+  id: SpreadType;
+  name: string;
+  description: string;
+  cardCount: number;
+  positions: string[];
+  icon: string;
+}
+
+const SPREAD_CONFIGS: SpreadConfig[] = [
+  {
+    id: 'single',
+    name: '單張占卜',
+    description: '快速洞察當前能量或核心問題',
+    cardCount: 1,
+    positions: ['核心'],
+    icon: '🎴'
+  },
+  {
+    id: 'three_card',
+    name: '三牌陣',
+    description: '過去-現在-未來的時間線解讀',
+    cardCount: 3,
+    positions: ['過去', '現在', '未來'],
+    icon: '🔮'
+  },
+  {
+    id: 'celtic_cross',
+    name: '凱爾特十字',
+    description: '最全面深入的10張牌綜合解讀',
+    cardCount: 10,
+    positions: ['核心', '挑戰', '顯意識', '潛意識', '過去', '未來', '自我', '外部', '希望/恐懼', '結果'],
+    icon: '✨'
+  }
+];
+
 export default function TarotPage() {
   const router = useRouter();
-  const [step, setStep] = useState<'intro' | 'input' | 'shuffle' | 'select' | 'reveal' | 'interpreting' | 'result'>('intro');
+  const [step, setStep] = useState<'intro' | 'spread_select' | 'input' | 'shuffle' | 'select' | 'reveal' | 'interpreting' | 'result'>('intro');
+  const [spreadType, setSpreadType] = useState<SpreadType>('three_card');
   const [question, setQuestion] = useState('');
   const [shuffledDeck, setShuffledDeck] = useState<TarotCardData[]>([]);
   const [selectedCards, setSelectedCards] = useState<TarotCardData[]>([]);
@@ -145,7 +184,29 @@ export default function TarotPage() {
   };
 
   const startDivination = () => {
+    setStep('spread_select');
+  };
+
+  const selectSpread = (type: SpreadType) => {
+    setSpreadType(type);
     setStep('input');
+  };
+
+  const getCurrentSpreadConfig = () => {
+    return SPREAD_CONFIGS.find(c => c.id === spreadType) || SPREAD_CONFIGS[1];
+  };
+
+  const getPositionLabel = (index: number) => {
+    const config = getCurrentSpreadConfig();
+    return config.positions[index] || `位置 ${index + 1}`;
+  };
+
+  const confirmSelection = () => {
+    const maxCards = getCurrentSpreadConfig().cardCount;
+    if (selectedCards.length === maxCards) {
+      setStep('reveal');
+      setRevealedCount(0);
+    }
   };
 
   const handleShuffle = () => {
@@ -192,6 +253,7 @@ export default function TarotPage() {
   };
 
   const handleSelectCard = (card: TarotCardData) => {
+    const maxCards = getCurrentSpreadConfig().cardCount;
     // Check if already selected
     if (selectedCards.find(c => c.id === card.id)) {
       // Deselect
@@ -199,8 +261,8 @@ export default function TarotPage() {
       return;
     }
 
-    // Select (limit to 3)
-    if (selectedCards.length >= 3) return;
+    // Select (limit to maxCards)
+    if (selectedCards.length >= maxCards) return;
     
     setSelectedCards([...selectedCards, card]);
   };
@@ -216,13 +278,23 @@ export default function TarotPage() {
 
     try {
       const token = localStorage.getItem('token');
+      const getCardPosition = (index: number) => {
+        if (spreadType === 'single') return 'single';
+        if (spreadType === 'three_card') {
+          return index === 0 ? 'past' : index === 1 ? 'present' : 'future';
+        }
+        // celtic_cross
+        const positions = ['heart', 'challenge', 'conscious', 'foundation', 'past', 'future', 'attitude', 'external', 'hopes_fears', 'outcome'];
+        return positions[index] || `position_${index + 1}`;
+      };
+
       const cardsPayload = selectedCards.map((card, index) => ({
         id: card.id,
         name: card.name,
         name_cn: card.name_cn,
         image: card.image,
         reversed: false, // 暫時不實作逆位
-        position: index === 0 ? 'past' : index === 1 ? 'present' : 'future'
+        position: getCardPosition(index)
       }));
 
       const res = await fetch('/api/tarot', {
@@ -234,7 +306,7 @@ export default function TarotPage() {
         body: JSON.stringify({
           question,
           cards: cardsPayload,
-          spread_type: 'three_card'  // 目前固定為三牌陣，未來可改為動態選擇
+          spread_type: spreadType
         })
       });
 
@@ -396,10 +468,69 @@ export default function TarotPage() {
           </div>
         )}
 
+        {/* Spread Selection Phase */}
+        {step === 'spread_select' && (
+          <div className="max-w-5xl mx-auto space-y-8 fade-in pt-10">
+            <div className="text-center space-y-3 mb-12">
+              <h2 className="text-3xl font-bold text-[var(--gold)]">選擇牌陣類型</h2>
+              <p className="text-gray-400">不同的牌陣適合不同深度的問題探索</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {SPREAD_CONFIGS.map((spread) => (
+                <button
+                  key={spread.id}
+                  onClick={() => selectSpread(spread.id)}
+                  className="group relative bg-gray-900/50 backdrop-blur-sm border-2 border-gray-800 rounded-2xl p-8 hover:border-[var(--gold)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(212,175,55,0.2)] hover:scale-105"
+                >
+                  {/* Icon */}
+                  <div className="text-6xl mb-4 transition-transform group-hover:scale-110">
+                    {spread.icon}
+                  </div>
+                  
+                  {/* Title */}
+                  <h3 className="text-2xl font-bold text-[var(--gold)] mb-2">
+                    {spread.name}
+                  </h3>
+                  
+                  {/* Description */}
+                  <p className="text-gray-400 text-sm leading-relaxed mb-4">
+                    {spread.description}
+                  </p>
+                  
+                  {/* Card Count Badge */}
+                  <div className="inline-block px-4 py-2 bg-[var(--gold)]/10 border border-[var(--gold)]/30 rounded-full">
+                    <span className="text-[var(--gold)] font-semibold">{spread.cardCount} 張牌</span>
+                  </div>
+
+                  {/* Hover Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-[var(--gold)]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none"></div>
+                </button>
+              ))}
+            </div>
+
+            {/* Back Button */}
+            <div className="text-center pt-8">
+              <button
+                onClick={() => setStep('intro')}
+                className="btn-gold-outline px-8 py-3"
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Input Phase */}
         {step === 'input' && (
           <div className="max-w-2xl mx-auto space-y-8 fade-in pt-10">
             <div className="text-center space-y-3">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <span className="text-4xl">{SPREAD_CONFIGS.find(s => s.id === spreadType)?.icon}</span>
+                <span className="text-lg text-[var(--gold)] font-semibold">
+                  {SPREAD_CONFIGS.find(s => s.id === spreadType)?.name}
+                </span>
+              </div>
               <h2 className="text-3xl font-bold text-[var(--gold)]">默念您的問題</h2>
               <p className="text-gray-400">保持內心平靜，將專注力放在您想尋求指引的事物上</p>
             </div>
@@ -510,8 +641,15 @@ export default function TarotPage() {
         {step === 'select' && (
           <div className="fade-in flex flex-col h-[calc(100vh-100px)]">
             <div className="text-center space-y-2 mb-6 flex-shrink-0">
-              <h2 className="text-3xl font-bold text-[var(--gold)]">請憑直覺選出 3 張牌</h2>
-              <p className="text-gray-400">已選擇：<span className="text-[var(--gold)] font-bold text-xl">{selectedCards.length}</span> / 3</p>
+              <h2 className="text-3xl font-bold text-[var(--gold)]">
+                請憑直覺選出 {getCurrentSpreadConfig().cardCount} 張牌
+              </h2>
+              <p className="text-gray-400">
+                已選擇：<span className="text-[var(--gold)] font-bold text-xl">{selectedCards.length}</span> / {getCurrentSpreadConfig().cardCount}
+              </p>
+              <p className="text-sm text-gray-500">
+                {getCurrentSpreadConfig().name} - {getCurrentSpreadConfig().description}
+              </p>
             </div>
 
             {/* Card Grid - Full Width & Responsive */}
@@ -549,7 +687,7 @@ export default function TarotPage() {
                 
                 {/* Selected Cards Slots */}
                 <div className="flex gap-4 md:gap-8">
-                  {[0, 1, 2].map((i) => {
+                  {Array.from({ length: getCurrentSpreadConfig().cardCount }, (_, i) => {
                     const card = selectedCards[i];
                     return (
                       <div key={i} className="relative group">
@@ -572,7 +710,7 @@ export default function TarotPage() {
                           )}
                         </div>
                         <div className="text-center text-[10px] md:text-xs text-[var(--gold)] mt-2 font-medium uppercase tracking-widest">
-                          {i === 0 ? '過去' : i === 1 ? '現在' : '未來'}
+                          {getPositionLabel(i)}
                         </div>
                       </div>
                     );
@@ -592,11 +730,11 @@ export default function TarotPage() {
                   )}
 
                   <button 
-                    onClick={() => setStep('reveal')}
-                    disabled={selectedCards.length !== 3}
+                    onClick={confirmSelection}
+                    disabled={selectedCards.length !== getCurrentSpreadConfig().cardCount}
                     className={`
                       px-10 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-all duration-300
-                      ${selectedCards.length === 3
+                      ${selectedCards.length === getCurrentSpreadConfig().cardCount
                         ? 'bg-gradient-to-r from-[var(--gold)] to-[var(--gold-dark)] text-black hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.4)]'
                         : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'}
                     `}
@@ -621,20 +759,20 @@ export default function TarotPage() {
             </div>
 
             {/* Cards Display */}
-            <div className="flex flex-col md:flex-row justify-center items-center gap-6 md:gap-8 lg:gap-10 min-h-[600px]">
+            <div className={`flex ${spreadType === 'celtic_cross' ? 'flex-wrap' : 'flex-col md:flex-row'} justify-center items-center gap-6 md:gap-8 lg:gap-10 min-h-[600px]`}>
               {selectedCards.map((card, index) => (
                 <div 
                   key={card.id} 
                   className={`transition-all duration-700 ${
                     step === 'reveal' && index > revealedCount ? 'opacity-50 scale-90 blur-[1px]' : 'opacity-100 scale-100'
-                  }`}
+                  } ${spreadType === 'celtic_cross' ? 'w-[20vw] md:w-[15vw] max-w-[180px]' : ''}`}
                 >
                   <TarotCard 
                     card={card} 
                     isRevealed={index < revealedCount || step !== 'reveal'} 
                     onClick={() => step === 'reveal' && handleReveal(index)}
-                    positionLabel={index === 0 ? 'Past' : index === 1 ? 'Present' : 'Future'}
-                    size="large"
+                    positionLabel={getPositionLabel(index)}
+                    size={spreadType === 'celtic_cross' ? 'normal' : 'large'}
                   />
                 </div>
               ))}
@@ -643,7 +781,7 @@ export default function TarotPage() {
             {/* Action Button for Reveal */}
             {step === 'reveal' && (
               <div className="flex justify-center h-24 items-center">
-                {revealedCount < 3 ? (
+                {revealedCount < getCurrentSpreadConfig().cardCount ? (
                   <p className="text-gray-500 animate-pulse">請依序點擊卡牌翻開...</p>
                 ) : (
                   <button onClick={submitDivination} className="btn-gold px-16 py-5 text-xl flex items-center gap-3 animate-fade-in-up shadow-[0_0_30px_rgba(212,175,55,0.3)]">
@@ -723,11 +861,11 @@ export default function TarotPage() {
                         <ChevronDown size={16} className="group-open:rotate-180 transition-transform ml-auto" />
                       </summary>
                       <div className="px-6 pb-6 text-gray-300 text-sm border-t border-gray-800 pt-4 leading-relaxed space-y-3">
-                        <div className="font-bold text-[var(--gold)] mb-3">三牌陣（過去-現在-未來）</div>
+                        <div className="font-bold text-[var(--gold)] mb-3">{getCurrentSpreadConfig().name}</div>
                         {selectedCards.map((card, index) => (
                           <div key={card.id} className="flex items-start gap-3 py-2 border-b border-gray-800 last:border-0">
-                            <span className="text-[var(--gold)] font-bold min-w-[60px]">
-                              {index === 0 ? '過去' : index === 1 ? '現在' : '未來'}:
+                            <span className="text-[var(--gold)] font-bold min-w-[80px]">
+                              {getPositionLabel(index)}:
                             </span>
                             <span className="flex-1">
                               {card.name_cn} ({card.name})
