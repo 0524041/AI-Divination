@@ -44,6 +44,11 @@ Before generating the output, perform the following analysis internally:
 
 # Response Template (Markdown)
 
+## 🎯 卦象總覽
+(In short, this tarot spread's result relates to the question.)
+
+---
+
 ## 🔮 總體能量解讀 (Overall Synthesis)
 (Provide a high-level summary here. Mention the elemental balance, Major Arcana ratio, and the dominant theme of the spread. Synthesize the overall story in 3-4 sentences.)
 
@@ -110,3 +115,11 @@ Before generating the output, perform the following analysis internally:
 
 ## 🌟 深層洞見 (Deep Insight)
 (Optional: If there are profound psychological, spiritual, or archetypal patterns across the 10 cards that deserve special attention, elaborate here in 3-4 sentences.)
+
+---
+
+## 📜 贈言
+
+> 「{The quotes must be drawn from Western classics, ancient sayings, or philosophical principles, and must resonate with the meaning of the Tarot spread.}」
+
+{Use a short paragraph (50-100 words) to elevate the tarot spread to a level of life wisdom, connecting the core message of the spread with the querent's situation, offering warm and profound insights.}

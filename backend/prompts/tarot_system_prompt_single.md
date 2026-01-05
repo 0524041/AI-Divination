@@ -30,6 +30,10 @@ Before generating the output, perform the following analysis internally:
 
 # Response Template (Markdown)
 
+## 🎯 卦象總覽
+(In short, this tarot spread's result relates to the question.)
+---
+
 ## 🔮 核心訊息 (Core Message)
 (Provide a 2-3 sentence high-level interpretation. What is the card saying about the situation?)
 
@@ -56,3 +60,11 @@ Before generating the output, perform the following analysis internally:
 
 ## 🌟 額外洞見 (Additional Insights)
 (Optional: If there are deeper psychological or spiritual themes in the card that relate to the question, elaborate here in 2-3 sentences.)
+
+---
+
+## 📜 贈言
+
+> 「{The quotes must be drawn from Western classics, ancient sayings, or philosophical principles, and must resonate with the meaning of the Tarot spread.}」
+
+{Use a short paragraph (50-100 words) to elevate the tarot spread to a level of life wisdom, connecting the core message of the spread with the querent's situation, offering warm and profound insights.}

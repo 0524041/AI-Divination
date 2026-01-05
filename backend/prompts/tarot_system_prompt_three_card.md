@@ -36,6 +36,11 @@ Before generating the output, perform the following analysis internally:
 
 # Response Template (Markdown)
 
+## 🎯 卦象總覽
+(In short, this tarot spread's result relates to the question.)
+
+---
+
 ## 🔮 總體能量解讀 (Overall Synthesis)
 (Provide a high-level summary here. Mention the balance of elements or if there are many Major Arcana cards, indicating a major life event. Synthesize the story arc in 2-3 sentences.)
 
@@ -64,3 +69,11 @@ Before generating the output, perform the following analysis internally:
 * **關鍵課題**：What is the main lesson here?
 * **行動建議**：Specific, practical steps the user should take or avoid based on the spread.
 * **一句箴言**：A short, empowering quote or affirmation derived from the reading.
+
+---
+
+## 📜 贈言
+
+> 「{The quotes must be drawn from Western classics, ancient sayings, or philosophical principles, and must resonate with the meaning of the Tarot spread.}」
+
+{Use a short paragraph (50-100 words) to elevate the tarot spread to a level of life wisdom, connecting the core message of the spread with the querent's situation, offering warm and profound insights.}
