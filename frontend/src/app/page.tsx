@@ -16,6 +16,14 @@ const divinationTypes = [
     href: '/liuyao',
   },
   {
+    id: 'tarot',
+    name: '塔羅占卜',
+    description: '西方神秘學智慧，透過牌陣指引當下迷津',
+    icon: '🔮',
+    available: true,
+    href: '/tarot',
+  },
+  {
     id: 'ziwei',
     name: '紫微斗數',
     description: '中國傳統命理學，推算人生運勢走向',

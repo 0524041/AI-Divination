@@ -259,6 +259,7 @@ export default function HistoryPage() {
       liuyao: '六爻占卜',
       ziwei: '紫微斗數',
       bazi: '八字命盤',
+      tarot: '塔羅占卜',
     };
     return types[type] || type;
   };
@@ -464,19 +465,19 @@ export default function HistoryPage() {
                 {expandedId === item.id && (
                   <div className="border-t border-gray-700 p-4 space-y-4 fade-in">
                     {/* 操作按鈕 */}
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-3">
                       <button
                         onClick={() => handleCopy(item)}
-                        className="text-gray-400 hover:text-[var(--gold)] flex items-center gap-1 text-sm"
+                        className="px-4 py-2 bg-gray-700 hover:bg-[var(--gold)] text-gray-300 hover:text-gray-900 rounded-lg transition shadow-md flex items-center gap-2"
                       >
-                        <Copy size={16} />
-                        複製
+                        <Copy size={18} />
+                        <span className="font-medium">複製內容</span>
                       </button>
                       <button
                         onClick={() => handleDelete(item.id)}
-                        className="text-gray-400 hover:text-red-400 flex items-center gap-1 text-sm"
+                        className="px-4 py-2 border border-gray-700 hover:border-red-500/50 text-gray-400 hover:text-red-400 rounded-lg transition flex items-center gap-2"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={18} />
                         刪除
                       </button>
                     </div>
@@ -504,6 +505,19 @@ export default function HistoryPage() {
                               </div>
                             </details>
                           )}
+
+                          {/* Raw Data Content */}
+                          <details className="bg-gray-800/50 rounded-lg border border-gray-700">
+                            <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
+                              <span className="text-lg">📊</span>
+                              <span>原始數據（點擊展開）</span>
+                            </summary>
+                            <div className="px-4 pb-4 text-gray-400 text-xs whitespace-pre-wrap border-t border-gray-700 pt-3 font-mono overflow-x-auto">
+                              {typeof item.chart_data === 'string' 
+                                ? item.chart_data 
+                                : JSON.stringify(item.chart_data, null, 2)}
+                            </div>
+                          </details>
 
                           {/* 主要內容 */}
                           <div

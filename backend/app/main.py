@@ -9,7 +9,8 @@ from app.api import (
     settings_router,
     divination_router,
     history_router,
-    admin_router
+    admin_router,
+    tarot_router
 )
 from app.core.config import get_settings
 
@@ -39,6 +40,7 @@ app.include_router(settings_router)
 app.include_router(divination_router)
 app.include_router(history_router)
 app.include_router(admin_router)
+app.include_router(tarot_router)
 
 
 @app.get("/")

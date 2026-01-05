@@ -58,6 +58,7 @@ const AI_TIMEOUT = 5 * 60 * 1000; // 5 分鐘超時
 
 export default function LiuYaoPage() {
   const router = useRouter();
+  const [step, setStep] = useState<'intro' | 'divine'>('intro');
   const [activeTab, setActiveTab] = useState<Tab>('divine');
   const [question, setQuestion] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
@@ -422,6 +423,36 @@ export default function LiuYaoPage() {
         </div>
       </nav>
 
+      {/* Intro Phase */}
+      {step === 'intro' && (
+        <div className="flex flex-col items-center text-center space-y-8 fade-in py-12 px-4">
+          <div className="w-48 h-48 relative mb-4 flex items-center justify-center">
+             <div className="absolute inset-0 bg-indigo-900/50 rounded-full border-2 border-[var(--gold)] animate-pulse-slow"></div>
+             <div className="text-8xl">☯</div>
+          </div>
+          
+          <div className="space-y-4 max-w-2xl">
+            <h2 className="text-3xl font-bold text-[var(--gold)]">探尋易經的智慧</h2>
+            <p className="text-gray-300 leading-relaxed">
+              六爻占卜源於《易經》，透過三次擲幣的變化，
+              洞察事物發展的規律與吉凶。
+              結合現代 AI 技術，為您提供深入淺出的解讀。
+            </p>
+            <p className="text-gray-400 text-sm">
+              心誠則靈，請保持內心平靜，專注於您想詢問的問題。
+            </p>
+          </div>
+
+          <button onClick={() => setStep('divine')} className="btn-gold px-12 py-4 text-lg flex items-center gap-2">
+            <Compass size={20} />
+            開始占卜
+          </button>
+        </div>
+      )}
+
+      {/* Main Content */}
+      {step === 'divine' && (
+        <>
       {/* 分頁選項 */}
       <div className="max-w-4xl mx-auto px-4 mt-6">
         <div className="flex gap-2 border-b border-gray-700 pb-2">
@@ -772,6 +803,17 @@ export default function LiuYaoPage() {
                         </details>
                       )}
 
+                      {/* Raw Data Content */}
+                      <details className="bg-gray-800/50 rounded-lg border border-gray-700">
+                        <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
+                          <span className="text-lg">📊</span>
+                          <span>原始卦象數據（點擊展開）</span>
+                        </summary>
+                        <div className="px-4 pb-4 text-gray-400 text-xs whitespace-pre-wrap border-t border-gray-700 pt-3 font-mono overflow-x-auto">
+                          {JSON.stringify(result.chart_data, null, 2)}
+                        </div>
+                      </details>
+
                       {/* 主要內容 */}
                       <div className="markdown-content bg-gray-800/30 rounded-xl p-6" dangerouslySetInnerHTML={{ __html: parsedContent.mainHtml }} />
                     </div>
@@ -829,6 +871,8 @@ export default function LiuYaoPage() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

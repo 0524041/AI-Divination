@@ -1,0 +1,742 @@
+
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, History, Sparkles, RotateCcw, Play, Check, ChevronDown, Bot, Settings, Copy, Loader2, X, Eye } from 'lucide-react';
+import { TAROT_CARDS, TarotCardData } from '@/lib/tarot-data';
+
+interface AIConfig {
+  id: number;
+  provider: string;
+  has_api_key: boolean;
+  local_url: string | null;
+  local_model: string | null;
+  is_active: boolean;
+}
+
+// 牌背組件 - 增加質感與光澤
+const CardBack = ({ onClick, className = "", style, glow = false }: { onClick?: () => void, className?: string, style?: React.CSSProperties, glow?: boolean }) => (
+  <div 
+    onClick={onClick}
+    style={style}
+    className={`
+      aspect-[2/3] bg-gradient-to-br from-indigo-950 to-indigo-900 rounded-lg border border-[var(--gold)] 
+      relative overflow-hidden cursor-pointer transition-all duration-300 shadow-lg
+      ${glow ? 'shadow-[0_0_15px_rgba(212,175,55,0.5)] border-opacity-100' : 'border-opacity-60 hover:border-opacity-100 hover:shadow-[0_0_10px_rgba(212,175,55,0.3)]'}
+      ${className}
+    `}
+  >
+    {/* 紋理背景 */}
+    <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_var(--gold)_1px,_transparent_1px)] bg-[length:12px_12px]"></div>
+    
+    {/* 神秘符號中心 */}
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="w-16 h-16 border border-[var(--gold)] rounded-full flex items-center justify-center opacity-80">
+        <div className="w-10 h-10 border border-[var(--gold)] rotate-45 flex items-center justify-center">
+          <div className="w-6 h-6 bg-[var(--gold)] rounded-full opacity-20 animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+    
+    {/* 邊框裝飾 */}
+    <div className="absolute inset-1 border border-[var(--gold)] border-opacity-30 rounded-md"></div>
+  </div>
+);
+
+// 牌面組件 - 增加立體感
+const TarotCard = ({ card, isRevealed, onClick, positionLabel, size = "normal" }: { card: TarotCardData, isRevealed: boolean, onClick?: () => void, positionLabel?: string, size?: "normal" | "large" }) => {
+  return (
+    <div className={`flex flex-col items-center gap-3 group ${size === 'large' ? 'w-[60vw] md:w-[22vw] max-w-[320px]' : 'w-full'}`} onClick={onClick}>
+      {positionLabel && (
+        <div className="text-[var(--gold)] text-sm font-bold uppercase tracking-[0.2em] opacity-80 group-hover:opacity-100 transition-opacity">
+          {positionLabel}
+        </div>
+      )}
+      <div className={`relative w-full aspect-[2/3] transition-all duration-700 transform-style-3d ${isRevealed ? 'rotate-y-0' : 'rotate-y-180'}`}>
+        {/* Front (Image) */}
+        <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-0 rounded-lg overflow-hidden border-2 border-[var(--gold)] shadow-[0_0_20px_rgba(212,175,55,0.2)] bg-black">
+          <img 
+            src={`/tarot-cards/${card.image}`} 
+            alt={card.name} 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pb-2 px-2 text-center">
+            <div className="text-white font-bold text-lg tracking-wide">{card.name_cn}</div>
+            <div className="text-[var(--gold)] text-xs uppercase tracking-wider opacity-80">{card.name}</div>
+          </div>
+        </div>
+        
+        {/* Back */}
+        <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180">
+          <CardBack className="w-full h-full" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function TarotPage() {
+  const router = useRouter();
+  const [step, setStep] = useState<'intro' | 'input' | 'shuffle' | 'select' | 'reveal' | 'interpreting' | 'result'>('intro');
+  const [question, setQuestion] = useState('');
+  const [shuffledDeck, setShuffledDeck] = useState<TarotCardData[]>([]);
+  const [selectedCards, setSelectedCards] = useState<TarotCardData[]>([]);
+  const [revealedCount, setRevealedCount] = useState(0);
+  const [interpretation, setInterpretation] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [historyId, setHistoryId] = useState<number | null>(null);
+  const [htmlContent, setHtmlContent] = useState<{ mainHtml: string; thinkContent: string } | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // 洗牌動畫狀態
+  const [isShuffling, setIsShuffling] = useState(false);
+  const [reshuffleCount, setReshuffleCount] = useState(0);
+
+  // AI 設定相關
+  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
+  const [activeAI, setActiveAI] = useState<AIConfig | null>(null);
+  const [showAISelector, setShowAISelector] = useState(false);
+
+  // 初始化
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    fetchAIConfigs();
+  };
+
+  const fetchAIConfigs = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('/api/settings/ai', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const configs = await res.json();
+        setAiConfigs(configs);
+        const active = configs.find((c: AIConfig) => c.is_active);
+        setActiveAI(active || null);
+      }
+    } catch (err) {
+      console.error('Fetch AI configs error:', err);
+    }
+  };
+
+  const handleSwitchAI = async (configId: number) => {
+    const token = localStorage.getItem('token');
+    try {
+      await fetch(`/api/settings/ai/${configId}/activate`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchAIConfigs();
+      setShowAISelector(false);
+    } catch (err) {
+      console.error('Switch AI error:', err);
+    }
+  };
+
+  const startDivination = () => {
+    setStep('input');
+  };
+
+  const handleShuffle = () => {
+    if (!question.trim()) {
+      alert('請先輸入您想問的問題');
+      return;
+    }
+    if (!activeAI) {
+      alert('請先設定 AI 服務');
+      return;
+    }
+    setStep('shuffle');
+    setIsShuffling(true);
+    
+    // 模擬洗牌動畫
+    setTimeout(() => {
+      setIsShuffling(false);
+      performShuffle();
+      setStep('select');
+    }, 3000);
+  };
+
+  const handleReshuffle = () => {
+    if (reshuffleCount >= 3) return;
+    setStep('shuffle');
+    setIsShuffling(true);
+    setReshuffleCount(prev => prev + 1);
+    setSelectedCards([]); // 重洗時清空選擇
+    
+    setTimeout(() => {
+      setIsShuffling(false);
+      performShuffle();
+      setStep('select');
+    }, 2000);
+  };
+
+  const performShuffle = () => {
+    const deck = [...TAROT_CARDS];
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    setShuffledDeck(deck);
+  };
+
+  const handleSelectCard = (card: TarotCardData) => {
+    // Check if already selected
+    if (selectedCards.find(c => c.id === card.id)) {
+      // Deselect
+      setSelectedCards(selectedCards.filter(c => c.id !== card.id));
+      return;
+    }
+
+    // Select (limit to 3)
+    if (selectedCards.length >= 3) return;
+    
+    setSelectedCards([...selectedCards, card]);
+  };
+
+  const handleReveal = (index: number) => {
+    if (index !== revealedCount) return; // 依序翻牌
+    setRevealedCount(prev => prev + 1);
+  };
+
+  const submitDivination = async () => {
+    setStep('interpreting');
+    setLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const cardsPayload = selectedCards.map((card, index) => ({
+        id: card.id,
+        name: card.name,
+        name_cn: card.name_cn,
+        image: card.image,
+        reversed: false, // 暫時不實作逆位
+        position: index === 0 ? 'past' : index === 1 ? 'present' : 'future'
+      }));
+
+      const res = await fetch('/api/tarot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          question,
+          cards: cardsPayload
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryId(data.id);
+        // 開始輪詢結果
+        pollResult(data.id);
+      } else {
+        alert('提交失敗，請稍後再試');
+        setStep('reveal');
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('發生錯誤');
+      setStep('reveal');
+      setLoading(false);
+    }
+  };
+
+  const pollResult = async (id: number) => {
+    const token = localStorage.getItem('token');
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/history/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'completed') {
+            setInterpretation(data.interpretation);
+            
+            // 解析 Markdown
+            try {
+              const { parseMarkdown } = await import('@/lib/markdown');
+              const result = await parseMarkdown(data.interpretation);
+              setHtmlContent(result);
+            } catch (err) {
+              console.error('Markdown parsing error:', err);
+              setHtmlContent({ mainHtml: `<p class="text-red-400">解析失敗: ${err}</p>`, thinkContent: '' });
+            }
+
+            setStep('result');
+            setLoading(false);
+          } else if (data.status === 'error') {
+            alert('AI 解盤失敗');
+            setLoading(false);
+            setStep('reveal');
+          } else {
+            setTimeout(check, 2000);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        setTimeout(check, 2000);
+      }
+    };
+    check();
+  };
+
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/tarot/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ history_id: historyId })
+      });
+      setStep('input');
+      setLoading(false);
+      setInterpretation('');
+    } catch (err) {
+      console.error('Cancel error:', err);
+      alert('取消失敗');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleCopy = async () => {
+
+    const cardText = selectedCards.map((c, i) => 
+      `${i === 0 ? '過去' : i === 1 ? '現在' : '未來'}: ${c.name_cn} (${c.name})`
+    ).join('\n');
+    
+    const markdownText = `## 問題\n${question}\n\n## 牌陣\n${cardText}\n\n## 解盤\n${interpretation}`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(markdownText);
+        alert('已複製到剪貼簿');
+        return;
+      } catch (err) {
+        console.warn('Clipboard API 失敗', err);
+      }
+    }
+    alert('複製失敗，請手動複製內容');
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 pb-20 overflow-x-hidden">
+      {/* 背景裝飾 */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,_rgba(21,21,40,1)_0%,_rgba(10,10,10,1)_80%)]"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--gold)] opacity-[0.03] blur-[100px] rounded-full"></div>
+      </div>
+
+      {/* 導航 */}
+      <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-4">
+        <div className="glass-card w-full px-6 py-3 flex items-center justify-between shadow-lg shadow-black/20">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-gray-400 hover:text-[var(--gold)] transition-colors">
+              <ArrowLeft size={24} />
+            </Link>
+            <div className="flex items-center gap-3">
+              <Sparkles className="text-[var(--gold)] animate-pulse" size={24} />
+              <h1 className="text-xl font-bold text-[var(--gold)] tracking-wider">塔羅占卜</h1>
+            </div>
+          </div>
+          <Link href="/history" className="text-gray-400 hover:text-[var(--gold)] transition-colors flex items-center gap-2">
+            <span className="hidden sm:inline text-sm">歷史紀錄</span>
+            <History size={24} />
+          </Link>
+        </div>
+      </nav>
+
+      {/* 主要內容區域 */}
+      <main className={`relative z-10 pt-24 px-4 transition-all duration-500 ${step === 'select' ? 'w-full max-w-[1800px] mx-auto' : (step === 'reveal' || step === 'interpreting' || step === 'result' ? 'w-full max-w-[1600px] mx-auto' : 'max-w-4xl mx-auto')}`}>
+        
+        {/* Intro Phase */}
+        {step === 'intro' && (
+          <div className="flex flex-col items-center text-center space-y-12 fade-in min-h-[70vh] justify-center">
+            <div className="relative w-64 h-96 animate-float">
+               <div className="absolute inset-0 bg-indigo-900 rounded-xl border border-[var(--gold)] transform rotate-6 opacity-30 blur-sm"></div>
+               <div className="absolute inset-0 bg-indigo-900 rounded-xl border border-[var(--gold)] transform -rotate-6 opacity-30 blur-sm"></div>
+               <CardBack className="w-full h-full absolute inset-0 shadow-[0_0_50px_rgba(212,175,55,0.2)]" glow />
+            </div>
+            
+            <div className="space-y-6 max-w-2xl">
+              <h2 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[var(--gold)] to-white">
+                探索內心的指引
+              </h2>
+              <p className="text-gray-300 text-lg leading-relaxed font-light">
+                塔羅牌是連結潛意識的鑰匙。<br/>
+                透過「過去、現在、未來」的三張牌陣，<br/>
+                洞察當下的處境，回顧過去的影響，並展望未來的可能性。
+              </p>
+            </div>
+
+            <button onClick={startDivination} className="btn-gold px-16 py-5 text-xl flex items-center gap-3 shadow-[0_0_30px_rgba(212,175,55,0.3)] hover:shadow-[0_0_50px_rgba(212,175,55,0.5)]">
+              <Play size={24} fill="currentColor" />
+              開始占卜
+            </button>
+          </div>
+        )}
+
+        {/* Input Phase */}
+        {step === 'input' && (
+          <div className="max-w-2xl mx-auto space-y-8 fade-in pt-10">
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl font-bold text-[var(--gold)]">默念您的問題</h2>
+              <p className="text-gray-400">保持內心平靜，將專注力放在您想尋求指引的事物上</p>
+            </div>
+
+            {/* AI Selector */}
+            <div className="relative group z-20">
+              <button
+                className="w-full flex items-center justify-between px-6 py-4 bg-gray-800/40 border border-gray-700 rounded-2xl hover:border-[var(--gold)] hover:bg-gray-800/60 transition-all duration-300 backdrop-blur-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-[var(--gold)]/10 rounded-lg">
+                    <Bot className="text-[var(--gold)]" size={24} />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">AI 解盤服務</div>
+                    <div className="font-medium text-gray-200 text-lg">
+                      {activeAI ? (
+                        activeAI.provider === 'gemini' ? 'Google Gemini Pro' : 'Local AI Model'
+                      ) : (
+                        '未設定 AI'
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <ChevronDown size={20} className={`text-gray-400 transition-transform duration-300 ${showAISelector ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAISelector && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a2e] border border-gray-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  {aiConfigs.map((config) => (
+                    <button
+                      key={config.id}
+                      onClick={() => handleSwitchAI(config.id)}
+                      className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800 transition ${
+                        config.is_active ? 'bg-[var(--gold)]/5' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${config.is_active ? 'bg-[var(--gold)] shadow-[0_0_10px_var(--gold)]' : 'bg-gray-600'}`} />
+                        <span className={config.is_active ? 'text-[var(--gold)] font-medium' : 'text-gray-300'}>
+                          {config.provider === 'gemini' ? 'Google Gemini' : `Local AI (${config.local_model})`}
+                        </span>
+                      </div>
+                      {config.is_active && <Check size={18} className="text-[var(--gold)]" />}
+                    </button>
+                  ))}
+                  <Link
+                    href="/settings"
+                    className="w-full px-6 py-4 flex items-center gap-3 text-gray-400 hover:bg-gray-800 hover:text-[var(--gold)] border-t border-gray-800 transition"
+                  >
+                    <Settings size={18} />
+                    <span>管理 AI 設定</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+            
+            <div className="relative">
+              <textarea
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="例如：我最近的工作運勢如何？這段感情會有結果嗎？"
+                className="w-full h-48 bg-gray-800/30 border border-gray-700 rounded-2xl p-6 text-xl text-gray-200 focus:border-[var(--gold)] focus:ring-1 focus:ring-[var(--gold)] focus:bg-gray-800/50 transition-all outline-none resize-none placeholder:text-gray-600"
+              />
+              <div className="absolute bottom-4 right-4 text-gray-600 text-sm">
+                {question.length} 字
+              </div>
+            </div>
+
+            <button 
+              onClick={handleShuffle} 
+              className="btn-gold w-full py-5 text-xl flex items-center justify-center gap-3 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RotateCcw size={24} />
+              開始洗牌
+            </button>
+          </div>
+        )}
+
+        {/* Shuffle Phase */}
+        {step === 'shuffle' && (
+          <div className="flex flex-col items-center justify-center h-[70vh] space-y-12 fade-in">
+            <div className="relative w-64 h-64 flex items-center justify-center">
+              {/* 圓形洗牌動畫 */}
+              {[...Array(12)].map((_, i) => (
+                <div 
+                  key={i}
+                  className="absolute w-32 h-48 origin-bottom transition-all duration-500"
+                  style={{
+                    transform: `rotate(${i * 30}deg) translateY(-20px)`,
+                    animation: `spin 3s linear infinite`,
+                    animationDelay: `${i * 0.1}s`
+                  }}
+                >
+                  <CardBack className="w-full h-full shadow-md" />
+                </div>
+              ))}
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-[var(--gold)] text-2xl font-bold animate-pulse">洗牌中...</p>
+              <p className="text-gray-500">請保持專注</p>
+            </div>
+          </div>
+        )}
+
+        {/* Select Phase */}
+        {step === 'select' && (
+          <div className="fade-in flex flex-col h-[calc(100vh-100px)]">
+            <div className="text-center space-y-2 mb-6 flex-shrink-0">
+              <h2 className="text-3xl font-bold text-[var(--gold)]">請憑直覺選出 3 張牌</h2>
+              <p className="text-gray-400">已選擇：<span className="text-[var(--gold)] font-bold text-xl">{selectedCards.length}</span> / 3</p>
+            </div>
+
+            {/* Card Grid - Full Width & Responsive */}
+            <div className="flex-1 overflow-y-auto px-2 pb-32 custom-scrollbar">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3 md:gap-4 mx-auto max-w-[1920px]">
+                {shuffledDeck.map((card, index) => {
+                  const isSelected = selectedCards.find(c => c.id === card.id);
+                  return (
+                    <div 
+                      key={card.id}
+                      className={`
+                        relative transition-all duration-500 ease-out
+                        ${isSelected ? 'opacity-0 scale-0' : 'opacity-100 scale-100 hover:-translate-y-4 hover:z-10'}
+                      `}
+                      style={{ 
+                        animationDelay: `${index * 0.015}s`,
+                        animationFillMode: 'both'
+                      }}
+                    >
+                      <div className="animate-deal">
+                        <CardBack 
+                          onClick={() => handleSelectCard(card)} 
+                          className={`w-full shadow-lg hover:shadow-[0_0_15px_rgba(212,175,55,0.4)] hover:border-[var(--gold)] transition-all duration-300`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Selected Cards Bar - Fixed Bottom */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0a]/90 backdrop-blur-xl border-t border-[var(--gold)]/30 pb-6 pt-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+              <div className="max-w-5xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
+                
+                {/* Selected Cards Slots */}
+                <div className="flex gap-4 md:gap-8">
+                  {[0, 1, 2].map((i) => {
+                    const card = selectedCards[i];
+                    return (
+                      <div key={i} className="relative group">
+                        <div className={`
+                          w-20 h-32 md:w-24 md:h-36 rounded-lg border-2 border-dashed transition-all duration-300 flex items-center justify-center
+                          ${card ? 'border-transparent' : 'border-gray-700 bg-gray-800/30'}
+                        `}>
+                          {card ? (
+                            <div className="w-full h-full animate-deal relative">
+                              <CardBack className="w-full h-full border-[var(--gold)] shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
+                              <button 
+                                onClick={() => handleSelectCard(card)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg hover:bg-red-600 transition opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-gray-600 font-bold text-2xl">{i + 1}</span>
+                          )}
+                        </div>
+                        <div className="text-center text-[10px] md:text-xs text-[var(--gold)] mt-2 font-medium uppercase tracking-widest">
+                          {i === 0 ? '過去' : i === 1 ? '現在' : '未來'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-row items-center gap-4">
+                  {reshuffleCount < 3 && selectedCards.length === 0 && (
+                    <button 
+                      onClick={handleReshuffle}
+                      className="px-6 py-3 rounded-xl border border-gray-700 text-gray-400 hover:text-[var(--gold)] hover:border-[var(--gold)] transition flex items-center gap-2"
+                    >
+                      <RotateCcw size={18} />
+                      <span className="hidden md:inline">重新洗牌</span>
+                    </button>
+                  )}
+
+                  <button 
+                    onClick={() => setStep('reveal')}
+                    disabled={selectedCards.length !== 3}
+                    className={`
+                      px-10 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-all duration-300
+                      ${selectedCards.length === 3
+                        ? 'bg-gradient-to-r from-[var(--gold)] to-[var(--gold-dark)] text-black hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.4)]'
+                        : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'}
+                    `}
+                  >
+                    <Check size={24} />
+                    確認牌陣
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reveal Phase */}
+        {(step === 'reveal' || step === 'interpreting' || step === 'result') && (
+          <div className="space-y-12 fade-in pb-20">
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl font-bold text-[var(--gold)]">
+                {step === 'reveal' ? '揭示命運' : '命運的指引'}
+              </h2>
+              <p className="text-gray-400 max-w-2xl mx-auto italic">"{question}"</p>
+            </div>
+
+            {/* Cards Display */}
+            <div className="flex flex-col md:flex-row justify-center items-center gap-6 md:gap-8 lg:gap-10 min-h-[600px]">
+              {selectedCards.map((card, index) => (
+                <div 
+                  key={card.id} 
+                  className={`transition-all duration-700 ${
+                    step === 'reveal' && index > revealedCount ? 'opacity-50 scale-90 blur-[1px]' : 'opacity-100 scale-100'
+                  }`}
+                >
+                  <TarotCard 
+                    card={card} 
+                    isRevealed={index < revealedCount || step !== 'reveal'} 
+                    onClick={() => step === 'reveal' && handleReveal(index)}
+                    positionLabel={index === 0 ? 'Past' : index === 1 ? 'Present' : 'Future'}
+                    size="large"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Action Button for Reveal */}
+            {step === 'reveal' && (
+              <div className="flex justify-center h-24 items-center">
+                {revealedCount < 3 ? (
+                  <p className="text-gray-500 animate-pulse">請依序點擊卡牌翻開...</p>
+                ) : (
+                  <button onClick={submitDivination} className="btn-gold px-16 py-5 text-xl flex items-center gap-3 animate-fade-in-up shadow-[0_0_30px_rgba(212,175,55,0.3)]">
+                    <Sparkles size={24} />
+                    AI 解讀牌義
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Loading State */}
+            {step === 'interpreting' && (
+              <div className="text-center py-12 space-y-6">
+                <div className="relative w-24 h-24 mx-auto">
+                  <div className="absolute inset-0 border-4 border-[var(--gold)] border-t-transparent rounded-full animate-spin"></div>
+                  <div className="absolute inset-4 border-4 border-indigo-500 border-b-transparent rounded-full animate-spin-slow"></div>
+                  <div className="absolute inset-0 flex items-center justify-center text-2xl">🔮</div>
+                </div>
+                <div>
+                  <h3 className="text-xl text-[var(--gold)] font-medium mb-2">AI 正在連結宇宙能量...</h3>
+                  <p className="text-gray-500">正在分析牌陣與問題的關聯</p>
+                </div>
+                
+                <button
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                  className="px-6 py-2 border border-red-500/30 text-red-400 rounded-full hover:bg-red-500/10 transition flex items-center gap-2 mx-auto text-sm"
+                >
+                  {isCancelling ? <Loader2 className="animate-spin" size={14} /> : <X size={14} />}
+                  取消占卜
+                </button>
+              </div>
+            )}
+
+            {/* Result Display */}
+            {step === 'result' && interpretation && (
+              <div className="max-w-4xl mx-auto bg-[#16162a]/80 backdrop-blur-md rounded-2xl p-8 md:p-12 border border-[var(--gold)]/20 shadow-2xl fade-in relative overflow-hidden">
+                {/* Decorative Elements */}
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[var(--gold)] to-transparent opacity-50"></div>
+                
+                {/* Copy Button */}
+                <button
+                  onClick={handleCopy}
+                  className="absolute top-6 right-6 p-2.5 bg-gray-800 hover:bg-[var(--gold)] text-gray-400 hover:text-gray-900 rounded-xl transition-all shadow-lg flex items-center gap-2 group"
+                  title="複製完整內容"
+                >
+                  <Copy size={18} />
+                  <span className="text-sm font-medium hidden group-hover:inline">複製</span>
+                </button>
+
+                <h3 className="text-2xl font-bold text-[var(--gold)] mb-8 flex items-center gap-3 border-b border-gray-800 pb-4">
+                  <Sparkles size={24} />
+                  牌義解析
+                </h3>
+                
+                {htmlContent ? (
+                  <div className="space-y-6">
+                    {/* Think Content */}
+                    {htmlContent.thinkContent && (
+                      <details className="group bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+                        <summary className="px-6 py-4 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-3 transition-colors">
+                          <span className="text-xl">🧠</span>
+                          <span className="font-medium">AI 思考過程</span>
+                          <ChevronDown size={16} className="group-open:rotate-180 transition-transform ml-auto" />
+                        </summary>
+                        <div className="px-6 pb-6 text-gray-400 text-sm whitespace-pre-wrap border-t border-gray-800 pt-4 leading-relaxed font-mono">
+                          {htmlContent.thinkContent}
+                        </div>
+                      </details>
+                    )}
+
+                    {/* Main Content */}
+                    <div
+                      className="markdown-content text-gray-200 leading-loose text-lg"
+                      dangerouslySetInnerHTML={{ __html: htmlContent.mainHtml }}
+                    />
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap text-gray-300 leading-loose text-lg">
+                    {interpretation}
+                  </div>
+                )}
+
+                <div className="mt-12 flex justify-center pt-8 border-t border-gray-800">
+                  <Link href="/history" className="btn-gold-outline px-10 py-3 flex items-center gap-2 group">
+                    <History size={20} className="group-hover:rotate-12 transition-transform" />
+                    查看歷史紀錄
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}
