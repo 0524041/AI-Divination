@@ -201,11 +201,62 @@ export default function TarotPage() {
     return config.positions[index] || `位置 ${index + 1}`;
   };
 
-  const confirmSelection = () => {
+  const confirmSelection = async () => {
     const maxCards = getCurrentSpreadConfig().cardCount;
     if (selectedCards.length === maxCards) {
+      // 立即提交给后端开始AI处理
+      await submitToBackend();
+      // 进入翻牌阶段
       setStep('reveal');
       setRevealedCount(0);
+    }
+  };
+
+  const submitToBackend = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const getCardPosition = (index: number) => {
+        if (spreadType === 'single') return 'single';
+        if (spreadType === 'three_card') {
+          return index === 0 ? 'past' : index === 1 ? 'present' : 'future';
+        }
+        // celtic_cross
+        const positions = ['heart', 'challenge', 'conscious', 'foundation', 'past', 'future', 'attitude', 'external', 'hopes_fears', 'outcome'];
+        return positions[index] || `position_${index + 1}`;
+      };
+
+      const cardsPayload = selectedCards.map((card, index) => ({
+        id: card.id,
+        name: card.name,
+        name_cn: card.name_cn,
+        image: card.image,
+        reversed: false, // 暫時不實作逆位
+        position: getCardPosition(index)
+      }));
+
+      const res = await fetch('/api/tarot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          question,
+          cards: cardsPayload,
+          spread_type: spreadType
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryId(data.id);
+        // 后台已经开始处理，但不立即轮询
+      } else {
+        alert('提交失敗，請稍後再試');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('發生錯誤');
     }
   };
 
@@ -273,59 +324,52 @@ export default function TarotPage() {
   };
 
   const submitDivination = async () => {
+    if (!historyId) {
+      alert('系統錯誤：找不到占卜記錄');
+      return;
+    }
+
     setStep('interpreting');
     setLoading(true);
 
+    // 先检查一次结果是否已经完成
+    const token = localStorage.getItem('token');
     try {
-      const token = localStorage.getItem('token');
-      const getCardPosition = (index: number) => {
-        if (spreadType === 'single') return 'single';
-        if (spreadType === 'three_card') {
-          return index === 0 ? 'past' : index === 1 ? 'present' : 'future';
-        }
-        // celtic_cross
-        const positions = ['heart', 'challenge', 'conscious', 'foundation', 'past', 'future', 'attitude', 'external', 'hopes_fears', 'outcome'];
-        return positions[index] || `position_${index + 1}`;
-      };
-
-      const cardsPayload = selectedCards.map((card, index) => ({
-        id: card.id,
-        name: card.name,
-        name_cn: card.name_cn,
-        image: card.image,
-        reversed: false, // 暫時不實作逆位
-        position: getCardPosition(index)
-      }));
-
-      const res = await fetch('/api/tarot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          question,
-          cards: cardsPayload,
-          spread_type: spreadType
-        })
+      const res = await fetch(`/api/history/${historyId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-
       if (res.ok) {
         const data = await res.json();
-        setHistoryId(data.id);
-        // 開始輪詢結果
-        pollResult(data.id);
-      } else {
-        alert('提交失敗，請稍後再試');
-        setStep('reveal');
-        setLoading(false);
+        if (data.status === 'completed') {
+          // AI已经完成，直接显示结果
+          setInterpretation(data.interpretation);
+          
+          // 解析 Markdown
+          try {
+            const { parseMarkdown } = await import('@/lib/markdown');
+            const result = await parseMarkdown(data.interpretation);
+            setHtmlContent(result);
+          } catch (err) {
+            console.error('Markdown parsing error:', err);
+            setHtmlContent({ mainHtml: `<p class="text-red-400">解析失敗: ${err}</p>`, thinkContent: '' });
+          }
+
+          setStep('result');
+          setLoading(false);
+          return;
+        } else if (data.status === 'error') {
+          alert('AI 解盤失敗');
+          setLoading(false);
+          setStep('reveal');
+          return;
+        }
       }
     } catch (err) {
-      console.error(err);
-      alert('發生錯誤');
-      setStep('reveal');
-      setLoading(false);
+      console.error('Check result error:', err);
     }
+
+    // 如果还没完成，继续轮询
+    pollResult(historyId);
   };
 
   const pollResult = async (id: number) => {
@@ -608,6 +652,17 @@ export default function TarotPage() {
               <RotateCcw size={24} />
               開始洗牌
             </button>
+
+            {/* Back Button */}
+            <div className="text-center pt-4">
+              <button
+                onClick={() => setStep('spread_select')}
+                className="btn-gold-outline px-8 py-3 flex items-center justify-center gap-2 mx-auto"
+              >
+                <ArrowLeft size={18} />
+                返回選擇牌陣
+              </button>
+            </div>
           </div>
         )}
 
