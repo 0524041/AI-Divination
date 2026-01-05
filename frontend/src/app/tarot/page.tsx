@@ -406,6 +406,7 @@ export default function TarotPage() {
             {/* AI Selector */}
             <div className="relative group z-20">
               <button
+                onClick={() => setShowAISelector(!showAISelector)}
                 className="w-full flex items-center justify-between px-6 py-4 bg-gray-800/40 border border-gray-700 rounded-2xl hover:border-[var(--gold)] hover:bg-gray-800/60 transition-all duration-300 backdrop-blur-sm"
               >
                 <div className="flex items-center gap-4">
