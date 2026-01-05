@@ -233,7 +233,8 @@ export default function TarotPage() {
         },
         body: JSON.stringify({
           question,
-          cards: cardsPayload
+          cards: cardsPayload,
+          spread_type: 'three_card'  // 目前固定為三牌陣，未來可改為動態選擇
         })
       });
 
@@ -713,6 +714,28 @@ export default function TarotPage() {
                         </div>
                       </details>
                     )}
+
+                    {/* Card Spread Details */}
+                    <details className="group bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+                      <summary className="px-6 py-4 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-3 transition-colors">
+                        <span className="text-xl">🎴</span>
+                        <span className="font-medium">牌陣詳情</span>
+                        <ChevronDown size={16} className="group-open:rotate-180 transition-transform ml-auto" />
+                      </summary>
+                      <div className="px-6 pb-6 text-gray-300 text-sm border-t border-gray-800 pt-4 leading-relaxed space-y-3">
+                        <div className="font-bold text-[var(--gold)] mb-3">三牌陣（過去-現在-未來）</div>
+                        {selectedCards.map((card, index) => (
+                          <div key={card.id} className="flex items-start gap-3 py-2 border-b border-gray-800 last:border-0">
+                            <span className="text-[var(--gold)] font-bold min-w-[60px]">
+                              {index === 0 ? '過去' : index === 1 ? '現在' : '未來'}:
+                            </span>
+                            <span className="flex-1">
+                              {card.name_cn} ({card.name})
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
 
                     {/* Main Content */}
                     <div

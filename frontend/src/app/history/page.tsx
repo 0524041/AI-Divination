@@ -24,8 +24,19 @@ interface HistoryItem {
   gender: string | null;
   target: string | null;
   chart_data: {
-    benguaming: string;
-    bianguaming: string;
+    benguaming?: string;
+    bianguaming?: string;
+    formatted?: string;
+    spread?: string;
+    spread_name?: string;
+    cards?: Array<{
+      id: number;
+      name: string;
+      name_cn: string;
+      image: string;
+      reversed: boolean;
+      position: string;
+    }>;
     [key: string]: unknown;
   };
   interpretation: string | null;
@@ -170,8 +181,30 @@ export default function HistoryPage() {
   };
 
   const handleCopy = async (item: HistoryItem) => {
+    // 準備不同占卜類型的文本
+    let cardInfo = '';
+    
+    if (item.divination_type === 'tarot') {
+      // 塔羅牌格式
+      cardInfo = `牌陣：${item.chart_data.spread_name || '未知'}\n\n`;
+      if (item.chart_data.cards) {
+        cardInfo += '抽牌結果：\n';
+        item.chart_data.cards.forEach((card, index) => {
+          const positionName = 
+            card.position === 'past' ? '過去' :
+            card.position === 'present' ? '現在' :
+            card.position === 'future' ? '未來' :
+            card.position;
+          cardInfo += `${index + 1}. ${positionName}：${card.name_cn} (${card.name})${card.reversed ? ' (逆位)' : ''}\n`;
+        });
+      }
+    } else {
+      // 六爻等其他占卜格式
+      cardInfo = `${item.chart_data.benguaming || ''} → ${item.chart_data.bianguaming || ''}`;
+    }
+    
     // 準備 Markdown 格式文本
-    const markdownText = `## 問題\n${item.question}\n\n## 卦象\n${item.chart_data.benguaming} → ${item.chart_data.bianguaming}\n\n## 解盤\n${item.interpretation || '無'}`;
+    const markdownText = `## 問題\n${item.question}\n\n## ${item.divination_type === 'tarot' ? '牌陣' : '卦象'}\n${cardInfo}\n\n## 解盤\n${item.interpretation || '無'}`;
 
     // 優先使用 execCommand（相容性最好）
     const fallbackCopy = () => {
@@ -431,8 +464,15 @@ export default function HistoryPage() {
                         {item.question}
                       </p>
                       
-                      {expandedId === item.id && (item.target || item.gender) && (
+                      {expandedId === item.id && (item.target || item.gender || (item.divination_type === 'tarot' && item.chart_data.spread_name)) && (
                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-400">
+                          {/* 塔羅牌顯示牌陣類型 */}
+                          {item.divination_type === 'tarot' && item.chart_data.spread_name && (
+                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
+                              牌陣：<span className="text-gray-300">{item.chart_data.spread_name}</span>
+                            </span>
+                          )}
+                          {/* 六爻等其他占卜顯示對象和性別 */}
                           {item.target && (
                             <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
                               對象：<span className="text-gray-300">{item.target}</span>
@@ -446,9 +486,12 @@ export default function HistoryPage() {
                         </div>
                       )}
 
-                      <p className="text-sm text-gray-500 mt-1">
-                        {item.chart_data.benguaming} → {item.chart_data.bianguaming}
-                      </p>
+                      {/* 塔羅牌不顯示本卦變卦 */}
+                      {item.divination_type !== 'tarot' && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          {item.chart_data.benguaming} → {item.chart_data.bianguaming}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <span className="text-xs text-gray-500">{formatDate(item.created_at)}</span>
@@ -509,13 +552,45 @@ export default function HistoryPage() {
                           {/* Raw Data Content */}
                           <details className="bg-gray-800/50 rounded-lg border border-gray-700">
                             <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
-                              <span className="text-lg">📊</span>
-                              <span>原始數據（點擊展開）</span>
+                              <span className="text-lg">{item.divination_type === 'tarot' ? '🎴' : '☯'}</span>
+                              <span>{item.divination_type === 'tarot' ? '牌陣詳情' : '完整卦象盤面'}（點擊展開）</span>
                             </summary>
-                            <div className="px-4 pb-4 text-gray-400 text-xs whitespace-pre-wrap border-t border-gray-700 pt-3 font-mono overflow-x-auto">
-                              {typeof item.chart_data === 'string' 
-                                ? item.chart_data 
-                                : JSON.stringify(item.chart_data, null, 2)}
+                            <div className="px-4 pb-4 text-gray-300 text-sm border-t border-gray-700 pt-3 leading-relaxed">
+                              {(() => {
+                                try {
+                                  const data = typeof item.chart_data === 'string' ? JSON.parse(item.chart_data) : item.chart_data;
+                                  if (item.divination_type === 'tarot') {
+                                    // 塔羅牌：顯示牌陣
+                                    const spreadName = data.spread === 'three_card' ? '三牌陣（過去-現在-未來）' : 
+                                                     data.spread === 'single' ? '單抽牌' : 
+                                                     data.spread === 'celtic_cross' ? '凱爾特十字' : '未知牌陣';
+                                    return (
+                                      <div className="space-y-3">
+                                        <div className="font-bold text-[var(--gold)] mb-3">{spreadName}</div>
+                                        {data.cards?.map((card: any, idx: number) => (
+                                          <div key={idx} className="flex items-start gap-3 py-2 border-b border-gray-800 last:border-0">
+                                            <span className="text-[var(--gold)] font-bold min-w-[60px]">
+                                              {card.position === 'past' ? '過去' : 
+                                               card.position === 'present' ? '現在' : 
+                                               card.position === 'future' ? '未來' : 
+                                               card.position}:
+                                            </span>
+                                            <span className="flex-1">
+                                              {card.name_cn} ({card.name}){card.reversed ? ' (逆位)' : ''}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  } else if (item.divination_type === 'liuyao') {
+                                    // 六爻：顯示 formatted
+                                    return <div className="whitespace-pre-wrap">{data.formatted || JSON.stringify(data, null, 2)}</div>;
+                                  }
+                                  return <div className="whitespace-pre-wrap">{JSON.stringify(data, null, 2)}</div>;
+                                } catch (e) {
+                                  return <div className="text-red-400">解析失敗</div>;
+                                }
+                              })()}
                             </div>
                           </details>
 

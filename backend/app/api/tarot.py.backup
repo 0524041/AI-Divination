@@ -18,22 +18,8 @@ from app.services.ai import get_ai_service
 router = APIRouter(prefix="/api/tarot", tags=["塔羅"])
 settings = get_settings()
 
-# 讀取 system prompt 的函數
-def get_system_prompt_for_spread(spread_type: str) -> str:
-    """根據牌陣類型讀取對應的 system prompt"""
-    prompt_files = {
-        "three_card": "tarot_system_prompt_three_card.md",
-        "single": "tarot_system_prompt_single.md",
-        "celtic_cross": "tarot_system_prompt_celtic_cross.md"
-    }
-    
-    filename = prompt_files.get(spread_type, "tarot_system_prompt_three_card.md")
-    prompt_path = Path(BASE_DIR) / "prompts" / filename
-    
-    if prompt_path.exists():
-        return prompt_path.read_text(encoding="utf-8")
-    else:
-        raise FileNotFoundError(f"找不到 Prompt 檔案：{filename}")
+# 讀取 system prompt
+SYSTEM_PROMPT_PATH = Path(BASE_DIR) / "prompts" / "tarot_system_prompt.md"
 
 # ========== Schemas ==========
 
@@ -43,13 +29,12 @@ class TarotCard(BaseModel):
     name_cn: str
     image: str
     reversed: bool = False
-    position: str  # 'past', 'present', 'future', 'heart', 'challenge', etc.
+    position: str  # 'past', 'present', 'future'
 
 class TarotRequest(BaseModel):
     """塔羅占卜請求"""
     question: str = Field(..., min_length=1, max_length=500)
-    cards: List[TarotCard] = Field(..., min_items=1, max_items=10)  # 支援 1-10 張牌
-    spread_type: str = Field(default="three_card")  # "three_card", "single", "celtic_cross"
+    cards: List[TarotCard] = Field(..., min_items=3, max_items=3)
 
 class TarotResponse(BaseModel):
     """塔羅回應"""
@@ -106,74 +91,42 @@ async def process_tarot_divination(history_id: int, db_url: str):
             db.commit()
             return
         
-        # 讀取對應的 system prompt
-        chart_data = json.loads(history.chart_data)
-        spread_type = chart_data.get("spread", "three_card")
-        
-        try:
-            system_prompt = get_system_prompt_for_spread(spread_type)
-        except FileNotFoundError as e:
+        # 讀取 system prompt
+        system_prompt = ""
+        if SYSTEM_PROMPT_PATH.exists():
+            system_prompt = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        else:
             history.status = "error"
-            history.interpretation = f"錯誤：{str(e)}"
+            history.interpretation = "錯誤：找不到 System Prompt 檔案"
             db.commit()
             return
 
-        # 構建 User Prompt（根據牌陣類型）
+        # 解析 chart_data
         try:
+            chart_data = json.loads(history.chart_data)
             cards = chart_data.get("cards", [])
-            
-            if spread_type == "single":
-                # 單抽牌
-                card = cards[0]
-                user_prompt = f"""
-User Question: {history.question}
+        except Exception as e:
+            history.status = "error"
+            history.interpretation = f"錯誤：資料解析失敗 - {str(e)}"
+            db.commit()
+            return
 
-Card Drawn: {card['name_cn']} ({card['name']}) {'(Reversed)' if card.get('reversed') else '(Upright)'}
+        # 構建 User Prompt
+        # 這裡使用 f-string 構建 prompt，將卡牌資訊填入
+        card_1 = next((c for c in cards if c["position"] == "past"), cards[0])
+        card_2 = next((c for c in cards if c["position"] == "present"), cards[1])
+        card_3 = next((c for c in cards if c["position"] == "future"), cards[2])
 
-Please interpret this single card reading.
-"""
-            elif spread_type == "three_card":
-                # 三牌陣
-                card_1 = next((c for c in cards if c["position"] == "past"), cards[0])
-                card_2 = next((c for c in cards if c["position"] == "present"), cards[1])
-                card_3 = next((c for c in cards if c["position"] == "future"), cards[2])
-
-                user_prompt = f"""
+        user_prompt = f"""
 User Question: {history.question}
 
 Cards Drawn:
-1. Past: {card_1['name_cn']} ({card_1['name']}) {'(Reversed)' if card_1.get('reversed') else '(Upright)'}
-2. Present: {card_2['name_cn']} ({card_2['name']}) {'(Reversed)' if card_2.get('reversed') else '(Upright)'}
-3. Future: {card_3['name_cn']} ({card_3['name']}) {'(Reversed)' if card_3.get('reversed') else '(Upright)'}
+1. Past: {card_1['name_cn']} ({card_1['name']}) {'(Reversed)' if card_1.get('reversed') else ''}
+2. Present: {card_2['name_cn']} ({card_2['name']}) {'(Reversed)' if card_2.get('reversed') else ''}
+3. Future: {card_3['name_cn']} ({card_3['name']}) {'(Reversed)' if card_3.get('reversed') else ''}
 
-Please interpret this three-card spread.
+Please interpret this spread.
 """
-            elif spread_type == "celtic_cross":
-                # 凱爾特十字（10 張牌）
-                position_names = ["The Heart", "The Challenge", "Conscious", "Foundation", "Recent Past", 
-                                "Near Future", "Your Attitude", "External", "Hopes & Fears", "Outcome"]
-                
-                cards_text = "\n".join([
-                    f"{i+1}. {position_names[i]}: {c['name_cn']} ({c['name']}) {'(Reversed)' if c.get('reversed') else '(Upright)'}"
-                    for i, c in enumerate(cards[:10])
-                ])
-                
-                user_prompt = f"""
-User Question: {history.question}
-
-Celtic Cross Spread:
-{cards_text}
-
-Please interpret this Celtic Cross spread.
-"""
-            else:
-                raise ValueError(f"不支援的牌陣類型：{spread_type}")
-                
-        except Exception as e:
-            history.status = "error"
-            history.interpretation = f"錯誤：User Prompt 構建失敗 - {str(e)}"
-            db.commit()
-            return
 
         # 呼叫 AI
         try:
@@ -207,18 +160,13 @@ async def create_tarot_divination(
 ):
     """建立塔羅占卜"""
     
-    # 牌陣類型名稱映射
-    spread_names = {
-        "three_card": "三牌陣",
-        "single": "單抽牌",
-        "celtic_cross": "凱爾特十字"
-    }
-    
     # 準備 chart_data
     chart_data = {
-        "spread": request.spread_type,
-        "spread_name": spread_names.get(request.spread_type, "未知牌陣"),
+        "spread": "three_card",
         "cards": [card.dict() for card in request.cards],
+        # 為了相容前端顯示，可能需要一些額外欄位，或者前端要改
+        "benguaming": "塔羅牌", # Placeholder for history list view
+        "bianguaming": "三牌陣" # Placeholder for history list view
     }
     
     # 建立歷史紀錄

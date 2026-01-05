@@ -806,11 +806,11 @@ export default function LiuYaoPage() {
                       {/* Raw Data Content */}
                       <details className="bg-gray-800/50 rounded-lg border border-gray-700">
                         <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
-                          <span className="text-lg">📊</span>
-                          <span>原始卦象數據（點擊展開）</span>
+                          <span className="text-lg">☯</span>
+                          <span>完整卦象盤面（點擊展開）</span>
                         </summary>
-                        <div className="px-4 pb-4 text-gray-400 text-xs whitespace-pre-wrap border-t border-gray-700 pt-3 font-mono overflow-x-auto">
-                          {JSON.stringify(result.chart_data, null, 2)}
+                        <div className="px-4 pb-4 text-gray-300 text-sm whitespace-pre-wrap border-t border-gray-700 pt-3 leading-relaxed">
+                          {result.chart_data.formatted || JSON.stringify(result.chart_data, null, 2)}
                         </div>
                       </details>
 
