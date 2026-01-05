@@ -8,7 +8,18 @@
 
 ## ✨ 功能特色
 
+### 占卜系統
 - 🔮 **六爻占卜**：傳統易經六爻排盤 + AI 智慧解讀
+  - 逼真的擲幣動畫與視覺效果
+  - 完整的卦象排盤與變卦分析
+- 🃏 **塔羅占卜**：含 78 張塔羅牌的完整牌組 + AI 專業解讀
+  - **單張牌陣**：快速洞察當前狀況
+  - **三張牌陣**：探索過去、現在、未來
+  - **凱爾特十字牌陣**：深度分析複雜問題（10張牌）
+  - 精美的牌卡圖像與翻牌動畫
+  - 支援正逆位解讀
+
+### AI 與系統功能
 - 🤖 **多 AI 支援**：支援 Google Gemini 和本地 AI（LM Studio、Ollama 等 OpenAI 兼容 API）
 - 📜 **歷史紀錄**：完整保存占卜紀錄，支援 Markdown 渲染
 - 🧠 **思考過程**：展示 AI 思考過程（可摺疊），了解解盤邏輯
@@ -88,7 +99,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 3. 登入後前往**設定頁面**配置 AI 服務：
    - **Gemini**：填入你的 Google AI API Key
    - **Local AI**：填入本地 AI 服務的 URL 和模型名稱
-4. 回到首頁，開始**六爻占卜**！
+4. 回到首頁，選擇你想要的占卜方式：
+   - **六爻占卜**：傳統易經占卜，適合重大決策
+   - **塔羅占卜**：靈性指引，適合自我探索與問題洞察
 
 ## �� 目錄結構
 
@@ -98,7 +111,8 @@ AI-Divination/
 │   ├── app/
 │   │   ├── api/               # API 路由
 │   │   │   ├── auth.py        # 認證 API
-│   │   │   ├── divination.py  # 占卜 API
+│   │   │   ├── divination.py  # 六爻占卜 API
+│   │   │   ├── tarot.py       # 塔羅占卜 API
 │   │   │   ├── history.py     # 歷史紀錄 API
 │   │   │   ├── settings.py    # 設定 API
 │   │   │   └── admin.py       # 管理員 API
@@ -109,17 +123,27 @@ AI-Divination/
 │   │   │   └── liuyao.py      # 六爻排盤
 │   │   └── utils/             # 工具函數
 │   ├── prompts/               # AI Prompt 模板
+│   │   ├── system_prompt.md   # 六爻占卜 Prompt
+│   │   ├── tarot_system_prompt_single.md       # 單張牌 Prompt
+│   │   ├── tarot_system_prompt_three_card.md   # 三張牌 Prompt
+│   │   └── tarot_system_prompt_celtic_cross.md # 凱爾特十字 Prompt
 │   └── requirements.txt       # Python 依賴
 ├── frontend/                   # 前端 (Next.js)
+│   ├── public/
+│   │   └── tarot-cards/       # 78 張塔羅牌圖片
 │   └── src/
 │       ├── app/               # 頁面
 │       │   ├── page.tsx       # 首頁
 │       │   ├── login/         # 登入頁
 │       │   ├── liuyao/        # 六爻占卜頁
+│       │   ├── tarot/         # 塔羅占卜頁
 │       │   ├── history/       # 歷史紀錄頁
 │       │   └── settings/      # 設定頁
+│       ├── components/
+│       │   └── CoinTossing.tsx # 六爻擲幣動畫
 │       └── lib/
-│           └── markdown.ts    # Markdown 解析
+│           ├── markdown.ts    # Markdown 解析
+│           └── tarot-data.ts  # 塔羅牌資料
 ├── docs/                       # 文檔
 ├── _legacy_backup/             # 舊版備份 (v1-v4)
 ├── start.sh                    # 啟動腳本
@@ -143,13 +167,26 @@ AI-Divination/
 ### 環境變數（可選）
 
 創建 `.env` 文件：
+### v5.1 (2026-01-05)
+- ✨ **塔羅占卜功能上線**：完整的 78 張塔羅牌系統
+  - 單張牌陣：適合每日指引
+  - 三張牌陣：過去-現在-未來分析
+  - 凱爾特十字牌陣：10 張牌深度解讀
+  - 精美的翻牌動畫與視覺效果
+  - 支援正逆位解讀
+- ✨ 針對不同牌陣優化的專屬 AI Prompt
+- ✨ 塔羅占卜歷史紀錄整合
+- 🐛 優化 AI 解盤時序，提前提交後端處理
+- 🐛 修復塔羅頁面 AI 切換器點擊問題
 
-```env
-# JWT 密鑰（可選，預設自動生成）
-JWT_SECRET_KEY=your-secret-key
-
-# 資料庫路徑（可選）
-DATABASE_URL=sqlite:///./divination.db
+### v5.0 (2025-12-29)
+- 🔄 完全重構前後端架構
+- ✨ 新增 AI 配置編輯功能
+- ✨ 新增占卜頁面 AI 切換器
+- ✨ 新增 AI 思考過程摺疊顯示
+- ✨ 新增 5 分鐘超時保護
+- ✨ 新增取消占卜功能
+- ✨ 新增六爻擲幣 3D 動畫效果=sqlite:///./divination.db
 ```
 
 ## �� 版本歷史
@@ -160,15 +197,28 @@ DATABASE_URL=sqlite:///./divination.db
 - ✨ 新增占卜頁面 AI 切換器
 - ✨ 新增 AI 思考過程摺疊顯示
 - ✨ 新增 5 分鐘超時保護
-- ✨ 新增取消占卜功能
-- 🐛 修復 Markdown 解析問題（處理 code block 包裝）
-- 🐛 修復登入頁面圖標重疊問題
-- 🔧 使用 uv 管理 Python 環境
-- 🔧 改進 start.sh 腳本（支援多種命令）
+### 已完成功能 ✅
+- [x] 六爻占卜核心功能
+- [x] 塔羅占卜系統（78 張完整牌組）
+  - [x] 單張牌陣
+  - [x] 三張牌陣
+  - [x] 凱爾特十字牌陣（10張）
+- [x] 用戶認證系統
+- [x] AI 服務整合（Gemini + Local）
+- [x] 歷史紀錄 + Markdown 渲染
+- [x] AI 思考過程顯示
+- [x] 3D 擲幣動畫
 
-### v4.0 (之前版本)
-- 基礎六爻占卜功能
-- 用戶認證系統
+### 規劃中功能 🚀
+- [ ] 更多塔羅牌陣類型
+  - [ ] 時間之流（時間線分析）
+  - [ ] 關係牌陣（雙人關係）
+  - [ ] 決策牌陣（選擇指引）
+- [ ] 紫微斗數 (Coming Soon)
+- [ ] 八字命盤 (Coming Soon)
+- [ ] 流年運勢 (Coming Soon)
+- [ ] Docker 部署支援
+- [ ] 占卜結果分享功能
 - AI 服務整合
 
 ## 🗺️ 開發計劃
