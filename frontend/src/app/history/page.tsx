@@ -15,6 +15,11 @@ import {
   User,
   Filter,
   Users,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  Calendar,
+  BarChart3,
 } from 'lucide-react';
 
 interface HistoryItem {
@@ -53,6 +58,13 @@ interface UserInfo {
   role: string;
 }
 
+interface Statistics {
+  total_count: number;
+  today_count: number;
+  last_7_days_most_used_type: string;
+  last_7_days_type_counts: Record<string, number>;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserInfo | null>(null);
@@ -60,6 +72,15 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [htmlContents, setHtmlContents] = useState<Record<number, { mainHtml: string; thinkContent: string }>>({});
+
+  // 分頁相關
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 20;
+
+  // 統計資訊
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
 
   // Admin 篩選功能
   const [allUsers, setAllUsers] = useState<UserInfo[]>([]);
@@ -73,11 +94,13 @@ export default function HistoryPage() {
   useEffect(() => {
     if (user) {
       fetchHistory();
+      // 始終獲取統計（包括 admin 查看其他用戶時）
+      fetchStatistics();
       if (user.role === 'admin') {
         fetchAllUsers();
       }
     }
-  }, [user, selectedUserId]);
+  }, [user, selectedUserId, currentPage]);
 
   // 點擊外部關閉下拉選單
   useEffect(() => {
@@ -134,16 +157,16 @@ export default function HistoryPage() {
     setLoading(true);
     const token = localStorage.getItem('token');
 
-    let endpoint = '/api/history';
+    let endpoint = `/api/history?page=${currentPage}&page_size=${pageSize}`;
 
     // Admin 用戶可以查看其他人的紀錄
     if (user?.role === 'admin') {
       if (selectedUserId === 0) {
         // 查看全部
-        endpoint = '/api/history/admin/all';
+        endpoint = `/api/history/admin/all?page=${currentPage}&page_size=${pageSize}`;
       } else if (selectedUserId !== null) {
         // 查看特定用戶
-        endpoint = `/api/history/admin/all?user_id=${selectedUserId}`;
+        endpoint = `/api/history/admin/all?user_id=${selectedUserId}&page=${currentPage}&page_size=${pageSize}`;
       }
       // selectedUserId === null 時查看自己的（使用預設 /api/history）
     }
@@ -155,11 +178,42 @@ export default function HistoryPage() {
       if (res.ok) {
         const data = await res.json();
         setHistory(data.items || []);
+        setTotalCount(data.total || 0);
+        setTotalPages(Math.ceil((data.total || 0) / pageSize));
       }
     } catch (err) {
       console.error('Fetch history error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStatistics = async () => {
+    const token = localStorage.getItem('token');
+    
+    // 根據當前篩選條件構建 endpoint
+    let endpoint = '/api/history/statistics';
+    if (user?.role === 'admin') {
+      if (selectedUserId === 0) {
+        // 查看全部用戶的統計
+        endpoint = '/api/history/statistics?user_id=0';
+      } else if (selectedUserId !== null) {
+        // 查看特定用戶的統計
+        endpoint = `/api/history/statistics?user_id=${selectedUserId}`;
+      }
+      // selectedUserId === null 時查看 admin 自己的統計（不帶參數）
+    }
+    
+    try {
+      const res = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStatistics(data);
+      }
+    } catch (err) {
+      console.error('Fetch statistics error:', err);
     }
   };
 
@@ -174,6 +228,8 @@ export default function HistoryPage() {
       });
       if (res.ok) {
         setHistory((prev) => prev.filter((item) => item.id !== id));
+        // 重新獲取統計資料
+        fetchStatistics();
       }
     } catch (err) {
       console.error('Delete error:', err);
@@ -297,6 +353,20 @@ export default function HistoryPage() {
     return types[type] || type;
   };
 
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleUserFilterChange = (userId: number | null) => {
+    setSelectedUserId(userId);
+    setCurrentPage(1); // 切換用戶時重置到第一頁
+    setShowUserFilter(false);
+    setStatistics(null); // 清空統計資料，等待重新加載
+  };
+
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       completed: 'bg-green-500/20 text-green-400',
@@ -358,10 +428,7 @@ export default function HistoryPage() {
                   <button
                     className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === null ? 'text-[var(--gold)]' : 'text-gray-300'
                       }`}
-                    onClick={() => {
-                      setSelectedUserId(null);
-                      setShowUserFilter(false);
-                    }}
+                    onClick={() => handleUserFilterChange(null)}
                   >
                     <User size={14} />
                     我的紀錄
@@ -372,10 +439,7 @@ export default function HistoryPage() {
                   <button
                     className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === 0 ? 'text-[var(--gold)]' : 'text-gray-300'
                       }`}
-                    onClick={() => {
-                      setSelectedUserId(0);
-                      setShowUserFilter(false);
-                    }}
+                    onClick={() => handleUserFilterChange(0)}
                   >
                     <Users size={14} />
                     全部用戶
@@ -393,10 +457,7 @@ export default function HistoryPage() {
                       key={u.id}
                       className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'
                         }`}
-                      onClick={() => {
-                        setSelectedUserId(u.id);
-                        setShowUserFilter(false);
-                      }}
+                      onClick={() => handleUserFilterChange(u.id)}
                     >
                       <User size={14} />
                       <span className="truncate">{u.username}</span>
@@ -424,6 +485,74 @@ export default function HistoryPage() {
 
       {/* 主內容 */}
       <main className="max-w-4xl mx-auto px-4 py-6">
+        {/* 統計卡片 - 始終顯示統計資訊 */}
+        {statistics && (
+          <div className="mb-6">
+            {/* 統計標題 - 顯示當前查看的統計範圍 */}
+            {user?.role === 'admin' && selectedUserId !== null && (
+              <div className="mb-3 flex items-center gap-2 text-sm text-gray-400">
+                <BarChart3 size={16} />
+                <span>
+                  {selectedUserId === 0 
+                    ? '所有用戶統計' 
+                    : `用戶 ${allUsers.find(u => u.id === selectedUserId)?.username || '未知'} 的統計`}
+                </span>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* 總計數 */}
+              <div className="glass-card p-4 flex items-center gap-3 hover:border-[var(--gold)]/30 transition-all">
+                <div className="p-2.5 bg-[var(--gold)]/10 text-[var(--gold)] rounded-lg shrink-0">
+                  <TrendingUp size={20} />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 mb-0.5">歷史總計</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-bold text-gray-200">
+                      {statistics.total_count}
+                    </span>
+                    <span className="text-xs text-gray-500">次</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 今日計數 */}
+              <div className="glass-card p-4 flex items-center gap-3 hover:border-blue-500/30 transition-all">
+                <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg shrink-0">
+                  <Calendar size={20} />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 mb-0.5">今日占卜</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-bold text-gray-200">
+                      {statistics.today_count}
+                    </span>
+                    <span className="text-xs text-gray-500">次</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 最常用類型 */}
+              <div className="glass-card p-4 flex items-center gap-3 hover:border-purple-500/30 transition-all">
+                <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-lg shrink-0">
+                  <BarChart3 size={20} />
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 mb-0.5">近期偏好 (7天)</div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-base font-bold text-gray-200 truncate max-w-[100px]" title={getDivinationTypeName(statistics.last_7_days_most_used_type)}>
+                      {getDivinationTypeName(statistics.last_7_days_most_used_type)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {statistics.last_7_days_type_counts[statistics.last_7_days_most_used_type] || 0}次
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-12">
             <div className="text-4xl mb-4 animate-spin-slow">☯</div>
@@ -613,6 +742,75 @@ export default function HistoryPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 分頁控制 */}
+        {!loading && history.length > 0 && (
+          <div className="glass-card p-4 mt-6 flex items-center justify-between">
+            <div className="text-sm text-gray-400">
+              顯示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalCount)} / 共 {totalCount} 筆
+            </div>
+            
+            {totalPages > 1 ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`p-2 rounded-lg border transition ${
+                  currentPage === 1
+                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                }`}
+              >
+                <ChevronLeft size={20} />
+              </button>
+
+              {/* 頁碼按鈕 */}
+              <div className="flex gap-2">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`w-10 h-10 rounded-lg border transition ${
+                        currentPage === pageNum
+                          ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)] font-bold'
+                          : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`p-2 rounded-lg border transition ${
+                  currentPage === totalPages
+                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                }`}
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+            ) : (
+              <div className="text-sm text-gray-500">第 1 頁，共 1 頁</div>
+            )}
           </div>
         )}
       </main>

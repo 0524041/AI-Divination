@@ -4,9 +4,10 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.database import get_db
 from app.models.user import User
@@ -40,6 +41,14 @@ class HistoryListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class StatisticsResponse(BaseModel):
+    """統計資訊回應"""
+    total_count: int
+    today_count: int
+    last_7_days_most_used_type: str
+    last_7_days_type_counts: dict
 
 
 # ========== Endpoints ==========
@@ -77,6 +86,134 @@ def get_history(
                 created_at=item.created_at
             )
             for item in items
+        ],
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
+@router.get("/statistics", response_model=StatisticsResponse)
+def get_statistics(
+    user_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """取得統計資訊
+    - 普通用戶：只能查看自己的統計
+    - Admin 用戶：可以查看指定用戶或所有用戶的統計
+    - user_id=None: 查看自己的統計（或 admin 自己的）
+    - user_id=0: 查看所有用戶的統計（僅 admin）
+    - user_id=specific_id: 查看指定用戶的統計（僅 admin）
+    """
+    # 確定要查詢的用戶
+    target_user_id = None
+    query_all_users = False
+    
+    if user_id is not None:
+        # 只有 admin 可以查看其他用戶的統計
+        if current_user.role != 'admin':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="無權限查看其他用戶的統計"
+            )
+        if user_id == 0:
+            # 查看所有用戶
+            query_all_users = True
+        else:
+            # 查看指定用戶
+            target_user_id = user_id
+    else:
+        # 查看自己的統計
+        target_user_id = current_user.id
+    
+    # 總計數
+    if query_all_users:
+        total_count = db.query(History).count()
+    else:
+        total_count = db.query(History).filter(History.user_id == target_user_id).count()
+    
+    # 今天的計數
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    if query_all_users:
+        today_count = db.query(History).filter(History.created_at >= today_start).count()
+    else:
+        today_count = db.query(History).filter(
+            History.user_id == target_user_id,
+            History.created_at >= today_start
+        ).count()
+    
+    # 最近7天的類型統計
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    if query_all_users:
+        type_counts = db.query(
+            History.divination_type,
+            func.count(History.id).label('count')
+        ).filter(
+            History.created_at >= seven_days_ago
+        ).group_by(History.divination_type).all()
+    else:
+        type_counts = db.query(
+            History.divination_type,
+            func.count(History.id).label('count')
+        ).filter(
+            History.user_id == target_user_id,
+            History.created_at >= seven_days_ago
+        ).group_by(History.divination_type).all()
+    
+    # 轉換為字典
+    type_counts_dict = {t[0]: t[1] for t in type_counts}
+    
+    # 找出最常使用的類型
+    most_used_type = max(type_counts_dict.items(), key=lambda x: x[1])[0] if type_counts_dict else "無"
+    
+    return StatisticsResponse(
+        total_count=total_count,
+        today_count=today_count,
+        last_7_days_most_used_type=most_used_type,
+        last_7_days_type_counts=type_counts_dict
+    )
+
+
+# ========== Admin Endpoints ==========
+
+@router.get("/admin/all", response_model=HistoryListResponse)
+def get_all_history(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: Optional[int] = None,
+    divination_type: Optional[str] = None,
+    admin_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Admin 取得所有用戶的歷史紀錄"""
+    query = db.query(History, User).join(User, History.user_id == User.id)
+    
+    if user_id:
+        query = query.filter(History.user_id == user_id)
+    if divination_type:
+        query = query.filter(History.divination_type == divination_type)
+    
+    total = query.count()
+    results = query.order_by(History.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    
+    return HistoryListResponse(
+        items=[
+            HistoryItem(
+                id=history.id,
+                divination_type=history.divination_type,
+                question=history.question,
+                gender=history.gender,
+                target=history.target,
+                chart_data=json.loads(history.chart_data),
+                interpretation=history.interpretation,
+                ai_provider=history.ai_provider,
+                ai_model=history.ai_model,
+                status=history.status,
+                created_at=history.created_at,
+                username=user.username
+            )
+            for history, user in results
         ],
         total=total,
         page=page,
@@ -139,49 +276,3 @@ def delete_history_item(
     db.commit()
     
     return {"message": "已刪除"}
-
-
-# ========== Admin Endpoints ==========
-
-@router.get("/admin/all", response_model=HistoryListResponse)
-def get_all_history(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    user_id: Optional[int] = None,
-    divination_type: Optional[str] = None,
-    admin_user: User = Depends(get_admin_user),
-    db: Session = Depends(get_db)
-):
-    """Admin 取得所有用戶的歷史紀錄"""
-    query = db.query(History, User).join(User, History.user_id == User.id)
-    
-    if user_id:
-        query = query.filter(History.user_id == user_id)
-    if divination_type:
-        query = query.filter(History.divination_type == divination_type)
-    
-    total = query.count()
-    results = query.order_by(History.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
-    
-    return HistoryListResponse(
-        items=[
-            HistoryItem(
-                id=history.id,
-                divination_type=history.divination_type,
-                question=history.question,
-                gender=history.gender,
-                target=history.target,
-                chart_data=json.loads(history.chart_data),
-                interpretation=history.interpretation,
-                ai_provider=history.ai_provider,
-                ai_model=history.ai_model,
-                status=history.status,
-                created_at=history.created_at,
-                username=user.username
-            )
-            for history, user in results
-        ],
-        total=total,
-        page=page,
-        page_size=page_size
-    )
