@@ -736,48 +736,51 @@ export default function TarotPage() {
               </div>
             </div>
 
-            {/* Selected Cards Bar - Fixed Bottom */}
-            <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0a]/90 backdrop-blur-xl border-t border-[var(--gold)]/30 pb-6 pt-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-              <div className="max-w-5xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
+            {/* Selected Cards Bar - Fixed Bottom - Optimized for Zoom/Responsive */}
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-[var(--gold)]/30 pb-2 pt-2 md:pb-4 md:pt-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all duration-300">
+              <div className="w-full max-w-[98%] 2xl:max-w-[1800px] mx-auto px-2 md:px-6 flex flex-row items-center justify-between gap-4">
                 
-                {/* Selected Cards Slots */}
-                <div className="flex gap-4 md:gap-8">
-                  {Array.from({ length: getCurrentSpreadConfig().cardCount }, (_, i) => {
-                    const card = selectedCards[i];
-                    return (
-                      <div key={i} className="relative group">
-                        <div className={`
-                          w-20 h-32 md:w-24 md:h-36 rounded-lg border-2 border-dashed transition-all duration-300 flex items-center justify-center
-                          ${card ? 'border-transparent' : 'border-gray-700 bg-gray-800/30'}
-                        `}>
-                          {card ? (
-                            <div className="w-full h-full animate-deal relative">
-                              <CardBack className="w-full h-full border-[var(--gold)] shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
-                              <button 
-                                onClick={() => handleSelectCard(card)}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg hover:bg-red-600 transition opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-gray-600 font-bold text-2xl">{i + 1}</span>
-                          )}
+                {/* Selected Cards Slots - Scrollable Area with Centering */}
+                <div className="flex-1 overflow-x-auto custom-scrollbar flex items-center justify-start xl:justify-center px-1">
+                  <div className="flex gap-2 md:gap-4 flex-nowrap min-w-max py-2 px-1">
+                    {Array.from({ length: getCurrentSpreadConfig().cardCount }, (_, i) => {
+                      const card = selectedCards[i];
+                      return (
+                        <div key={i} className="relative group flex-shrink-0">
+                          <div className={`
+                            w-16 h-24 sm:w-20 sm:h-32 md:w-24 md:h-36 rounded-lg border-2 border-dashed transition-all duration-300 flex items-center justify-center
+                            ${card ? 'border-transparent' : 'border-gray-700 bg-gray-800/30'}
+                          `}>
+                            {card ? (
+                              <div className="w-full h-full animate-deal relative">
+                                <CardBack className="w-full h-full border-[var(--gold)] shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
+                                <button 
+                                  onClick={() => handleSelectCard(card)}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg hover:bg-red-600 transition opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 z-10"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-gray-600 font-bold text-xl md:text-2xl">{i + 1}</span>
+                            )}
+                          </div>
+                          <div className="text-center text-[10px] md:text-xs text-[var(--gold)] mt-1 md:mt-2 font-medium uppercase tracking-widest truncate max-w-[64px] sm:max-w-[80px] md:max-w-[96px]">
+                            {getPositionLabel(i)}
+                          </div>
                         </div>
-                        <div className="text-center text-[10px] md:text-xs text-[var(--gold)] mt-2 font-medium uppercase tracking-widest">
-                          {getPositionLabel(i)}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-row items-center gap-4">
+                {/* Actions - Fixed Right, non-shrinking */}
+                <div className="flex-shrink-0 flex flex-row items-center gap-2 md:gap-4 pl-2 md:pl-6 border-l border-gray-800/50">
                   {reshuffleCount < 3 && selectedCards.length === 0 && (
                     <button 
                       onClick={handleReshuffle}
-                      className="px-6 py-3 rounded-xl border border-gray-700 text-gray-400 hover:text-[var(--gold)] hover:border-[var(--gold)] transition flex items-center gap-2"
+                      className="p-3 md:px-6 md:py-3 rounded-xl border border-gray-700 text-gray-400 hover:text-[var(--gold)] hover:border-[var(--gold)] transition flex items-center gap-2 whitespace-nowrap"
+                      title="重新洗牌"
                     >
                       <RotateCcw size={18} />
                       <span className="hidden md:inline">重新洗牌</span>
@@ -788,14 +791,15 @@ export default function TarotPage() {
                     onClick={confirmSelection}
                     disabled={selectedCards.length !== getCurrentSpreadConfig().cardCount}
                     className={`
-                      px-10 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-all duration-300
+                      px-6 py-3 md:px-10 md:py-4 rounded-xl font-bold text-base md:text-lg flex items-center gap-2 md:gap-3 transition-all duration-300 whitespace-nowrap
                       ${selectedCards.length === getCurrentSpreadConfig().cardCount
                         ? 'bg-gradient-to-r from-[var(--gold)] to-[var(--gold-dark)] text-black hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.4)]'
                         : 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-700'}
                     `}
                   >
-                    <Check size={24} />
-                    確認牌陣
+                    <Check size={20} className="md:w-6 md:h-6" />
+                    <span className="hidden sm:inline">確認牌陣</span>
+                    <span className="sm:hidden">確認</span>
                   </button>
                 </div>
               </div>
