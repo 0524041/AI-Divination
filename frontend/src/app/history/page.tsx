@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { parseMarkdown } from '@/lib/markdown';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -315,7 +316,6 @@ export default function HistoryPage() {
     // 渲染 Markdown
     if (item.interpretation && !htmlContents[item.id]) {
       try {
-        const { parseMarkdown } = await import('@/lib/markdown');
         const result = await parseMarkdown(item.interpretation);
         setHtmlContents((prev) => ({ ...prev, [item.id]: result }));
       } catch (err) {

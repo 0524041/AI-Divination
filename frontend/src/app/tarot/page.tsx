@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { parseMarkdown } from '@/lib/markdown';
 import { ArrowLeft, History, Sparkles, RotateCcw, Play, Check, ChevronDown, Bot, Settings, Copy, Loader2, X, Eye } from 'lucide-react';
 import { TAROT_CARDS, TarotCardData } from '@/lib/tarot-data';
 
@@ -353,7 +354,6 @@ export default function TarotPage() {
           
           // 解析 Markdown
           try {
-            const { parseMarkdown } = await import('@/lib/markdown');
             const result = await parseMarkdown(data.interpretation);
             setHtmlContent(result);
           } catch (err) {
@@ -393,7 +393,6 @@ export default function TarotPage() {
             
             // 解析 Markdown
             try {
-              const { parseMarkdown } = await import('@/lib/markdown');
               const result = await parseMarkdown(data.interpretation);
               setHtmlContent(result);
             } catch (err) {
