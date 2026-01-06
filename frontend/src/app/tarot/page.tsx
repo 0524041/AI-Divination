@@ -436,12 +436,13 @@ export default function TarotPage() {
   };
 
   const handleCopy = async () => {
-
+    // 使用正確的牌陣位置標籤
     const cardText = selectedCards.map((c, i) => 
-      `${i === 0 ? '過去' : i === 1 ? '現在' : '未來'}: ${c.name_cn} (${c.name})`
+      `${getPositionLabel(i)}: ${c.name_cn} (${c.name})`
     ).join('\n');
     
-    const markdownText = `## 問題\n${question}\n\n## 牌陣\n${cardText}\n\n## 解盤\n${interpretation}`;
+    const spreadName = getCurrentSpreadConfig().name;
+    const markdownText = `## 問題\n${question}\n\n## 牌陣類型\n${spreadName}\n\n## 抽到的牌\n${cardText}\n\n## AI 解盤\n${interpretation}`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
