@@ -3,6 +3,7 @@ export interface TarotCardData {
   name: string;
   name_cn: string;
   image: string;
+  reversed?: boolean;
 }
 
 export const TAROT_CARDS: TarotCardData[] = [

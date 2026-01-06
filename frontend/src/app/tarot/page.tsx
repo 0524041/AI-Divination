@@ -57,14 +57,16 @@ const TarotCard = ({ card, isRevealed, onClick, positionLabel, size = "normal" }
       <div className={`relative w-full aspect-[2/3] transition-all duration-700 transform-style-3d ${isRevealed ? 'rotate-y-0' : 'rotate-y-180'}`}>
         {/* Front (Image) */}
         <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-0 rounded-lg overflow-hidden border-2 border-[var(--gold)] shadow-[0_0_20px_rgba(212,175,55,0.2)] bg-black">
-          <img 
-            src={`/tarot-cards/${card.image}`} 
-            alt={card.name} 
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pb-2 px-2 text-center">
-            <div className="text-white font-bold text-lg tracking-wide">{card.name_cn}</div>
-            <div className="text-[var(--gold)] text-xs uppercase tracking-wider opacity-80">{card.name}</div>
+          <div className={`w-full h-full h-full relative ${card.reversed ? 'rotate-180' : ''}`}>
+            <img 
+              src={`/tarot-cards/${card.image}`} 
+              alt={card.name} 
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pb-2 px-2 text-center">
+              <div className="text-white font-bold text-lg tracking-wide">{card.name_cn}</div>
+              <div className="text-[var(--gold)] text-xs uppercase tracking-wider opacity-80">{card.name}</div>
+            </div>
           </div>
         </div>
         
@@ -230,7 +232,7 @@ export default function TarotPage() {
         name: card.name,
         name_cn: card.name_cn,
         image: card.image,
-        reversed: false, // 暫時不實作逆位
+        reversed: card.reversed || false,
         position: getCardPosition(index)
       }));
 
@@ -295,7 +297,12 @@ export default function TarotPage() {
   };
 
   const performShuffle = () => {
-    const deck = [...TAROT_CARDS];
+    // 複製並為每張牌隨機分配正逆位
+    const deck = TAROT_CARDS.map(card => ({
+      ...card,
+      reversed: Math.random() < 0.5
+    }));
+    
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
