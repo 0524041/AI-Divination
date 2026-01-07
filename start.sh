@@ -117,8 +117,32 @@ clean_cache() {
 stop_services() {
     echo -e "\n${YELLOW}[停止] 正在停止所有服務...${NC}"
     
+    # 停止後端
     pkill -f "uvicorn app.main:app" 2>/dev/null && echo -e "${GREEN}✓ 後端服務已停止${NC}" || echo -e "${CYAN}ℹ 後端服務未運行${NC}"
-    pkill -f "next-server\|next dev\|next start" 2>/dev/null && echo -e "${GREEN}✓ 前端服務已停止${NC}" || echo -e "${CYAN}ℹ 前端服務未運行${NC}"
+    
+    # 停止前端 - 更徹底的方式
+    # 1. 先嘗試 pkill
+    pkill -f "next-server" 2>/dev/null
+    pkill -f "next dev" 2>/dev/null
+    pkill -f "next start" 2>/dev/null
+    
+    # 2. 檢查是否還有進程在運行
+    sleep 1
+    if pgrep -f "next-server|next dev|next start" > /dev/null; then
+        echo -e "${YELLOW}⚠ 前端進程未完全停止，強制終止...${NC}"
+        pkill -9 -f "next-server" 2>/dev/null
+        pkill -9 -f "next dev" 2>/dev/null
+        pkill -9 -f "next start" 2>/dev/null
+        sleep 1
+    fi
+    
+    # 3. 確認停止
+    if pgrep -f "next-server|next dev|next start" > /dev/null; then
+        echo -e "${RED}✗ 前端服務停止失敗${NC}"
+        echo -e "${YELLOW}請手動執行: killall -9 node${NC}"
+    else
+        echo -e "${GREEN}✓ 前端服務已停止${NC}"
+    fi
     
     echo -e "${GREEN}✓ 服務停止完成${NC}"
 }
@@ -376,11 +400,28 @@ install_frontend_deps() {
 start_services() {
     echo -e "\n${YELLOW}[7/7] 啟動服務...${NC}"
     
-    # 停止已存在的服務
-    pkill -f "uvicorn app.main:app" 2>/dev/null || true
-    pkill -f "next dev" 2>/dev/null || true
+    # 確保沒有殘留的進程
+    echo "清理殘留進程..."
+    pkill -9 -f "uvicorn app.main:app" 2>/dev/null || true
+    pkill -9 -f "next-server" 2>/dev/null || true
+    pkill -9 -f "next dev" 2>/dev/null || true
+    pkill -9 -f "next start" 2>/dev/null || true
     
-    sleep 1
+    # 等待端口釋放
+    sleep 2
+    
+    # 檢查端口是否已釋放
+    if lsof -ti:3000 > /dev/null 2>&1; then
+        echo -e "${RED}✗ 端口 3000 仍被占用，嘗試強制釋放...${NC}"
+        kill -9 $(lsof -ti:3000) 2>/dev/null || true
+        sleep 1
+    fi
+    
+    if lsof -ti:8000 > /dev/null 2>&1; then
+        echo -e "${RED}✗ 端口 8000 仍被占用，嘗試強制釋放...${NC}"
+        kill -9 $(lsof -ti:8000) 2>/dev/null || true
+        sleep 1
+    fi
     
     # 啟動後端 (只監聽 localhost，透過 Next.js rewrites 代理訪問)
     echo "啟動後端服務 (Port 8000, localhost only)..."

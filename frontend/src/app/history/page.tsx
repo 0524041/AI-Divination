@@ -209,13 +209,18 @@ export default function HistoryPage() {
       // selectedUserId === null 時查看 admin 自己的統計（不帶參數）
     }
     
+    console.log('[History] Fetching statistics:', { endpoint, selectedUserId, role: user?.role });
+    
     try {
       const res = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
+        console.log('[History] Statistics received:', data);
         setStatistics(data);
+      } else {
+        console.error('[History] Statistics fetch failed:', res.status, res.statusText);
       }
     } catch (err) {
       console.error('Fetch statistics error:', err);
@@ -365,10 +370,11 @@ export default function HistoryPage() {
   };
 
   const handleUserFilterChange = (userId: number | null) => {
+    console.log('[History] User filter changed:', { from: selectedUserId, to: userId });
     setSelectedUserId(userId);
     setCurrentPage(1); // 切換用戶時重置到第一頁
     setShowUserFilter(false);
-    setStatistics(null); // 清空統計資料，等待重新加載
+    // 不需要清空統計資料，useEffect 會自動重新獲取
   };
 
   const getStatusBadge = (status: string) => {
