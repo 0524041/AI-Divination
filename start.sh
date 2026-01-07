@@ -384,10 +384,18 @@ start_services() {
     nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
     
-    # 啟動前端 (監聽所有網絡接口，接受外網連線)
+    # 啟動前端 (生產模式)
     echo "啟動前端服務 (Port 3000, 0.0.0.0)..."
     cd "$FRONTEND_DIR"
-    nohup npm run dev -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
+    
+    # 檢查是否需要構建
+    if [ ! -d ".next" ] || [ "$1" == "--rebuild" ]; then
+        echo "構建前端 (生產模式)..."
+        npm run build
+    fi
+    
+    # 啟動生產伺服器
+    nohup npm start -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
     
     sleep 3

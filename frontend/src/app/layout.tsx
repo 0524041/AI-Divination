@@ -1,5 +1,13 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { Noto_Serif_TC } from 'next/font/google';
+
+const notoSerifTC = Noto_Serif_TC({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  preload: true,
+});
 
 export const metadata: Metadata = {
   title: 'AI 算命 - 六爻占卜',
@@ -12,13 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-TW">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="zh-TW" className={notoSerifTC.className}>
       <body className="font-chinese antialiased">{children}</body>
     </html>
   );
