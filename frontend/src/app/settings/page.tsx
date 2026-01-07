@@ -52,9 +52,9 @@ export default function SettingsPage() {
   const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
   const [showAddAI, setShowAddAI] = useState(false);
   const [editingConfig, setEditingConfig] = useState<AIConfig | null>(null);
-  const [newAIProvider, setNewAIProvider] = useState<'gemini' | 'local'>('gemini');
+  const [newAIProvider, setNewAIProvider] = useState<'gemini' | 'openai' | 'local'>('gemini');
   const [newAPIKey, setNewAPIKey] = useState('');
-  const [newLocalURL, setNewLocalURL] = useState('http://localhost:11434');
+  const [newLocalURL, setNewLocalURL] = useState('');
   const [newLocalModel, setNewLocalModel] = useState('');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -182,19 +182,25 @@ export default function SettingsPage() {
     const token = localStorage.getItem('token');
     const body: Record<string, string> = { provider: newAIProvider };
 
-    if (newAIProvider === 'gemini') {
+    if (newAIProvider === 'gemini' || newAIProvider === 'openai') {
       if (!newAPIKey) {
         alert('請輸入 API Key');
         return;
       }
       body.api_key = newAPIKey;
+      if (newAIProvider === 'openai') {
+        body.local_model = newLocalModel || "gpt-5.1";
+      }
     } else {
       if (!newLocalURL || !newLocalModel) {
-        alert('請填寫 URL 和選擇模型');
+        alert('請填寫 URL 和模型名稱');
         return;
       }
       body.local_url = newLocalURL;
       body.local_model = newLocalModel;
+      if (newAPIKey) {
+        body.api_key = newAPIKey;
+      }
     }
 
     try {
@@ -222,12 +228,12 @@ export default function SettingsPage() {
 
   const handleEditAIConfig = (config: AIConfig) => {
     setEditingConfig(config);
-    setNewAIProvider(config.provider as 'gemini' | 'local');
+    setNewAIProvider(config.provider as 'gemini' | 'openai' | 'local');
     setNewAPIKey('');
     setNewLocalURL(config.local_url || '');
     setNewLocalModel(config.local_model || '');
-    if (config.local_url) {
-      // 自動測試連線以取得可用模型
+    if (config.local_url && config.provider === 'local') {
+      // 自動測試連線以取得可用模型 (僅限 Custom AI)
       handleTestConnectionForEdit(config.local_url);
     }
   };
@@ -262,17 +268,23 @@ export default function SettingsPage() {
     const token = localStorage.getItem('token');
     const body: Record<string, string> = { provider: newAIProvider };
 
-    if (newAIProvider === 'gemini') {
+    if (newAIProvider === 'gemini' || newAIProvider === 'openai') {
       if (newAPIKey) {
         body.api_key = newAPIKey;
       }
+      if (newAIProvider === 'openai' && newLocalModel) {
+        body.local_model = newLocalModel;
+      }
     } else {
       if (!newLocalURL || !newLocalModel) {
-        alert('請填寫 URL 和選擇模型');
+        alert('請填寫 URL 和模型名稱');
         return;
       }
       body.local_url = newLocalURL;
       body.local_model = newLocalModel;
+      if (newAPIKey) {
+        body.api_key = newAPIKey;
+      }
     }
 
     try {
@@ -563,16 +575,24 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-3">
                           {config.provider === 'gemini' ? (
                             <Key className="text-blue-400" size={20} />
+                          ) : config.provider === 'openai' ? (
+                            <Server className="text-purple-400" size={20} />
                           ) : (
                             <Server className="text-green-400" size={20} />
                           )}
                           <div>
                             <p className="font-medium">
-                              {config.provider === 'gemini' ? 'Google Gemini' : 'Local AI'}
+                              {config.provider === 'gemini' ? 'Google Gemini' :
+                                config.provider === 'openai' ? 'OpenAI' : '其他 AI 服務'}
                             </p>
                             {config.provider === 'local' && (
                               <p className="text-sm text-gray-500">
                                 {config.local_url} - {config.local_model}
+                              </p>
+                            )}
+                            {config.provider === 'openai' && (
+                              <p className="text-sm text-gray-500">
+                                Model: {config.local_model}
                               </p>
                             )}
                           </div>
@@ -628,33 +648,44 @@ export default function SettingsPage() {
                 {/* Provider 選擇 */}
                 <div className="mb-4">
                   <label className="block text-sm text-gray-400 mb-2">類型</label>
-                  <div className="flex gap-4">
+                  <div className="flex gap-2">
                     <button
-                      className={`flex-1 py-3 rounded-lg border transition ${newAIProvider === 'gemini'
+                      className={`flex-1 py-3 rounded-lg border transition text-sm ${newAIProvider === 'gemini'
                         ? 'border-[var(--gold)] bg-[var(--gold)]/20'
                         : 'border-gray-600 text-gray-400'
                         }`}
                       onClick={() => setNewAIProvider('gemini')}
                       disabled={!!editingConfig}
                     >
-                      <Key className="inline mr-2" size={18} />
+                      <Key className="inline mr-1" size={16} />
                       Gemini
                     </button>
                     <button
-                      className={`flex-1 py-3 rounded-lg border transition ${newAIProvider === 'local'
+                      className={`flex-1 py-3 rounded-lg border transition text-sm ${newAIProvider === 'openai'
+                        ? 'border-[var(--gold)] bg-[var(--gold)]/20'
+                        : 'border-gray-600 text-gray-400'
+                        }`}
+                      onClick={() => setNewAIProvider('openai')}
+                      disabled={!!editingConfig}
+                    >
+                      <Server className="inline mr-1" size={16} />
+                      OpenAI
+                    </button>
+                    <button
+                      className={`flex-1 py-3 rounded-lg border transition text-sm ${newAIProvider === 'local'
                         ? 'border-[var(--gold)] bg-[var(--gold)]/20'
                         : 'border-gray-600 text-gray-400'
                         }`}
                       onClick={() => setNewAIProvider('local')}
                       disabled={!!editingConfig}
                     >
-                      <Server className="inline mr-2" size={18} />
-                      Local AI
+                      <Server className="inline mr-1" size={16} />
+                      其他 AI
                     </button>
                   </div>
                 </div>
 
-                {newAIProvider === 'gemini' ? (
+                {newAIProvider === 'gemini' || newAIProvider === 'openai' ? (
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm text-gray-400 mb-2">
@@ -666,7 +697,7 @@ export default function SettingsPage() {
                           value={newAPIKey}
                           onChange={(e) => setNewAPIKey(e.target.value)}
                           className="input-dark w-full pr-10"
-                          placeholder={editingConfig ? '輸入新 API Key 或留空' : '輸入 Gemini API Key'}
+                          placeholder={editingConfig ? '輸入新 API Key 或留空' : `輸入 ${newAIProvider === 'gemini' ? 'Gemini' : 'OpenAI'} API Key`}
                         />
                         <button
                           type="button"
@@ -677,6 +708,23 @@ export default function SettingsPage() {
                         </button>
                       </div>
                     </div>
+                    {newAIProvider === 'openai' && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-yellow-500 text-sm mb-2">
+                        <p>⚠️ OpenAI 沒有提供免費AI Token 次數，請謹慎使用，使用需付費。</p>
+                      </div>
+                    )}
+                    {newAIProvider === 'openai' && (
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">模型 (預設 gpt-5.1)</label>
+                        <input
+                          type="text"
+                          value={newLocalModel}
+                          onChange={(e) => setNewLocalModel(e.target.value)}
+                          className="input-dark w-full"
+                          placeholder="gpt-5.1"
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -688,12 +736,12 @@ export default function SettingsPage() {
                           value={newLocalURL}
                           onChange={(e) => setNewLocalURL(e.target.value)}
                           className="input-dark flex-1"
-                          placeholder="http://localhost:11434"
+                          placeholder="請填寫服務商URL"
                         />
                         <button
                           onClick={handleTestConnection}
                           disabled={testingConnection || !newLocalURL}
-                          className="btn-gold flex items-center gap-1"
+                          className="btn-gold flex items-center gap-1 whitespace-nowrap"
                         >
                           {testingConnection ? (
                             <RefreshCw className="animate-spin" size={16} />
@@ -705,22 +753,45 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    {availableModels.length > 0 && (
-                      <div>
-                        <label className="block text-sm text-gray-400 mb-2">模型</label>
-                        <select
-                          value={newLocalModel}
-                          onChange={(e) => setNewLocalModel(e.target.value)}
-                          className="input-dark w-full"
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">
+                        API Key (選填)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showAPIKey ? 'text' : 'password'}
+                          value={newAPIKey}
+                          onChange={(e) => setNewAPIKey(e.target.value)}
+                          className="input-dark w-full pr-10"
+                          placeholder="若服務需要驗證請填寫"
+                        />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                          onClick={() => setShowAPIKey(!showAPIKey)}
                         >
-                          {availableModels.map((model) => (
-                            <option key={model} value={model}>
-                              {model}
-                            </option>
-                          ))}
-                        </select>
+                          {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
                       </div>
-                    )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-2">模型名稱</label>
+                      <input
+                        type="text"
+                        list="available-models"
+                        value={newLocalModel}
+                        onChange={(e) => setNewLocalModel(e.target.value)}
+                        className="input-dark w-full"
+                        placeholder="例如: llama3, qwen2.5:14b"
+                      />
+                      <datalist id="available-models">
+                        {availableModels.map((model) => (
+                          <option key={model} value={model} />
+                        ))}
+                      </datalist>
+                      <p className="text-xs text-gray-500 mt-1">可點擊上方「測試」按鈕自動取得模型列表，或直接手動輸入。</p>
+                    </div>
                   </div>
                 )}
 
