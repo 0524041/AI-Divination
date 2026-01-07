@@ -92,24 +92,18 @@ export default function HistoryPage() {
     checkAuth();
   }, []);
 
-  // 換頁或切換用戶時載入歷史
+  // 換頁或切換用戶時載入歷史和統計
   useEffect(() => {
     if (user) {
       fetchHistory();
+      fetchStatistics(); // 切換用戶時也更新統計資料
     }
   }, [user, selectedUserId, currentPage]);
 
-  // 統計和用戶列表只在初始載入時請求一次
+  // 用戶列表只在初始載入時請求一次
   useEffect(() => {
-    if (user) {
-      const loadInitialData = async () => {
-        const promises = [fetchStatistics()];
-        if (user.role === 'admin') {
-          promises.push(fetchAllUsers());
-        }
-        await Promise.all(promises);
-      };
-      loadInitialData();
+    if (user && user.role === 'admin') {
+      fetchAllUsers();
     }
   }, [user]);
 
