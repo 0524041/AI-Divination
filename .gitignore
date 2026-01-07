@@ -54,3 +54,7 @@ _legacy_backup/
 # Lock files (optional - uncomment if not needed in repo)
 # uv.lock
 # frontend/package-lock.json
+__pycache__
+*.pyc
+.venv
+node_modules

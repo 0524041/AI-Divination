@@ -42,12 +42,14 @@ show_help() {
     echo -e "  ${GREEN}--status${NC}        查看服務狀態"
     echo -e "  ${GREEN}--logs [-f]${NC}     查看服務日誌 (-f 可動態追蹤)"
     echo -e "  ${GREEN}--install${NC}       只安裝依賴，不啟動服務"
+    echo -e "  ${GREEN}--optimize-db${NC}   優化資料庫 (創建索引、ANALYZE、VACUUM)"
     echo -e "  ${GREEN}--help, -h${NC}      顯示此幫助信息"
     echo ""
     echo -e "${YELLOW}範例:${NC}"
     echo -e "  ./start.sh              # 啟動服務"
     echo -e "  ./start.sh --reset      # 重置資料庫後啟動"
     echo -e "  ./start.sh --clean-cache # 清理快取後啟動"
+    echo -e "  ./start.sh --optimize-db # 優化資料庫"
     echo -e "  ./start.sh --stop       # 停止服務"
     echo ""
 }
@@ -298,6 +300,34 @@ init_database() {
 }
 
 # ============================================
+# 優化資料庫
+# ============================================
+optimize_database() {
+    echo -e "\n${BLUE}============================================${NC}"
+    echo -e "${BLUE}       資料庫優化${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    
+    cd "$BACKEND_DIR"
+    
+    if [ ! -f "divination.db" ]; then
+        echo -e "${RED}✗ 找不到資料庫檔案${NC}"
+        echo -e "${YELLOW}請先啟動服務一次以創建資料庫${NC}"
+        exit 1
+    fi
+    
+    echo -e "${YELLOW}正在執行資料庫優化...${NC}\n"
+    
+    python3 optimize_db_simple.py all
+    
+    echo -e "\n${BLUE}============================================${NC}"
+    echo -e "${GREEN}✓ 資料庫優化完成！${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "${CYAN}建議: 如果資料庫較大，可額外執行 VACUUM:${NC}"
+    echo -e "  cd backend && python3 optimize_db_simple.py vacuum"
+    echo ""
+}
+
+# ============================================
 # 檢查 Node.js
 # ============================================
 check_nodejs() {
@@ -401,6 +431,10 @@ main() {
             --reset)
                 RESET_DB=true
                 shift
+                ;;
+            --optimize-db)
+                optimize_database
+                exit 0
                 ;;
             --clean-cache)
                 CLEAN_CACHE=true

@@ -1,6 +1,7 @@
 """
 FastAPI 主應用程式
 """
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -12,7 +13,15 @@ from app.api import (
     admin_router,
     tarot_router
 )
+from app.api.debug import router as debug_router
+from app.middleware.performance import PerformanceMiddleware
 from app.core.config import get_settings
+
+# 設定日誌
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 settings = get_settings()
 
@@ -24,6 +33,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# 性能監控 Middleware（必須在 CORS 之後）
+app.add_middleware(PerformanceMiddleware)
 
 # CORS 設定
 app.add_middleware(
@@ -41,6 +53,7 @@ app.include_router(divination_router)
 app.include_router(history_router)
 app.include_router(admin_router)
 app.include_router(tarot_router)
+app.include_router(debug_router)  # 除錯 API
 
 
 @app.get("/")
