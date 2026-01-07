@@ -200,6 +200,16 @@ export default function HomePage() {
       {/* 頁尾 */}
       <footer className="text-center py-8 text-gray-500 text-sm">
         <p>AI 算命 v2.0 - 結合傳統智慧與現代科技</p>
+        <p className="mt-2">
+          <a 
+            href="https://github.com/0524041/AI-Divination" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-[var(--gold)] hover:underline"
+          >
+            GitHub 專案原始碼
+          </a>
+        </p>
       </footer>
     </div>
   );

@@ -1,5 +1,7 @@
 # ☯ AI 算命網頁 v5.0
 
+🌐 **網站上線啦！歡迎大家測試：[https://akspace99.dpdns.org](https://akspace99.dpdns.org)**
+
 結合傳統易經智慧與現代 AI 技術的智能算命網站。透過六爻占卜排盤，搭配 AI 大師進行專業解讀。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
