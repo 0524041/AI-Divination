@@ -119,6 +119,26 @@ def check_rate_limit(
         )
 
 
+class RateLimitDep:
+    """
+    Rate Limit 依賴注入工廠
+    
+    使用方式:
+    @router.post("/login")
+    async def login(
+        request: Request,
+        _: None = Depends(RateLimitDep(max_requests=5, window_seconds=60))
+    ):
+        ...
+    """
+    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+    
+    def __call__(self, request: Request):
+        check_rate_limit(request, self.max_requests, self.window_seconds)
+
+
 # ===== 輸入清理 =====
 
 def sanitize_text_input(text: str, max_length: int = 1000) -> str:
@@ -150,11 +170,52 @@ def sanitize_text_input(text: str, max_length: int = 1000) -> str:
     return text.strip()
 
 
+import socket
+import ipaddress
+from urllib.parse import urlparse
+
+def is_safe_url(url: str) -> bool:
+    """
+    檢查 URL 是否安全 (防止 SSRF)
+    
+    1. 禁止私有 IP (127.0.0.1, 192.168.x.x, 10.x.x.x 等)
+    2. 禁止 Loopback
+    3. 必須是 http 或 https
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        
+        if not hostname:
+            return False
+            
+        # 取得 IP
+        try:
+            ip_list = socket.getaddrinfo(hostname, None)
+            # 檢查所有解析出來的 IP
+            for item in ip_list:
+                ip_str = item[4][0]
+                ip_obj = ipaddress.ip_address(ip_str)
+                
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
+                    logger.warning(f"Blocked unsafe IP access: {url} -> {ip_str}")
+                    return False
+                    
+        except socket.gaierror:
+            # 無法解析 DNS，視為不安全或無效
+            return False
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error checking URL safety: {e}")
+        return False
+
 def sanitize_url(url: str) -> str:
     """
     清理 URL 輸入
     
-    只允許 http:// 和 https:// 開頭的 URL
+    只允許 http:// 和 https:// 開頭的 URL，且禁止存取私有 IP
     """
     if not url:
         return ""
@@ -177,6 +238,10 @@ def sanitize_url(url: str) -> str:
     
     if not url_pattern.match(url):
         raise ValueError("無效的 URL 格式")
+        
+    # SSRF 檢查
+    if not is_safe_url(url):
+        raise ValueError("禁止連線到私有網路或無效的主機")
     
     return url
 

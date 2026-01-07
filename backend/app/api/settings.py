@@ -1,7 +1,7 @@
 """
 設定 API 路由
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -10,7 +10,8 @@ from app.core.database import get_db
 from app.models.user import User
 from app.models.settings import AIConfig
 from app.utils.auth import get_current_user, encrypt_api_key, decrypt_api_key
-from app.services.ai import LocalAIService
+from app.services.ai import CustomAIService
+from app.utils.security import sanitize_url, RateLimitDep
 
 router = APIRouter(prefix="/api/settings", tags=["設定"])
 
@@ -83,12 +84,28 @@ def create_ai_config(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Gemini 需要提供 API Key"
         )
-    if request.provider == "local" and (not request.local_url or not request.local_model):
+    if request.provider == "openai" and not request.api_key:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Local AI 需要提供 URL 和模型"
+            detail="OpenAI 需要提供 API Key"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="自定義 AI 需要提供 URL 和模型"
         )
     
+    # URL 安全清理與驗證
+    if request.provider == "local":
+        try:
+             # 注意：sanitize_url 會檢查是否為私有 IP。如果用戶確實需要連線到 Localhost，
+             # 這裡會被擋下。這是基於安全考量。
+            request.local_url = sanitize_url(request.local_url)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+
     # 停用其他同類型設定
     db.query(AIConfig).filter(
         AIConfig.user_id == current_user.id,
@@ -140,7 +157,18 @@ def update_ai_config(
     config.provider = request.provider
     if request.api_key:
         config.api_key_encrypted = encrypt_api_key(request.api_key)
-    config.local_url = request.local_url
+        
+    if request.local_url:
+        try:
+            config.local_url = sanitize_url(request.local_url)
+        except ValueError as e:
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+    else:
+        config.local_url = request.local_url
+        
     config.local_model = request.local_model
     
     db.commit()
@@ -211,7 +239,16 @@ def delete_ai_config(
 
 
 @router.post("/ai/test", response_model=TestConnectionResponse)
-async def test_ai_connection(request: TestConnectionRequest):
-    """測試 Local AI 連線"""
-    result = await LocalAIService.test_connection(request.url)
+async def test_ai_connection(
+    body: TestConnectionRequest,
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(RateLimitDep(max_requests=5, window_seconds=60))
+):
+    """測試 AI 連線"""
+    try:
+        url = sanitize_url(body.url)
+    except ValueError as e:
+        return TestConnectionResponse(success=False, error=str(e))
+        
+    result = await CustomAIService.test_connection(url)
     return TestConnectionResponse(**result)

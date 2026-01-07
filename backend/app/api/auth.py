@@ -14,7 +14,7 @@ from app.utils.auth import (
     create_access_token,
     get_current_user
 )
-from app.utils.security import check_rate_limit
+from app.utils.security import check_rate_limit, RateLimitDep
 
 router = APIRouter(prefix="/api/auth", tags=["認證"])
 
@@ -138,10 +138,9 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(
-    request: Request,
     login_request: LoginRequest, 
     db: Session = Depends(get_db),
-    _: None = Depends(lambda r: check_rate_limit(r, max_requests=10, window_seconds=60))
+    _: None = Depends(RateLimitDep(max_requests=10, window_seconds=60))
 ):
     """登入"""
     user = db.query(User).filter(User.username == login_request.username).first()
