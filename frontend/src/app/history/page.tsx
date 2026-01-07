@@ -92,16 +92,26 @@ export default function HistoryPage() {
     checkAuth();
   }, []);
 
+  // 換頁或切換用戶時載入歷史
   useEffect(() => {
     if (user) {
       fetchHistory();
-      // 始終獲取統計（包括 admin 查看其他用戶時）
-      fetchStatistics();
-      if (user.role === 'admin') {
-        fetchAllUsers();
-      }
     }
   }, [user, selectedUserId, currentPage]);
+
+  // 統計和用戶列表只在初始載入時請求一次
+  useEffect(() => {
+    if (user) {
+      const loadInitialData = async () => {
+        const promises = [fetchStatistics()];
+        if (user.role === 'admin') {
+          promises.push(fetchAllUsers());
+        }
+        await Promise.all(promises);
+      };
+      loadInitialData();
+    }
+  }, [user]);
 
   // 點擊外部關閉下拉選單
   useEffect(() => {

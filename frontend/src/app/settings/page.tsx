@@ -80,10 +80,15 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (currentUser) {
-      fetchAIConfigs();
-      if (currentUser.role === 'admin') {
-        fetchUsers();
-      }
+      // 並行請求，減少等待時間
+      const loadData = async () => {
+        const promises = [fetchAIConfigs()];
+        if (currentUser.role === 'admin') {
+          promises.push(fetchUsers());
+        }
+        await Promise.all(promises);
+      };
+      loadData();
     }
   }, [currentUser]);
 
