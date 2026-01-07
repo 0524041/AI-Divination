@@ -41,7 +41,22 @@ export default function LoginPage() {
       let endpoint = '';
       let body: Record<string, string> = {};
 
+      // Common Validation
+      const validateLength = (str: string, min: number, max: number, name: string) => {
+        if (str.length < min || str.length > max) return `${name}長度需為 ${min}-${max} 字`;
+        return null;
+      };
+
+      const validateUsername = (name: string) => {
+        if (!/^[a-zA-Z0-9_-]+$/.test(name)) return "用戶名只能包含英數字、底線或連字號";
+        return validateLength(name, 3, 20, "用戶名");
+      }
+
+      const validatePassword = (pwd: string) => validateLength(pwd, 6, 20, "密碼");
+
       if (mode === 'init') {
+        const pwdError = validatePassword(password);
+        if (pwdError) { setError(pwdError); setLoading(false); return; }
         if (password !== confirmPassword) {
           setError('密碼不一致');
           setLoading(false);
@@ -50,6 +65,11 @@ export default function LoginPage() {
         endpoint = '/api/auth/init';
         body = { password };
       } else if (mode === 'register') {
+        const userError = validateUsername(username);
+        if (userError) { setError(userError); setLoading(false); return; }
+        const pwdError = validatePassword(password);
+        if (pwdError) { setError(pwdError); setLoading(false); return; }
+
         if (password !== confirmPassword) {
           setError('密碼不一致');
           setLoading(false);
@@ -58,6 +78,7 @@ export default function LoginPage() {
         endpoint = '/api/auth/register';
         body = { username, password };
       } else {
+        // Login usually doesn't need strict validation, but length check is fine
         endpoint = '/api/auth/login';
         body = { username, password };
       }

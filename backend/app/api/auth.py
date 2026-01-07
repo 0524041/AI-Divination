@@ -1,7 +1,7 @@
 """
 認證 API 路由
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -14,6 +14,7 @@ from app.utils.auth import (
     create_access_token,
     get_current_user
 )
+from app.utils.security import check_rate_limit
 
 router = APIRouter(prefix="/api/auth", tags=["認證"])
 
@@ -22,13 +23,13 @@ router = APIRouter(prefix="/api/auth", tags=["認證"])
 
 class InitRequest(BaseModel):
     """初始化請求"""
-    password: str = Field(..., min_length=6, description="Admin 密碼")
+    password: str = Field(..., min_length=6, max_length=20, description="Admin 密碼")
 
 
 class RegisterRequest(BaseModel):
     """註冊請求"""
-    username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=6)
+    username: str = Field(..., min_length=3, max_length=20, pattern=r"^[a-zA-Z0-9_-]+$")
+    password: str = Field(..., min_length=6, max_length=20)
 
 
 class LoginRequest(BaseModel):
@@ -40,7 +41,7 @@ class LoginRequest(BaseModel):
 class PasswordChangeRequest(BaseModel):
     """修改密碼請求"""
     old_password: str
-    new_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=6, max_length=20)
     confirm_password: str
 
 
@@ -136,11 +137,16 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(request: LoginRequest, db: Session = Depends(get_db)):
+def login(
+    request: Request,
+    login_request: LoginRequest, 
+    db: Session = Depends(get_db),
+    _: None = Depends(lambda r: check_rate_limit(r, max_requests=10, window_seconds=60))
+):
     """登入"""
-    user = db.query(User).filter(User.username == request.username).first()
+    user = db.query(User).filter(User.username == login_request.username).first()
     
-    if not user or not verify_password(request.password, user.password_hash):
+    if not user or not verify_password(login_request.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="帳號或密碼錯誤"

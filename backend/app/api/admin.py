@@ -17,8 +17,8 @@ router = APIRouter(prefix="/api/admin", tags=["管理"])
 
 class CreateUserRequest(BaseModel):
     """建立用戶請求"""
-    username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=6)
+    username: str = Field(..., min_length=3, max_length=20, pattern=r"^[a-zA-Z0-9_-]+$")
+    password: str = Field(..., min_length=6, max_length=20)
     role: str = Field("user", description="'admin' | 'user'")
 
 

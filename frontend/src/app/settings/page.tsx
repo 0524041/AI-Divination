@@ -334,10 +334,27 @@ export default function SettingsPage() {
     setShowAPIKey(false);
   };
 
+  // Validation Helpers
+  const validateLength = (str: string, min: number, max: number, name: string) => {
+    if (str.length < min || str.length > max) return `${name}長度需為 ${min}-${max} 字`;
+    return null;
+  };
+  const validateUsername = (name: string) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) return "用戶名只能包含英數字、底線或連字號";
+    return validateLength(name, 3, 20, "用戶名");
+  }
+  const validatePassword = (pwd: string) => validateLength(pwd, 6, 20, "密碼");
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
     setPasswordSuccess(false);
+
+    const pwdError = validatePassword(newPassword);
+    if (pwdError) {
+      setPasswordError(pwdError);
+      return;
+    }
 
     if (newPassword !== confirmPassword) {
       setPasswordError('新密碼與確認密碼不符');
@@ -378,6 +395,12 @@ export default function SettingsPage() {
       alert('請填寫完整資訊');
       return;
     }
+
+    const userError = validateUsername(newUsername);
+    if (userError) { alert(userError); return; }
+
+    const pwdError = validatePassword(newUserPassword);
+    if (pwdError) { alert(pwdError); return; }
 
     const token = localStorage.getItem('token');
     try {
