@@ -114,7 +114,7 @@ stop_services() {
     echo -e "\n${YELLOW}[停止] 正在停止所有服務...${NC}"
     
     pkill -f "uvicorn app.main:app" 2>/dev/null && echo -e "${GREEN}✓ 後端服務已停止${NC}" || echo -e "${CYAN}ℹ 後端服務未運行${NC}"
-    pkill -f "next dev" 2>/dev/null && echo -e "${GREEN}✓ 前端服務已停止${NC}" || echo -e "${CYAN}ℹ 前端服務未運行${NC}"
+    pkill -f "next-server\|next dev\|next start" 2>/dev/null && echo -e "${GREEN}✓ 前端服務已停止${NC}" || echo -e "${CYAN}ℹ 前端服務未運行${NC}"
     
     echo -e "${GREEN}✓ 服務停止完成${NC}"
 }
@@ -146,8 +146,8 @@ show_status() {
     fi
     
     # 檢查前端
-    if pgrep -f "next dev" > /dev/null; then
-        FRONTEND_PID=$(pgrep -f "next dev")
+    if pgrep -f "next-server|next dev|next start" > /dev/null; then
+        FRONTEND_PID=$(pgrep -f "next-server|next dev|next start")
         echo -e "前端服務: ${GREEN}運行中${NC} (PID: $FRONTEND_PID)"
     else
         echo -e "前端服務: ${RED}未運行${NC}"
