@@ -45,12 +45,14 @@ show_help() {
     echo -e "  ${GREEN}--build${NC}         強制重新構建前端後啟動"
     echo -e "  ${GREEN}--build only${NC}    只構建前端，不啟動服務"
     echo -e "  ${GREEN}--optimize-db${NC}   優化資料庫 (創建索引、ANALYZE、VACUUM)"
+    echo -e "  ${GREEN}--dev${NC}           開發模式 (前端 npm run dev + 後端 uvicorn --reload)"
     echo -e "  ${GREEN}--help, -h${NC}      顯示此幫助信息"
     echo ""
     echo -e "${YELLOW}範例:${NC}"
     echo -e "  ./start.sh              # 啟動服務 (自動檢測是否需要構建)"
     echo -e "  ./start.sh --build      # 強制重新構建前端後啟動"
     echo -e "  ./start.sh --build only # 只構建前端 (不啟動)"
+    echo -e "  ./start.sh --dev        # 開發模式 (有熱重載)"
     echo -e "  ./start.sh --reset      # 重置資料庫後啟動"
     echo -e "  ./start.sh --clean-cache # 清理快取後啟動"
     echo -e "  ./start.sh --optimize-db # 優化資料庫"
@@ -298,7 +300,10 @@ install_python_deps() {
 check_dependencies() {
     echo -e "\n${YELLOW}[依賴檢查] 驗證核心套件...${NC}"
     
-    local packages=("fastapi" "uvicorn" "google.genai")
+    local packages=("fastapi" "httpx"
+    "google.genai"
+    "openai"
+)
     local missing=0
     
     for pkg in "${packages[@]}"; do
@@ -482,6 +487,50 @@ start_services() {
 }
 
 # ============================================
+# 啟動開發模式服務
+# ============================================
+start_dev_services() {
+    echo -e "\n${YELLOW}[開發模式] 啟動服務...${NC}"
+    
+    # 確保沒有殘留的進程
+    echo "清理殘留進程..."
+    pkill -9 -f "uvicorn app.main:app" 2>/dev/null || true
+    pkill -9 -f "next-server" 2>/dev/null || true
+    pkill -9 -f "next dev" 2>/dev/null || true
+    pkill -9 -f "next start" 2>/dev/null || true
+    
+    sleep 2
+    
+    # 啟動後端 (開發模式)
+    echo "啟動後端服務 (開發模式 Port 8000)..."
+    cd "$BACKEND_DIR"
+    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
+    BACKEND_PID=$!
+    
+    # 啟動前端 (開發模式)
+    echo "啟動前端服務 (開發模式 Port 3000, 0.0.0.0)..."
+    cd "$FRONTEND_DIR"
+    nohup npm run dev -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
+    FRONTEND_PID=$!
+    
+    sleep 3
+    
+    echo -e "\n${BLUE}============================================${NC}"
+    echo -e "${GREEN}       開發模式服務已啟動！${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "前端:    ${GREEN}http://localhost:3000${NC} (Hot Reload)"
+    echo -e "後端:    ${GREEN}http://localhost:8000${NC} (Auto Reload)"
+    echo -e "API 文檔: ${GREEN}http://localhost:8000/docs${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "後端 PID: $BACKEND_PID"
+    echo -e "前端 PID: $FRONTEND_PID"
+    echo -e "日誌檔案: backend.log, frontend.log"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "\n${CYAN}提示: 使用 ${GREEN}./start.sh --stop${CYAN} 停止服務${NC}"
+    echo -e "${CYAN}      使用 ${GREEN}./start.sh --logs -f${CYAN} 動態查看日誌${NC}"
+}
+
+# ============================================
 # 主程序
 # ============================================
 main() {
@@ -494,6 +543,7 @@ main() {
     CLEAN_CACHE=false
     INSTALL_ONLY=false
     FORCE_BUILD=false
+    DEV_MODE=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -552,6 +602,10 @@ main() {
                 INSTALL_ONLY=true
                 shift
                 ;;
+            --dev)
+                DEV_MODE=true
+                shift
+                ;;
             *)
                 echo -e "${RED}未知選項: $1${NC}"
                 echo -e "使用 ${GREEN}--help${NC} 查看可用選項"
@@ -596,6 +650,8 @@ main() {
     if [ "$INSTALL_ONLY" = true ]; then
         echo -e "\n${GREEN}✓ 安裝完成！${NC}"
         echo -e "${CYAN}使用 ${GREEN}./start.sh${CYAN} 啟動服務${NC}"
+    elif [ "$DEV_MODE" = true ]; then
+        start_dev_services
     else
         start_services
     fi
