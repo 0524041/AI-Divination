@@ -42,11 +42,15 @@ show_help() {
     echo -e "  ${GREEN}--status${NC}        查看服務狀態"
     echo -e "  ${GREEN}--logs [-f]${NC}     查看服務日誌 (-f 可動態追蹤)"
     echo -e "  ${GREEN}--install${NC}       只安裝依賴，不啟動服務"
+    echo -e "  ${GREEN}--build${NC}         強制重新構建前端後啟動"
+    echo -e "  ${GREEN}--build only${NC}    只構建前端，不啟動服務"
     echo -e "  ${GREEN}--optimize-db${NC}   優化資料庫 (創建索引、ANALYZE、VACUUM)"
     echo -e "  ${GREEN}--help, -h${NC}      顯示此幫助信息"
     echo ""
     echo -e "${YELLOW}範例:${NC}"
-    echo -e "  ./start.sh              # 啟動服務"
+    echo -e "  ./start.sh              # 啟動服務 (自動檢測是否需要構建)"
+    echo -e "  ./start.sh --build      # 強制重新構建前端後啟動"
+    echo -e "  ./start.sh --build only # 只構建前端 (不啟動)"
     echo -e "  ./start.sh --reset      # 重置資料庫後啟動"
     echo -e "  ./start.sh --clean-cache # 清理快取後啟動"
     echo -e "  ./start.sh --optimize-db # 優化資料庫"
@@ -389,9 +393,28 @@ start_services() {
     cd "$FRONTEND_DIR"
     
     # 檢查是否需要構建
-    if [ ! -d ".next" ] || [ "$1" == "--rebuild" ]; then
-        echo "構建前端 (生產模式)..."
+    NEED_BUILD=false
+    if [ ! -d ".next" ]; then
+        echo "未找到構建檔案 (.next 目錄不存在)"
+        NEED_BUILD=true
+    elif [ ! -f ".next/BUILD_ID" ]; then
+        echo "構建檔案不完整 (缺少 BUILD_ID)"
+        NEED_BUILD=true
+    elif [ "$FORCE_BUILD" = true ]; then
+        echo "強制重新構建"
+        NEED_BUILD=true
+    fi
+    
+    if [ "$NEED_BUILD" = true ]; then
+        echo "正在構建前端 (生產模式)..."
         npm run build
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}✗ 前端構建失敗${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✓ 前端構建完成${NC}"
+    else
+        echo "使用現有構建檔案"
     fi
     
     # 啟動生產伺服器
@@ -429,6 +452,7 @@ main() {
     RESET_DB=false
     CLEAN_CACHE=false
     INSTALL_ONLY=false
+    FORCE_BUILD=false
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -438,6 +462,24 @@ main() {
                 ;;
             --reset)
                 RESET_DB=true
+                shift
+                ;;
+            --build|--rebuild)
+                if [ "$2" == "only" ]; then
+                    # 只構建，不啟動服務
+                    echo -e "\n${YELLOW}[構建] 正在構建前端...${NC}"
+                    cd "$FRONTEND_DIR"
+                    npm run build
+                    if [ $? -eq 0 ]; then
+                        echo -e "${GREEN}✓ 前端構建完成${NC}"
+                    else
+                        echo -e "${RED}✗ 前端構建失敗${NC}"
+                        exit 1
+                    fi
+                    exit 0
+                else
+                    FORCE_BUILD=true
+                fi
                 shift
                 ;;
             --optimize-db)
