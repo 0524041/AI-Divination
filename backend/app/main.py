@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import (
     auth_router,
     settings_router,
-    divination_router,
+    liuyao_router,
     history_router,
     admin_router,
     tarot_router
@@ -35,6 +35,20 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# 全局異常處理
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import traceback
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    error_msg = f"Global Error: {str(exc)}\n{traceback.format_exc()}"
+    print(error_msg)  # 確保印在後端終端機
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()},
+    )
+
 # API 安全中間件（最優先）
 app.add_middleware(APISecurityMiddleware)
 
@@ -53,7 +67,7 @@ app.add_middleware(
 # 註冊路由
 app.include_router(auth_router)
 app.include_router(settings_router)
-app.include_router(divination_router)
+app.include_router(liuyao_router)
 app.include_router(history_router)
 app.include_router(admin_router)
 app.include_router(tarot_router)

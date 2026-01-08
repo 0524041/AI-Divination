@@ -88,7 +88,8 @@ export async function secureApiRequest(
   if (!skipSignature && API_CONFIG.signatureKey) {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const nonce = generateNonce();
-    const path = pathname;
+    // Normalize path for signature: remove trailing slash
+    const path = pathname.replace(/\/$/, '');
 
     try {
       const signature = await generateSignature(path, timestamp, nonce);
@@ -104,15 +105,7 @@ export async function secureApiRequest(
   const response = await fetch(url, {
     ...fetchOptions,
     headers,
-    // 不允許跟隨重定向
-    redirect: 'manual',
   });
-
-  // 檢查是否被重定向
-  if (response.type === 'opaqueredirect' ||
-    (response.status >= 300 && response.status < 400)) {
-    throw new Error('Request was redirected - possible attack detected');
-  }
 
   // 驗證響應簽名（確保響應來自真實的後端服務器）
   await verifyResponseSignature(response);

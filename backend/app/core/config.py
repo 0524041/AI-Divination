@@ -31,7 +31,10 @@ class Settings(BaseSettings):
     
     # API 安全設定
     API_REQUEST_SIGNATURE_KEY: str = ""
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]
     API_RATE_LIMIT: int = 100  # 每分鐘請求次數
     
     class Config:

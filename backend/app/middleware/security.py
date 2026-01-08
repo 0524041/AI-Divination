@@ -107,7 +107,10 @@ class APISecurityMiddleware(BaseHTTPMiddleware):
             return
         
         # 生成期望的簽名
-        path = str(request.url.path)
+        # Normalize path: remove trailing slash to match frontend
+        path = str(request.url.path).rstrip('/')
+        if not path: # Handle root path
+            path = "/"
         message = f"{path}:{timestamp}:{nonce}"
         expected_signature = hmac.new(
             settings.API_REQUEST_SIGNATURE_KEY.encode(),
@@ -181,6 +184,11 @@ def verify_api_signature(path: str, timestamp: str, nonce: str) -> str:
     生成 API 請求簽名
     用於客戶端生成簽名
     """
+    # Normalize path
+    path = path.rstrip('/')
+    if not path:
+        path = "/"
+        
     message = f"{path}:{timestamp}:{nonce}"
     signature = hmac.new(
         settings.API_REQUEST_SIGNATURE_KEY.encode(),
