@@ -95,12 +95,18 @@ def create_ai_config(
         )
     
     # URL 安全清理與驗證
+    # 管理員可以使用 localhost/私有 IP
+    is_admin = current_user.is_admin if hasattr(current_user, 'is_admin') else False
+    
     if request.provider == "local":
         try:
-             # 注意：sanitize_url 會檢查是否為私有 IP。如果用戶確實需要連線到 Localhost，
-             # 這裡會被擋下。這是基於安全考量。
-            request.local_url = sanitize_url(request.local_url)
+            request.local_url = sanitize_url(request.local_url, allow_private=is_admin)
         except ValueError as e:
+            if not is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="禁止連線到私有網路。只有管理員可以使用 localhost。"
+                )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e)
@@ -158,11 +164,19 @@ def update_ai_config(
     if request.api_key:
         config.api_key_encrypted = encrypt_api_key(request.api_key)
         
+    # 管理員可以使用 localhost/私有 IP
+    is_admin = current_user.is_admin if hasattr(current_user, 'is_admin') else False
+    
     if request.local_url:
         try:
-            config.local_url = sanitize_url(request.local_url)
+            config.local_url = sanitize_url(request.local_url, allow_private=is_admin)
         except ValueError as e:
-             raise HTTPException(
+            if not is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="禁止連線到私有網路。只有管理員可以使用 localhost。"
+                )
+            raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e)
             )
@@ -244,11 +258,24 @@ async def test_ai_connection(
     current_user: User = Depends(get_current_user),
     _: None = Depends(RateLimitDep(max_requests=5, window_seconds=60))
 ):
-    """測試 AI 連線"""
+    """
+    測試 AI 連線
+    
+    注意：只有管理員可以使用 localhost/私有 IP 進行測試
+    """
+    # 檢查用戶是否為管理員（允許 localhost 測試）
+    is_admin = current_user.is_admin if hasattr(current_user, 'is_admin') else False
+    
     try:
-        url = sanitize_url(body.url)
+        url = sanitize_url(body.url, allow_private=is_admin)
     except ValueError as e:
-        return TestConnectionResponse(success=False, error=str(e))
+        if is_admin:
+            return TestConnectionResponse(success=False, error=str(e))
+        else:
+            return TestConnectionResponse(
+                success=False, 
+                error="禁止連線到私有網路。只有管理員可以測試 localhost。"
+            )
         
     result = await CustomAIService.test_connection(url)
     return TestConnectionResponse(**result)

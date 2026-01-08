@@ -211,11 +211,18 @@ def is_safe_url(url: str) -> bool:
         logger.error(f"Error checking URL safety: {e}")
         return False
 
-def sanitize_url(url: str) -> str:
+def sanitize_url(url: str, allow_private: bool = False) -> str:
     """
     清理 URL 輸入
     
-    只允許 http:// 和 https:// 開頭的 URL，且禁止存取私有 IP
+    只允許 http:// 和 https:// 開頭的 URL
+    
+    Args:
+        url: 原始 URL
+        allow_private: 是否允許私有 IP（僅供管理員使用）
+    
+    Returns:
+        清理後的 URL
     """
     if not url:
         return ""
@@ -238,9 +245,9 @@ def sanitize_url(url: str) -> str:
     
     if not url_pattern.match(url):
         raise ValueError("無效的 URL 格式")
-        
-    # SSRF 檢查
-    if not is_safe_url(url):
+    
+    # SSRF 檢查（管理員可以跳過）
+    if not allow_private and not is_safe_url(url):
         raise ValueError("禁止連線到私有網路或無效的主機")
     
     return url
