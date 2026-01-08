@@ -74,3 +74,11 @@ def root():
 def health():
     """健康檢查"""
     return {"status": "ok"}
+
+
+@app.post("/api/cancel-stream/{connection_id}")
+async def cancel_stream(connection_id: str):
+    """取消 SSE 連接"""
+    from app.utils.sse import cancel_sse_connection
+    await cancel_sse_connection(connection_id)
+    return {"message": "連接已取消", "connection_id": connection_id}
