@@ -96,7 +96,7 @@ def create_ai_config(
     
     # URL 安全清理與驗證
     # 管理員可以使用 localhost/私有 IP
-    is_admin = current_user.is_admin if hasattr(current_user, 'is_admin') else False
+    is_admin = current_user.role == 'admin'
     
     if request.provider == "local":
         try:
@@ -165,7 +165,7 @@ def update_ai_config(
         config.api_key_encrypted = encrypt_api_key(request.api_key)
         
     # 管理員可以使用 localhost/私有 IP
-    is_admin = current_user.is_admin if hasattr(current_user, 'is_admin') else False
+    is_admin = current_user.role == 'admin'
     
     if request.local_url:
         try:
@@ -264,7 +264,7 @@ async def test_ai_connection(
     注意：只有管理員可以使用 localhost/私有 IP 進行測試
     """
     # 檢查用戶是否為管理員（允許 localhost 測試）
-    is_admin = current_user.is_admin if hasattr(current_user, 'is_admin') else False
+    is_admin = current_user.role == 'admin'
     
     try:
         url = sanitize_url(body.url, allow_private=is_admin)
