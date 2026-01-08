@@ -302,16 +302,16 @@ export class SecureSSEConnection {
 
     // 監聽特定事件
     this.eventSource.addEventListener('connected', (e) => {
-      console.log('SSE connected:', e.data);
+      console.debug('SSE connected:', e.data);
     });
 
     this.eventSource.addEventListener('done', () => {
-      console.log('SSE stream completed');
+      console.debug('SSE stream completed');
       this.close();
     });
 
     this.eventSource.addEventListener('cancelled', () => {
-      console.log('SSE stream cancelled');
+      console.debug('SSE stream cancelled');
       this.close();
     });
   }

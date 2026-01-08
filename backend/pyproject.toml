@@ -1,0 +1,28 @@
+[project]
+name = "ai-divination-backend"
+version = "6.1.0"
+description = "AI 算命網頁 - 後端 API 服務"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib>=1.7.4",
+    "bcrypt==4.0.1",
+    "cryptography>=41.0.0",
+    "python-multipart>=0.0.6",
+    "httpx>=0.25.0",
+    "lunar-python>=1.3.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "google-genai>=0.3.0",
+    "openai>=1.0.0",
+]
+
+[project.scripts]
+start = "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+[tool.uv]
+dev-dependencies = []

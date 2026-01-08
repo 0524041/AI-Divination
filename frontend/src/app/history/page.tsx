@@ -195,7 +195,7 @@ export default function HistoryPage() {
 
   const fetchStatistics = async () => {
     const token = localStorage.getItem('token');
-    
+
     // 根據當前篩選條件構建 endpoint
     let endpoint = '/api/history/statistics';
     if (user?.role === 'admin') {
@@ -208,16 +208,14 @@ export default function HistoryPage() {
       }
       // selectedUserId === null 時查看 admin 自己的統計（不帶參數）
     }
-    
-    console.log('[History] Fetching statistics:', { endpoint, selectedUserId, role: user?.role });
-    
+
+
     try {
       const res = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
-        console.log('[History] Statistics received:', data);
         setStatistics(data);
       } else {
         console.error('[History] Statistics fetch failed:', res.status, res.statusText);
@@ -249,18 +247,18 @@ export default function HistoryPage() {
   const handleCopy = async (item: HistoryItem) => {
     // 準備不同占卜類型的文本
     let cardInfo = '';
-    
+
     if (item.divination_type === 'tarot') {
       // 塔羅牌格式
       cardInfo = `牌陣：${item.chart_data.spread_name || '未知'}\n\n`;
       if (item.chart_data.cards) {
         cardInfo += '抽牌結果：\n';
         item.chart_data.cards.forEach((card, index) => {
-          const positionName = 
+          const positionName =
             card.position === 'past' ? '過去' :
-            card.position === 'present' ? '現在' :
-            card.position === 'future' ? '未來' :
-            card.position;
+              card.position === 'present' ? '現在' :
+                card.position === 'future' ? '未來' :
+                  card.position;
           cardInfo += `${index + 1}. ${positionName}：${card.name_cn} (${card.name})${card.reversed ? ' (逆位)' : ''}\n`;
         });
       }
@@ -268,7 +266,7 @@ export default function HistoryPage() {
       // 六爻等其他占卜格式
       cardInfo = `${item.chart_data.benguaming || ''} → ${item.chart_data.bianguaming || ''}`;
     }
-    
+
     // 準備 Markdown 格式文本
     const markdownText = `## 問題\n${item.question}\n\n## ${item.divination_type === 'tarot' ? '牌陣' : '卦象'}\n${cardInfo}\n\n## 解盤\n${item.interpretation || '無'}`;
 
@@ -370,7 +368,6 @@ export default function HistoryPage() {
   };
 
   const handleUserFilterChange = (userId: number | null) => {
-    console.log('[History] User filter changed:', { from: selectedUserId, to: userId });
     setSelectedUserId(userId);
     setCurrentPage(1); // 切換用戶時重置到第一頁
     setShowUserFilter(false);
@@ -503,8 +500,8 @@ export default function HistoryPage() {
               <div className="mb-3 flex items-center gap-2 text-sm text-gray-400">
                 <BarChart3 size={16} />
                 <span>
-                  {selectedUserId === 0 
-                    ? '所有用戶統計' 
+                  {selectedUserId === 0
+                    ? '所有用戶統計'
                     : `用戶 ${allUsers.find(u => u.id === selectedUserId)?.username || '未知'} 的統計`}
                 </span>
               </div>
@@ -602,7 +599,7 @@ export default function HistoryPage() {
                       <p className={`text-gray-200 ${expandedId === item.id ? 'whitespace-pre-wrap' : 'truncate'}`}>
                         {item.question}
                       </p>
-                      
+
                       {expandedId === item.id && (item.target || item.gender || (item.divination_type === 'tarot' && item.chart_data.spread_name)) && (
                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-400">
                           {/* 塔羅牌顯示牌陣類型 */}
@@ -700,19 +697,19 @@ export default function HistoryPage() {
                                   const data = typeof item.chart_data === 'string' ? JSON.parse(item.chart_data) : item.chart_data;
                                   if (item.divination_type === 'tarot') {
                                     // 塔羅牌：顯示牌陣
-                                    const spreadName = data.spread === 'three_card' ? '三牌陣（過去-現在-未來）' : 
-                                                     data.spread === 'single' ? '單抽牌' : 
-                                                     data.spread === 'celtic_cross' ? '凱爾特十字' : '未知牌陣';
+                                    const spreadName = data.spread === 'three_card' ? '三牌陣（過去-現在-未來）' :
+                                      data.spread === 'single' ? '單抽牌' :
+                                        data.spread === 'celtic_cross' ? '凱爾特十字' : '未知牌陣';
                                     return (
                                       <div className="space-y-3">
                                         <div className="font-bold text-[var(--gold)] mb-3">{spreadName}</div>
                                         {data.cards?.map((card: any, idx: number) => (
                                           <div key={idx} className="flex items-start gap-3 py-2 border-b border-gray-800 last:border-0">
                                             <span className="text-[var(--gold)] font-bold min-w-[60px]">
-                                              {card.position === 'past' ? '過去' : 
-                                               card.position === 'present' ? '現在' : 
-                                               card.position === 'future' ? '未來' : 
-                                               card.position}:
+                                              {card.position === 'past' ? '過去' :
+                                                card.position === 'present' ? '現在' :
+                                                  card.position === 'future' ? '未來' :
+                                                    card.position}:
                                             </span>
                                             <span className="flex-1">
                                               {card.name_cn} ({card.name}){card.reversed ? ' (逆位)' : ''}
@@ -761,63 +758,60 @@ export default function HistoryPage() {
             <div className="text-sm text-gray-400">
               顯示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalCount)} / 共 {totalCount} 筆
             </div>
-            
+
             {totalPages > 1 ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className={`p-2 rounded-lg border transition ${
-                  currentPage === 1
-                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
-                }`}
-              >
-                <ChevronLeft size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={`p-2 rounded-lg border transition ${currentPage === 1
+                      ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                      : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                    }`}
+                >
+                  <ChevronLeft size={20} />
+                </button>
 
-              {/* 頁碼按鈕 */}
-              <div className="flex gap-2">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum: number;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
+                {/* 頁碼按鈕 */}
+                <div className="flex gap-2">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
 
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => handlePageChange(pageNum)}
-                      className={`w-10 h-10 rounded-lg border transition ${
-                        currentPage === pageNum
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)] font-bold'
-                          : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`w-10 h-10 rounded-lg border transition ${currentPage === pageNum
+                            ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)] font-bold'
+                            : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                          }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className={`p-2 rounded-lg border transition ${currentPage === totalPages
+                      ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                      : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                    }`}
+                >
+                  <ChevronRight size={20} />
+                </button>
               </div>
-
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className={`p-2 rounded-lg border transition ${
-                  currentPage === totalPages
-                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
-                }`}
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
             ) : (
               <div className="text-sm text-gray-500">第 1 頁，共 1 頁</div>
             )}

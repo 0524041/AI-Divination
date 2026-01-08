@@ -11,11 +11,11 @@ export async function initializeApiClient() {
   if (initialized) {
     return;
   }
-  
+
   try {
     await getApiConfig();
     initialized = true;
-    console.log('API client initialized');
+    console.debug('API client initialized');
   } catch (error) {
     console.error('Failed to initialize API client:', error);
     // 不阻止應用啟動

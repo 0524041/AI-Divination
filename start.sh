@@ -325,11 +325,68 @@ check_dependencies() {
 # 初始化資料庫
 # ============================================
 init_database() {
-    echo -e "\n${YELLOW}[4/7] 初始化資料庫...${NC}"
+    echo -e "\n${YELLOW}[4/8] 初始化資料庫...${NC}"
     
     cd "$BACKEND_DIR"
     "$VENV_DIR/bin/python" -c "from app.core.database import init_db; init_db()"
     echo -e "${GREEN}✓ 資料庫初始化完成${NC}"
+}
+
+# ============================================
+# 配置安全機制（自動執行）
+# ============================================
+configure_security() {
+    echo -e "\n${YELLOW}[5/8] 配置安全機制...${NC}"
+    
+    SIGNATURE_KEY_FILE="$BACKEND_DIR/.api_signature_key"
+    FRONTEND_ENV_FILE="$FRONTEND_DIR/.env.local"
+    
+    # 檢查並生成後端密鑰（後端會在 Settings 初始化時自動生成）
+    cd "$BACKEND_DIR"
+    "$VENV_DIR/bin/python" -c "from app.core.config import get_settings; get_settings()"
+    
+    if [ -f "$SIGNATURE_KEY_FILE" ]; then
+        SIGNATURE_KEY=$(cat "$SIGNATURE_KEY_FILE")
+        echo -e "${GREEN}✓ API 簽名密鑰已就緒${NC}"
+    else
+        echo -e "${RED}✗ API 簽名密鑰生成失敗${NC}"
+        return 1
+    fi
+    
+    # 檢查並同步前端配置
+    if [ -f "$FRONTEND_ENV_FILE" ]; then
+        # 檢查現有配置中的密鑰是否正確
+        EXISTING_KEY=$(grep "NEXT_PUBLIC_API_SIGNATURE_KEY=" "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d'=' -f2)
+        if [ "$EXISTING_KEY" != "$SIGNATURE_KEY" ]; then
+            echo "更新前端 API 簽名密鑰..."
+            # 使用 sed 更新密鑰
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|NEXT_PUBLIC_API_SIGNATURE_KEY=.*|NEXT_PUBLIC_API_SIGNATURE_KEY=$SIGNATURE_KEY|" "$FRONTEND_ENV_FILE"
+            else
+                sed -i "s|NEXT_PUBLIC_API_SIGNATURE_KEY=.*|NEXT_PUBLIC_API_SIGNATURE_KEY=$SIGNATURE_KEY|" "$FRONTEND_ENV_FILE"
+            fi
+            echo -e "${GREEN}✓ 前端密鑰已更新${NC}"
+            # 標記需要重新構建
+            FORCE_BUILD=true
+        else
+            echo -e "${GREEN}✓ 前端密鑰已同步${NC}"
+        fi
+    else
+        # 創建新的 .env.local
+        echo "創建前端環境配置..."
+        cat > "$FRONTEND_ENV_FILE" << EOF
+# API 配置 (由 start.sh 自動生成)
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# API 簽名密鑰
+NEXT_PUBLIC_API_SIGNATURE_KEY=$SIGNATURE_KEY
+EOF
+        echo -e "${GREEN}✓ 前端配置已創建${NC}"
+        # 新配置需要重新構建
+        FORCE_BUILD=true
+    fi
+    
+    echo -e "${GREEN}✓ 安全機制配置完成${NC}"
 }
 
 # ============================================
@@ -364,7 +421,7 @@ optimize_database() {
 # 檢查 Node.js
 # ============================================
 check_nodejs() {
-    echo -e "\n${YELLOW}[5/7] 檢查 Node.js 版本...${NC}"
+    echo -e "\n${YELLOW}[6/8] 檢查 Node.js 版本...${NC}"
     
     if command -v node &> /dev/null; then
         NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
@@ -384,7 +441,7 @@ check_nodejs() {
 # 安裝前端依賴
 # ============================================
 install_frontend_deps() {
-    echo -e "\n${YELLOW}[6/7] 安裝前端依賴...${NC}"
+    echo -e "\n${YELLOW}[7/8] 安裝前端依賴...${NC}"
     
     cd "$FRONTEND_DIR"
     
@@ -403,7 +460,7 @@ install_frontend_deps() {
 # 啟動服務
 # ============================================
 start_services() {
-    echo -e "\n${YELLOW}[7/7] 啟動服務...${NC}"
+    echo -e "\n${YELLOW}[8/8] 啟動服務...${NC}"
     
     # 確保沒有殘留的進程
     echo "清理殘留進程..."
@@ -640,13 +697,16 @@ main() {
     # 4. 初始化資料庫
     init_database
     
-    # 5. 檢查 Node.js
+    # 5. 配置安全機制
+    configure_security
+    
+    # 6. 檢查 Node.js
     check_nodejs
     
-    # 6. 安裝前端依賴
+    # 7. 安裝前端依賴
     install_frontend_deps
     
-    # 7. 啟動服務 (除非只安裝)
+    # 8. 啟動服務 (除非只安裝)
     if [ "$INSTALL_ONLY" = true ]; then
         echo -e "\n${GREEN}✓ 安裝完成！${NC}"
         echo -e "${CYAN}使用 ${GREEN}./start.sh${CYAN} 啟動服務${NC}"

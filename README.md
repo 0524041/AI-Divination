@@ -81,26 +81,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ### 首次安裝配置
 
-#### 1. 配置 API 安全機制（v6.0 必須）
-
 ```bash
-# 方法一：自動配置（推薦）
-./configure_security.sh
+# 克隆代碼
+git clone https://github.com/0524041/AI-Divination.git
+cd AI-Divination
 
-# 方法二：手動配置
-# 後端會在首次啟動時自動生成密鑰文件
-# 前端需要配置環境變量
-cd frontend
-cp .env.local.example .env.local
-# 編輯 .env.local，或讓前端自動從後端獲取配置
-```
-
-**⚠️ 重要：** 在新機器上首次部署時，必須執行此步驟配置安全機制。
-
-#### 2. 啟動服務
-
-```bash
-# 一鍵啟動
+# 一鍵啟動（自動配置安全機制）
 ./start.sh
 
 # 查看狀態
@@ -108,53 +94,9 @@ cp .env.local.example .env.local
 
 # 查看日誌
 ./start.sh --logs
-### 在新機器上部署
-
-1. **克隆代碼**
-   ```bash
-   git clone <your-repo-url>
-   cd AI-Divination
-   ```
-
-2. **配置安全機制**（v6.0 必須）
-   ```bash
-   ./configure_security.sh
-   ```
-   此腳本會：
-   - 啟動後端生成 API 簽名密鑰
-   - 自動配置前端環境變量
-   - 驗證配置是否正確
-
-3. **啟動服務**
-   ```bash
-   ./start.sh
-   ```
-
-4. **初始化系統**
-   - 訪問 http://localhost:3000
-   - 系統會引導你建立**管理員帳號**（記住密碼！）
-
-5. **配置 AI 服務**
-   - 登入後前往**設定頁面**配置 AI 服務：
-     - **Gemini**：填入你的 Google AI API Key
-     - **Local AI**：填入本地 AI 服務的 URL 和模型名稱
-
-6. **開始使用**
-   - 回到首頁，選擇你想要的占卜方式：
-     - **六爻占卜**：傳統易經占卜，適合重大決策
-     - **塔羅占卜**：靈性指引，適合自我探索與問題洞察
-
-### 配置檢查清單
-
-部署前請確認：
-- ✅ 已執行 `./configure_security.sh`
-- ✅ 後端密鑰文件已生成（`.api_signature_key` 等）
-- ✅ 前端環境變量已配置（`.env.local`）
-- ✅ 安全測試通過：`python test_tools/test_api_security.py`
-
-詳細配置說明：[SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md)
-./start.sh --clean-cache
 ```
+
+> **📝 v6.1 更新**：安全機制現已整合到 `start.sh`，無需單獨執行 `configure_security.sh`
 
 啟動後訪問：
 - **前端**：http://localhost:3000
@@ -262,17 +204,6 @@ AI-Divination/
 - ✨ 塔羅占卜歷史紀錄整合
 - 🐛 優化 AI 解盤時序，提前提交後端處理
 - 🐛 修復塔羅頁面 AI 切換器點擊問題
-
-### v5.0 (2025-12-29)
-- 🔄 完全重構前後端架構
-- ✨ 新增 AI 配置編輯功能
-- ✨ 新增占卜頁面 AI 切換器
-- ✨ 新增 AI 思考過程摺疊顯示
-- ✨ 新增 5 分鐘超時保護
-- ✨ 新增取消占卜功能
-- ✨ 新增六爻擲幣 3D 動畫效果
-
-### 版本歷史
 
 ### v5.0 (2025-12-29)
 - 🔄 完全重構前後端架構

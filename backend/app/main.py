@@ -41,10 +41,10 @@ app.add_middleware(APISecurityMiddleware)
 # 性能監控 Middleware（必須在 CORS 之後）
 app.add_middleware(PerformanceMiddleware)
 
-# CORS 設定
+# CORS 設定 - 使用配置中的允許來源
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
