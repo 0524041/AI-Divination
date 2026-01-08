@@ -30,6 +30,10 @@ frontend/out/
 # Security keys (auto-generated for development)
 .secret_key
 .encryption_key
+.api_signature_key
+backend/.secret_key
+backend/.encryption_key
+backend/.api_signature_key
 
 # Logs
 *.log

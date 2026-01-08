@@ -201,3 +201,18 @@ def change_password(
     db.commit()
     
     return {"message": "密碼已更新"}
+
+
+@router.get("/client-config")
+def get_client_config():
+    """
+    獲取客戶端配置
+    提供簽名密鑰給前端（僅開發環境）
+    """
+    from app.core.config import get_settings
+    settings = get_settings()
+    
+    return {
+        "signature_key": settings.API_REQUEST_SIGNATURE_KEY,
+        "allowed_origins": settings.ALLOWED_ORIGINS
+    }

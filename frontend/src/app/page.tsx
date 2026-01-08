@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Compass, History, Settings, LogOut, Menu, X } from 'lucide-react';
+import { initializeApiClient } from '@/lib/api-init';
+import { apiGet } from '@/lib/api-client';
 
 // 算命類型卡片
 const divinationTypes = [
@@ -56,7 +58,10 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    checkAuth();
+    // 初始化 API 客戶端
+    initializeApiClient().then(() => {
+      checkAuth();
+    });
   }, []);
 
   const checkAuth = async () => {
@@ -67,9 +72,7 @@ export default function HomePage() {
     }
 
     try {
-      const res = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiGet('/api/auth/me');
 
       if (res.ok) {
         const data = await res.json();

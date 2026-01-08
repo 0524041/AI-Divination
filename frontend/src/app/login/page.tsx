@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, User, Lock } from 'lucide-react';
+import { initializeApiClient } from '@/lib/api-init';
+import { apiGet, apiPost } from '@/lib/api-client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,12 +18,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    checkInit();
+    // 初始化 API 客戶端
+    initializeApiClient().then(() => {
+      checkInit();
+    });
   }, []);
 
   const checkInit = async () => {
     try {
-      const res = await fetch('/api/auth/check-init');
+      const res = await apiGet('/api/auth/check-init', { skipSignature: true });
       const data = await res.json();
       setIsInit(data.initialized);
       if (!data.initialized) {
@@ -83,11 +88,7 @@ export default function LoginPage() {
         body = { username, password };
       }
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const res = await apiPost(endpoint, body, { skipSignature: true });
 
       const data = await res.json();
 

@@ -1,12 +1,57 @@
 # 🔒 安全性快速指南
 
-## 已自動修復的問題 ✅
+## v6.0 重大安全更新 🆕
+
+### 新增安全特性
+
+執行 `./configure_security.sh` 配置以下安全機制：
+
+1. ✅ **API 請求簽名驗證** (HMAC-SHA256)
+   - 防止 CSRF 攻擊
+   - 防止請求偽造
+   - 確保數據完整性
+
+2. ✅ **來源白名單驗證**
+   - 只允許授權域名訪問
+   - 防止跨域攻擊
+
+3. ✅ **防重定向攻擊**
+   - 自動檢測並阻止重定向
+   - 驗證響應來源
+
+4. ✅ **防重放攻擊**
+   - 時間戳驗證（5分鐘窗口）
+   - Nonce 機制
+
+5. ✅ **SSE 安全通訊**
+   - 長連接使用 Server-Sent Events
+   - 防止輪詢被攻擊
+
+### 快速配置
+
+```bash
+# 自動配置安全機制
+./configure_security.sh
+
+# 啟動服務
+./start.sh
+
+# 測試安全性
+python test_tools/test_api_security.py
+```
+
+詳細文檔：[API_SECURITY.md](API_SECURITY.md)
+
+---
+
+## 已自動修復的問題（v5.0）✅
 
 執行 `./fix_security.sh` 後，以下問題已修復：
 
 1. ✅ 敏感檔案權限設定為 600
    - `.secret_key`
    - `.encryption_key`
+   - `.api_signature_key`
    - `divination.db`
 
 2. ✅ `.gitignore` 已更新，防止敏感檔案被提交

@@ -15,6 +15,7 @@ from app.api import (
 )
 from app.api.debug import router as debug_router
 from app.middleware.performance import PerformanceMiddleware
+from app.middleware.security import APISecurityMiddleware
 from app.core.config import get_settings
 
 # 設定日誌
@@ -33,6 +34,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# API 安全中間件（最優先）
+app.add_middleware(APISecurityMiddleware)
 
 # 性能監控 Middleware（必須在 CORS 之後）
 app.add_middleware(PerformanceMiddleware)
