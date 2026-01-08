@@ -79,7 +79,25 @@
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### 啟動服務
+### 首次安裝配置
+
+#### 1. 配置 API 安全機制（v6.0 必須）
+
+```bash
+# 方法一：自動配置（推薦）
+./configure_security.sh
+
+# 方法二：手動配置
+# 後端會在首次啟動時自動生成密鑰文件
+# 前端需要配置環境變量
+cd frontend
+cp .env.local.example .env.local
+# 編輯 .env.local，或讓前端自動從後端獲取配置
+```
+
+**⚠️ 重要：** 在新機器上首次部署時，必須執行此步驟配置安全機制。
+
+#### 2. 啟動服務
 
 ```bash
 # 一鍵啟動
@@ -90,14 +108,51 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 查看日誌
 ./start.sh --logs
+### 在新機器上部署
 
-# 停止服務
-./start.sh --stop
+1. **克隆代碼**
+   ```bash
+   git clone <your-repo-url>
+   cd AI-Divination
+   ```
 
-# 重置資料庫（清除所有數據）
-./start.sh --reset
+2. **配置安全機制**（v6.0 必須）
+   ```bash
+   ./configure_security.sh
+   ```
+   此腳本會：
+   - 啟動後端生成 API 簽名密鑰
+   - 自動配置前端環境變量
+   - 驗證配置是否正確
 
-# 清除快取
+3. **啟動服務**
+   ```bash
+   ./start.sh
+   ```
+
+4. **初始化系統**
+   - 訪問 http://localhost:3000
+   - 系統會引導你建立**管理員帳號**（記住密碼！）
+
+5. **配置 AI 服務**
+   - 登入後前往**設定頁面**配置 AI 服務：
+     - **Gemini**：填入你的 Google AI API Key
+     - **Local AI**：填入本地 AI 服務的 URL 和模型名稱
+
+6. **開始使用**
+   - 回到首頁，選擇你想要的占卜方式：
+     - **六爻占卜**：傳統易經占卜，適合重大決策
+     - **塔羅占卜**：靈性指引，適合自我探索與問題洞察
+
+### 配置檢查清單
+
+部署前請確認：
+- ✅ 已執行 `./configure_security.sh`
+- ✅ 後端密鑰文件已生成（`.api_signature_key` 等）
+- ✅ 前端環境變量已配置（`.env.local`）
+- ✅ 安全測試通過：`python test_tools/test_api_security.py`
+
+詳細配置說明：[SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md)
 ./start.sh --clean-cache
 ```
 
@@ -181,6 +236,21 @@ AI-Divination/
 ### 環境變數（可選）
 
 創建 `.env` 文件：
+## 📚 版本歷史
+
+### v6.0 (2026-01-08) 🔒
+- 🛡️ **重大安全更新**：實施全面 API 安全機制
+  - ✅ HMAC-SHA256 請求簽名驗證
+  - ✅ 來源白名單驗證
+  - ✅ 防止重定向攻擊
+  - ✅ 防止重放攻擊（時間戳 + nonce）
+  - ✅ SSE 安全通訊機制
+  - ✅ 完整的安全響應頭
+- 📖 新增完整安全文檔（90+ 頁）
+- 🔧 新增自動配置腳本 `configure_security.sh`
+- 🧪 新增安全測試工具
+- 📝 詳見：[API_SECURITY.md](docs/API_SECURITY.md)
+
 ### v5.1 (2026-01-05)
 - ✨ **塔羅占卜功能上線**：完整的 78 張塔羅牌系統
   - 單張牌陣：適合每日指引
@@ -210,7 +280,10 @@ AI-Divination/
 - ✨ 新增占卜頁面 AI 切換器
 - ✨ 新增 AI 思考過程摺疊顯示
 - ✨ 新增 5 分鐘超時保護
-### 已完成功能 ✅
+- ✨ 新增取消占卜功能
+- ✨ 新增六爻擲幣 3D 動畫效果
+
+## ✅ 已完成功能
 - [x] 六爻占卜核心功能
 - [x] 塔羅占卜系統（78 張完整牌組）
   - [x] 單張牌陣
@@ -221,8 +294,13 @@ AI-Divination/
 - [x] 歷史紀錄 + Markdown 渲染
 - [x] AI 思考過程顯示
 - [x] 3D 擲幣動畫
+- [x] **API 安全機制**（v6.0）
+  - [x] 請求簽名驗證
+  - [x] 防重定向攻擊
+  - [x] 防 CSRF/重放攻擊
+  - [x] SSE 安全通訊
 
-### 規劃中功能 🚀
+## 🚀 規劃中功能
 - [ ] 更多塔羅牌陣類型
   - [ ] 時間之流（時間線分析）
   - [ ] 關係牌陣（雙人關係）
@@ -232,19 +310,15 @@ AI-Divination/
 - [ ] 流年運勢 (Coming Soon)
 - [ ] Docker 部署支援
 - [ ] 占卜結果分享功能
-- AI 服務整合
 
-## 🗺️ 開發計劃
+## 🔗 相關文檔
 
-- [x] 六爻占卜核心功能
-- [x] 用戶認證系統
-- [x] AI 服務整合（Gemini + Local）
-- [x] 歷史紀錄 + Markdown 渲染
-- [x] AI 思考過程顯示
-- [ ] 紫微斗數 (Coming Soon)
-- [ ] 八字命盤 (Coming Soon)
-- [ ] 流年運勢 (Coming Soon)
-- [ ] Docker 部署支援
+- 📖 [API 安全機制詳細文檔](docs/API_SECURITY.md)
+- 🚀 [安全配置快速指南](docs/SECURITY_QUICKSTART.md)
+- 📝 [安全修復總結](docs/SECURITY_FIX_SUMMARY.md)
+- ✅ [配置檢查清單](SECURITY_CHECKLIST.md)
+- 📊 [性能分析](docs/PERFORMANCE_ANALYSIS.md)
+- 🔐 [輸入安全分析](docs/INPUT_SECURITY_ANALYSIS.md)
 
 ## 🤝 貢獻
 
