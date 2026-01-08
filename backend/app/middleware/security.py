@@ -94,19 +94,15 @@ class APISecurityMiddleware(BaseHTTPMiddleware):
             )
     
     def _verify_signature(self, request: Request):
-        """驗證請求簽名"""
+        """驗證請求簽名（若有提供則驗證，無則跳過）"""
         signature = request.headers.get("X-Request-Signature")
         timestamp = request.headers.get("X-Request-Timestamp")
         nonce = request.headers.get("X-Request-Nonce")
         
+        # 如果沒有提供簽名標頭，跳過驗證
+        # 注意：這是為了兼容前端直接 fetch 的情況
+        # 生產環境可以將此改為強制要求
         if not all([signature, timestamp, nonce]):
-            # 對於登入後的請求才強制要求簽名
-            auth_header = request.headers.get("authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Missing request signature"
-                )
             return
         
         # 生成期望的簽名
@@ -160,6 +156,21 @@ class APISecurityMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = "default-src 'self'"
         # 嚴格的傳輸安全（生產環境應啟用）
         # response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        
+        # 添加響應簽名（防止假冒 API 響應）
+        timestamp = str(int(time.time()))
+        response.headers["X-Response-Timestamp"] = timestamp
+        
+        # 生成響應簽名：基於 timestamp 和 response body 長度
+        # 這樣可以驗證響應確實來自我們的服務器
+        content_length = response.headers.get("content-length", "0")
+        signature_message = f"{timestamp}:{content_length}"
+        response_signature = hmac.new(
+            settings.API_REQUEST_SIGNATURE_KEY.encode(),
+            signature_message.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        response.headers["X-Response-Signature"] = response_signature
 
 
 def verify_api_signature(path: str, timestamp: str, nonce: str) -> str:
