@@ -361,6 +361,7 @@ class LiuYaoChart:
         """計算神煞"""
         shensha = []
         
+        # 驛馬 (以日支查)
         yima_map = {'寅': '申', '申': '寅', '巳': '亥', '亥': '巳',
                     '子': '寅', '午': '申', '卯': '巳', '酉': '亥',
                     '辰': '寅', '戌': '申', '丑': '亥', '未': '巳'}
@@ -368,6 +369,7 @@ class LiuYaoChart:
         if yima:
             shensha.append({'name': '驛馬', 'zhi': [yima]})
         
+        # 桃花 (以日支查)
         taohua_map = {'寅': '卯', '午': '卯', '戌': '卯',
                       '申': '酉', '子': '酉', '辰': '酉',
                       '巳': '午', '酉': '午', '丑': '午',
@@ -375,11 +377,85 @@ class LiuYaoChart:
         taohua = taohua_map.get(self.day_zhi, '')
         if taohua:
             shensha.append({'name': '桃花', 'zhi': [taohua]})
+            
+        # 日祿 (以日干查)
+        lu_map = {'甲': '寅', '乙': '卯', '丙': '巳', '戊': '巳',
+                  '丁': '午', '己': '午', '庚': '申', '辛': '酉',
+                  '壬': '亥', '癸': '子'}
+        lu = lu_map.get(self.day_gan, '')
+        if lu:
+            shensha.append({'name': '日祿', 'zhi': [lu]})
+            
+        # 貴人 (天乙貴人 - 以日干查)
+        guiren_map = {
+            '甲': ['丑', '未'], '戊': ['丑', '未'], '庚': ['丑', '未'],
+            '乙': ['子', '申'], '己': ['子', '申'],
+            '丙': ['亥', '酉'], '丁': ['亥', '酉'],
+            '壬': ['巳', '卯'], '癸': ['巳', '卯'],
+            '辛': ['午', '寅']
+        }
+        guiren = guiren_map.get(self.day_gan, [])
+        if guiren:
+            shensha.append({'name': '貴人', 'zhi': guiren})
         
         return shensha
     
+    def _get_pure_gua_lines(self, gong_name: str) -> List[Dict[str, Any]]:
+        """獲取某宮本宮卦的六爻信息 (用於查伏神)"""
+        # 本宮卦 上下卦相同
+        upper = gong_name
+        lower = gong_name
+        
+        lower_dizhi = GONG_DIZHI.get(lower, [])
+        upper_dizhi = GONG_DIZHI.get(upper, [])
+        full_dizhi = lower_dizhi + upper_dizhi
+        
+        gong_wuxing = BAGUA[gong_name]['wuxing']
+        
+        lines = []
+        for zhi in full_dizhi:
+            zhi_idx = DIZHI.index(zhi)
+            wuxing = DIZHI_WUXING[zhi_idx]
+            liuqin = get_liuqin(gong_wuxing, wuxing)
+            lines.append({
+                'zhi': zhi,
+                'wuxing': wuxing,
+                'liuqin': liuqin
+            })
+        return lines
+
+    def _find_fushen(self):
+        """查找伏神"""
+        # 1. 檢查本卦中出現了哪些六親
+        present_liuqins = set()
+        for yao in self.yaos:
+            present_liuqins.add(yao['liuqin'])
+            
+        # 2. 找出缺少的六親
+        all_liuqins = {'兄弟', '子孫', '妻財', '父母', '官鬼'}
+        missing_liuqins = all_liuqins - present_liuqins
+        
+        # 3. 如果有缺，從本宮卦中尋找
+        if missing_liuqins:
+            pure_lines = self._get_pure_gua_lines(self.gong)
+            
+            # 遍歷本卦的每一爻，看是否需要安伏神
+            for i, yao in enumerate(self.yaos):
+                # 對應本宮卦的該爻
+                pure_line = pure_lines[i]
+                
+                # 如果本宮卦這爻的六親是缺少的，則它就是伏神，伏在當前爻(飛神)之下
+                if pure_line['liuqin'] in missing_liuqins:
+                    yao['fushen'] = {
+                        'liuqin': pure_line['liuqin'],
+                        'zhi': pure_line['zhi'],
+                        'wuxing': pure_line['wuxing']
+                    }
+
     def to_dict(self) -> Dict[str, Any]:
         """輸出為字典格式"""
+        self._find_fushen() # 確保伏神已計算
+
         result = {
             'yaogua': self.yaogua,
             'time': self.dt.strftime('%Y-%m-%d %H:%M:%S'),
@@ -413,53 +489,104 @@ class LiuYaoChart:
                     'zhi': yao['variant']['zhi'],
                     'wuxing': yao['variant']['wuxing'],
                 }
+                
+            if yao.get('fushen'):
+                 yao_data['origin']['fushen'] = {
+                    'relative': yao['fushen']['liuqin'],
+                    'zhi': yao['fushen']['zhi'],
+                    'wuxing': yao['fushen']['wuxing']
+                 }
             
             result[yao_names[i]] = yao_data
         
         return result
     
     def format_for_ai(self) -> str:
-        """格式化為 AI 可讀的文字"""
+        """
+        格式化為 AI 可讀的文字
+        
+        輸出格式範例：
+        
+        【基本資訊】
+        起卦時間：2023年10月27日 10:30
+        干支：癸卯年 壬戌月 戊申日 丁巳時  (日空: 寅卯)
+        神煞：驛馬-寅 桃花-酉 日祿-巳 貴人-丑,未
+
+        【卦象結構】
+        本卦：兌宮: 澤山咸 (世)             變卦：   坎宮: 水火既濟
+        ------------------------------------------------------------
+        六神  伏神        本      卦                  變      卦
+        ------------------------------------------------------------
+        白虎              父母未土     ▅▅　▅▅ 应        → 兄弟子水 ▅▅　▅▅
+        螣蛇              兄弟酉金     ▅▅▅▅▅ O       → 官鬼戌土 ▅▅▅▅▅
+        勾陳              子孫亥水     ▅▅▅▅▅          
+        朱雀  妻財卯木    兄弟申金     ▅▅▅▅▅ 世        → 兄弟亥水 ▅▅　▅▅
+        青龍              官鬼午火     ▅▅　▅▅ X       → 官鬼丑土 ▅▅　▅▅
+        玄武              父母辰土     ▅▅　▅▅          
+        ------------------------------------------------------------
+        """
+        self._find_fushen() # 確保伏神已計算
+        
         lines = []
-        lines.append(f"【起卦時間】{self.dt.strftime('%Y年%m月%d日 %H:%M')}")
-        lines.append(f"【四柱】{self.bazi}")
-        lines.append(f"【空亡】{''.join(self.kongwang)}")
-        lines.append(f"【卦宮】{self.gong}宮 ({self.gong_wuxing})")
-        lines.append(f"【本卦】{self.bengua_name} ({self.gua_type})")
-        if self.biangua_name:
-            lines.append(f"【變卦】{self.biangua_name}")
+        lines.append(f"【基本資訊】")
+        lines.append(f"起卦時間：{self.dt.strftime('%Y年%m月%d日 %H:%M')}")
+        lines.append(f"干支：{self.bazi}  (日空: {''.join(self.kongwang)})")
+        
+        shensha_str = " ".join([f"{s['name']}-{','.join(s['zhi'])}" for s in self.get_shensha()])
+        lines.append(f"神煞：{shensha_str}")
         lines.append("")
-        lines.append("【六爻詳情】（從初爻到上爻）")
         
-        yao_names = ['初爻', '二爻', '三爻', '四爻', '五爻', '上爻']
-        for i, yao in enumerate(self.yaos):
-            marks = []
-            if yao['is_shi']:
-                marks.append('世')
-            if yao['is_ying']:
-                marks.append('應')
+        # 卦宮資訊
+        ben_gong_info = f"{self.gong}宮: {self.bengua_name} ({self.gua_type})"
+        
+        bian_gong_info = ""
+        if self.biangua_name:
+            # 簡單推算變卦宮位
+            bg_gong, _, _ = self._find_gong_and_shi(self.bian_upper_gua, self.bian_lower_gua)
+            bian_gong_info = f"   {bg_gong}宮: {self.biangua_name}"
+            
+        lines.append(f"【卦象結構】")
+        lines.append(f"本卦：{ben_gong_info:<20} 變卦：{bian_gong_info}")
+        lines.append("-" * 60)
+        lines.append(f"六神  伏神        本      卦                  變      卦")
+        lines.append("-" * 60)
+        
+        yao_names = ['初爻', '二爻', '三爻', '四爻', '五爻', '六爻']
+        
+        # 倒序輸出 (從上爻到初爻)
+        for i in range(5, -1, -1):
+            yao = self.yaos[i]
+            
+            # 1. 六神
+            ls = f"{yao['liushen']}"
+            
+            # 2. 伏神
+            fs = ""
+            if yao.get('fushen'):
+                fs = f"{yao['fushen']['liuqin']}{yao['fushen']['zhi']}{yao['fushen']['wuxing']}"
+            
+            # 3. 本卦爻
+            ben_marks = []
+            if yao['is_shi']: ben_marks.append('世')
+            if yao['is_ying']: ben_marks.append('應')
+            
+            ben_info = f"{yao['liuqin']}{yao['zhi']}{yao['wuxing']}"
+            ben_line = '▅▅▅▅▅' if yao['is_yang'] else '▅▅　▅▅'
             if yao['is_moving']:
-                marks.append('動')
-            if yao['is_kong']:
-                marks.append('空')
+                 ben_line += " O" if yao['is_yang'] else " X"
+                 
+            ben_str = f"{ben_info} {ben_line} {''.join(ben_marks)}"
             
-            mark_str = f"[{','.join(marks)}]" if marks else ""
-            
-            line = f"{yao_names[i]}: {yao['liushen']} {yao['liuqin']}{yao['zhi']}({yao['wuxing']}) {yao['line']} {mark_str}"
-            
+            # 4. 變卦爻
+            bian_str = ""
             if yao.get('variant'):
-                v = yao['variant']
-                line += f" → {v['liuqin']}{v['zhi']}({v['wuxing']})"
+                bian_info = f"{yao['variant']['liuqin']}{yao['variant']['zhi']}{yao['variant']['wuxing']}"
+                bian_line = '▅▅▅▅▅' if yao['variant']['is_yang'] else '▅▅　▅▅'
+                bian_str = f"→ {bian_info} {bian_line}"
             
-            lines.append(line)
-        
-        # 神煞
-        shensha = self.get_shensha()
-        if shensha:
-            lines.append("")
-            lines.append("【神煞】")
-            for s in shensha:
-                lines.append(f"{s['name']}: {','.join(s['zhi'])}")
+            lines.append(f"{ls:<4} {fs:<10} {ben_info:<8} {ben_line:<8} {','.join(ben_marks):<4} {bian_str}")
+            
+        lines.append("-" * 60)
         
         return "\n".join(lines)
 
@@ -491,3 +618,5 @@ def perform_divination(
     result['formatted'] = chart.format_for_ai()
     
     return result
+
+
