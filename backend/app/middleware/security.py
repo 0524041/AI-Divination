@@ -4,6 +4,7 @@ API 安全中間件 - 防止重定向和請求偽造攻擊
 import hmac
 import hashlib
 import time
+import secrets
 import logging
 from typing import Callable
 from fastapi import Request, Response, HTTPException, status
@@ -158,13 +159,15 @@ class APISecurityMiddleware(BaseHTTPMiddleware):
         # response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         
         # 添加響應簽名（防止假冒 API 響應）
+        # 注意：不使用 Content-Length，因為 CDN/代理可能會修改它（如 gzip 壓縮）
         timestamp = str(int(time.time()))
+        nonce = secrets.token_urlsafe(8)  # 隨機值，確保每次響應唯一
         response.headers["X-Response-Timestamp"] = timestamp
+        response.headers["X-Response-Nonce"] = nonce
         
-        # 生成響應簽名：基於 timestamp 和 response body 長度
-        # 這樣可以驗證響應確實來自我們的服務器
-        content_length = response.headers.get("content-length", "0")
-        signature_message = f"{timestamp}:{content_length}"
+        # 生成響應簽名：基於 timestamp 和 nonce
+        # 只有擁有密鑰的服務器才能生成正確的簽名
+        signature_message = f"response:{timestamp}:{nonce}"
         response_signature = hmac.new(
             settings.API_REQUEST_SIGNATURE_KEY.encode(),
             signature_message.encode(),

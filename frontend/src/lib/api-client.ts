@@ -132,21 +132,20 @@ async function verifyResponseSignature(response: Response): Promise<void> {
 
   const responseSignature = response.headers.get('X-Response-Signature');
   const responseTimestamp = response.headers.get('X-Response-Timestamp');
+  const responseNonce = response.headers.get('X-Response-Nonce');
 
   // 如果沒有響應簽名，可能是舊的 API 或公開端點
-  if (!responseSignature || !responseTimestamp) {
-    // 對於關鍵操作（有 Authorization header），我們要求必須有簽名
-    const hasAuth = response.headers.get('Authorization') ||
-      localStorage.getItem('token');
+  if (!responseSignature || !responseTimestamp || !responseNonce) {
+    // 對於關鍵操作（有 token），記錄警告
+    const hasAuth = localStorage.getItem('token');
     if (hasAuth && response.status === 200) {
       console.warn('Response missing signature - possible security risk');
     }
     return;
   }
 
-  // 生成預期的簽名
-  const contentLength = response.headers.get('content-length') || '0';
-  const message = `${responseTimestamp}:${contentLength}`;
+  // 生成預期的簽名（使用 nonce，不使用 content-length 因為 CDN 會修改它）
+  const message = `response:${responseTimestamp}:${responseNonce}`;
 
   try {
     const encoder = new TextEncoder();
@@ -175,10 +174,13 @@ async function verifyResponseSignature(response: Response): Promise<void> {
     // 檢查時間戳是否過舊（防止重放攻擊）
     const timestamp = parseInt(responseTimestamp);
     const currentTime = Math.floor(Date.now() / 1000);
-    if (Math.abs(currentTime - timestamp) > 60) {
+    if (Math.abs(currentTime - timestamp) > 300) {  // 5 分鐘容忍時間差
       throw new Error('Response timestamp too old - possible replay attack');
     }
   } catch (error) {
+    if (error instanceof Error && error.message.includes('fake API')) {
+      throw error;
+    }
     console.error('Response verification failed:', error);
     throw new Error('Failed to verify response authenticity');
   }
