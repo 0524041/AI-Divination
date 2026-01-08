@@ -3,8 +3,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { initializeApiClient, isInitialized } from './api-init';
-import { apiGet, apiPost, apiPut, apiDelete, SecureSSEConnection } from './api-client';
+import { initializeApiClient, isInitialized } from '../lib/api-init';
+import { apiGet, apiPost, apiPut, apiDelete, SecureSSEConnection } from '../lib/api-client';
 
 export function useApiClient() {
   const [ready, setReady] = useState(false);
