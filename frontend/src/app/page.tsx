@@ -95,11 +95,42 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-spin-slow">☯</div>
-          <p className="text-gray-400">載入中...</p>
+      <div className="min-h-screen">
+        {/* Skeleton nav */}
+        <div className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">☯</span>
+            <div className="h-7 w-24 bg-gray-700 rounded animate-pulse"></div>
+          </div>
+          <div className="hidden md:flex items-center gap-6">
+            <div className="h-4 w-16 bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-4 w-16 bg-gray-700 rounded animate-pulse"></div>
+            <div className="h-4 w-16 bg-gray-700 rounded animate-pulse"></div>
+          </div>
         </div>
+
+        {/* Skeleton content */}
+        <main className="max-w-6xl mx-auto px-4 py-8">
+          <div className="text-center mb-12">
+            <div className="text-6xl mb-4 animate-spin-slow">☯</div>
+            <p className="text-gray-400">載入中...</p>
+          </div>
+
+          {/* Skeleton cards - reserve space for divination type cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="glass-card p-6 animate-pulse">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-gray-700 rounded"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-6 w-24 bg-gray-700 rounded"></div>
+                    <div className="h-4 w-full bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -176,11 +207,10 @@ export default function HomePage() {
           {divinationTypes.map((type) => (
             <div
               key={type.id}
-              className={`glass-card p-6 transition-all duration-300 ${
-                type.available
+              className={`glass-card p-6 transition-all duration-300 ${type.available
                   ? 'hover:border-[var(--gold)] hover:shadow-lg hover:shadow-[var(--gold)]/20 cursor-pointer'
                   : 'opacity-60'
-              }`}
+                }`}
               onClick={() => type.available && router.push(type.href)}
             >
               <div className="flex items-start gap-4">
@@ -204,9 +234,9 @@ export default function HomePage() {
       <footer className="text-center py-8 text-gray-500 text-sm">
         <p>AI 算命 v2.0 - 結合傳統智慧與現代科技</p>
         <p className="mt-2">
-          <a 
-            href="https://github.com/0524041/AI-Divination" 
-            target="_blank" 
+          <a
+            href="https://github.com/0524041/AI-Divination"
+            target="_blank"
             rel="noopener noreferrer"
             className="text-[var(--gold)] hover:underline"
           >

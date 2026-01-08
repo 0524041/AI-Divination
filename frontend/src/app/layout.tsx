@@ -5,8 +5,9 @@ import { Noto_Serif_TC } from 'next/font/google';
 const notoSerifTC = Noto_Serif_TC({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  display: 'swap',
+  display: 'optional', // Use 'optional' to prevent layout shift from font swap
   preload: true,
+  fallback: ['serif', 'system-ui'], // Specify fallback fonts
 });
 
 export const metadata: Metadata = {

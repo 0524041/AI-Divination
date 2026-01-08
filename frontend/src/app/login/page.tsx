@@ -107,10 +107,28 @@ export default function LoginPage() {
 
   if (isInit === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-spin-slow">☯</div>
-          <p className="text-gray-400">載入中...</p>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          {/* Skeleton Logo */}
+          <div className="text-center mb-8">
+            <div className="text-7xl mb-4">☯</div>
+            <div className="h-9 w-32 bg-gray-700 rounded mx-auto animate-pulse"></div>
+            <div className="h-5 w-48 bg-gray-700 rounded mx-auto mt-2 animate-pulse"></div>
+          </div>
+
+          {/* Skeleton Form Card */}
+          <div className="glass-card p-8">
+            <div className="text-center mb-6">
+              <div className="text-4xl animate-spin-slow">☯</div>
+              <p className="text-gray-400 mt-2">載入中...</p>
+            </div>
+            {/* Skeleton form fields */}
+            <div className="space-y-4">
+              <div className="h-12 bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-12 bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-12 bg-gray-700 rounded animate-pulse"></div>
+            </div>
+          </div>
         </div>
       </div>
     );
