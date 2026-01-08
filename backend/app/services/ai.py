@@ -187,7 +187,21 @@ class CustomAIService(AIService):
             # 設置較短的 timeout
             async with httpx.AsyncClient(timeout=5.0) as client:
                 
-                # 嘗試 1: Ollama API (/api/tags)
+                # 優先嘗試: OpenAI Compatible (/v1/models) - 支援 LM Studio, vLLM 等
+                url_openai = f"{base_url.rstrip('/')}/v1/models"
+                content = await fetch_safely(client, url_openai)
+                
+                if content:
+                    try:
+                        data = json.loads(content)
+                        models = []
+                        if "data" in data:
+                            models = [m.get("id", "") for m in data["data"]]
+                        return {"success": True, "models": models}
+                    except json.JSONDecodeError:
+                        pass
+
+                # 備用嘗試: Ollama API (/api/tags)
                 url_ollama = f"{base_url.rstrip('/')}/api/tags"
                 content = await fetch_safely(client, url_ollama)
                 
@@ -198,20 +212,6 @@ class CustomAIService(AIService):
                         if "models" in data:
                             models = [m.get("name", "") for m in data["models"]]
                         elif "data" in data:
-                            models = [m.get("id", "") for m in data["data"]]
-                        return {"success": True, "models": models}
-                    except json.JSONDecodeError:
-                        pass
-
-                # 嘗試 2: OpenAI Compatible (/v1/models)
-                url_openai = f"{base_url.rstrip('/')}/v1/models"
-                content = await fetch_safely(client, url_openai)
-                
-                if content:
-                    try:
-                        data = json.loads(content)
-                        models = []
-                        if "data" in data:
                             models = [m.get("id", "") for m in data["data"]]
                         return {"success": True, "models": models}
                     except json.JSONDecodeError:
