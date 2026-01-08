@@ -11,8 +11,12 @@ const notoSerifTC = Noto_Serif_TC({
 });
 
 export const metadata: Metadata = {
-  title: 'AI 算命 - 六爻占卜',
-  description: '結合 AI 的智慧算命系統，提供六爻占卜解盤服務',
+  title: '玄覺空間 - AI 玄學占卜',
+  description: '結合傳統玄學智慧與 AI 科技的占卜系統，提供六爻、塔羅等專業解盤服務',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

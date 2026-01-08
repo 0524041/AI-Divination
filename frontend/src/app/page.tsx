@@ -141,7 +141,7 @@ export default function HomePage() {
       <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-3xl">☯</span>
-          <h1 className="text-xl font-bold text-[var(--gold)]">AI 算命</h1>
+          <h1 className="text-xl font-bold text-[var(--gold)]">玄覺空間</h1>
         </div>
 
         {/* 桌面選單 */}
@@ -208,8 +208,8 @@ export default function HomePage() {
             <div
               key={type.id}
               className={`glass-card p-6 transition-all duration-300 ${type.available
-                  ? 'hover:border-[var(--gold)] hover:shadow-lg hover:shadow-[var(--gold)]/20 cursor-pointer'
-                  : 'opacity-60'
+                ? 'hover:border-[var(--gold)] hover:shadow-lg hover:shadow-[var(--gold)]/20 cursor-pointer'
+                : 'opacity-60'
                 }`}
               onClick={() => type.available && router.push(type.href)}
             >
@@ -232,7 +232,7 @@ export default function HomePage() {
 
       {/* 頁尾 */}
       <footer className="text-center py-8 text-gray-500 text-sm">
-        <p>AI 算命 v2.0 - 結合傳統智慧與現代科技</p>
+        <p>玄覺空間 - 結合傳統智慧與現代科技</p>
         <p className="mt-2">
           <a
             href="https://github.com/0524041/AI-Divination"

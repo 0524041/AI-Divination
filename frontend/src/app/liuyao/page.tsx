@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import CoinTossing from '@/components/CoinTossing';
+import { apiGet, apiPost, apiPut } from '@/lib/api-client';
 import {
   ArrowLeft,
   Compass,
@@ -98,11 +99,8 @@ export default function LiuYaoPage() {
   }, [router]);
 
   const fetchAIConfigs = async () => {
-    const token = localStorage.getItem('token');
     try {
-      const res = await fetch('/api/settings/ai', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await apiGet('/api/settings/ai');
       if (res.ok) {
         const configs = await res.json();
         setAiConfigs(configs);
@@ -115,12 +113,8 @@ export default function LiuYaoPage() {
   };
 
   const handleSwitchAI = async (configId: number) => {
-    const token = localStorage.getItem('token');
     try {
-      await fetch(`/api/settings/ai/${configId}/activate`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiPut(`/api/settings/ai/${configId}/activate`);
       await fetchAIConfigs();
       setShowAISelector(false);
     } catch (err) {
@@ -176,10 +170,7 @@ export default function LiuYaoPage() {
       }
 
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`/api/history/${result.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await apiGet(`/api/history/${result.id}`);
 
         if (res.ok) {
           const data = await res.json();
@@ -218,6 +209,8 @@ export default function LiuYaoPage() {
     e.preventDefault();
     if (!question.trim()) return;
 
+    console.log('[LiuYao] handleSubmit started', { question, gender, target });
+
     setError('');
     setLoading(true);
     setResult(null);
@@ -233,31 +226,40 @@ export default function LiuYaoPage() {
     abortControllerRef.current = new AbortController();
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/divination/liuyao', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ question, gender, target }),
-        signal: abortControllerRef.current.signal,
-      });
+      console.log('[LiuYao] Sending request to /api/liuyao');
+      const res = await apiPost('/api/liuyao', { question, gender, target });
+      console.log('[LiuYao] Response received', { status: res.status, statusText: res.statusText });
+
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textBody = await res.text();
+        console.error('[LiuYao] Non-JSON response received:', textBody.substring(0, 200));
+        throw new Error(`伺服器回應格式錯誤 (Status: ${res.status}): ${textBody.substring(0, 50)}...`);
+      }
 
       const data = await res.json();
 
       if (res.ok) {
+        console.log('[LiuYao] Request successful', data);
         setResult(data);
         // 注意：這裡不設定 setShowResult(true)，因為要先顯示擲幣動畫
       } else {
+        console.warn('[LiuYao] Request failed with logic error', data);
         setError(data.detail || '占卜失敗');
         setIsTossing(false);
       }
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError('占卜已取消');
+      console.error('[LiuYao] Caught error in handleSubmit:', err);
+
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('占卜已取消');
+        } else {
+          // 顯示更詳細的錯誤資訊
+          setError(`連線錯誤: ${err.message}`);
+        }
       } else {
-        setError('無法連接伺服器');
+        setError('發生未知錯誤');
       }
       setIsTossing(false);
     } finally {
@@ -275,11 +277,7 @@ export default function LiuYaoPage() {
 
     // 取消後端處理
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/divination/${result.id}/cancel`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiPost(`/api/liuyao/${result.id}/cancel`);
     } catch (err) {
       console.error('Cancel error:', err);
     }
