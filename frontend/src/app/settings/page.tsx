@@ -775,21 +775,28 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="relative z-50">
                       <label className="block text-sm text-gray-400 mb-2">模型名稱</label>
-                      <input
-                        type="text"
-                        list="available-models"
-                        value={newLocalModel}
-                        onChange={(e) => setNewLocalModel(e.target.value)}
-                        className="input-dark w-full"
-                        placeholder="例如: llama3, qwen2.5:14b"
-                      />
-                      <datalist id="available-models">
-                        {availableModels.map((model) => (
-                          <option key={model} value={model} />
-                        ))}
-                      </datalist>
+                      {availableModels.length > 0 ? (
+                        <select
+                          value={newLocalModel}
+                          onChange={(e) => setNewLocalModel(e.target.value)}
+                          className="input-dark w-full"
+                        >
+                          <option value="">請選擇模型</option>
+                          {availableModels.map((model) => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={newLocalModel}
+                          onChange={(e) => setNewLocalModel(e.target.value)}
+                          className="input-dark w-full"
+                          placeholder="例如: llama3, qwen2.5:14b"
+                        />
+                      )}
                       <p className="text-xs text-gray-500 mt-1">可點擊上方「測試」按鈕自動取得模型列表，或直接手動輸入。</p>
                     </div>
                   </div>
@@ -797,7 +804,7 @@ export default function SettingsPage() {
 
                 <button
                   onClick={editingConfig ? handleUpdateAIConfig : handleAddAIConfig}
-                  className="btn-gold w-full mt-4"
+                  className="btn-gold w-full mt-6"
                 >
                   {editingConfig ? '更新設定' : '儲存設定'}
                 </button>
