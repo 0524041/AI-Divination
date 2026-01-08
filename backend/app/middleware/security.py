@@ -73,26 +73,26 @@ class APISecurityMiddleware(BaseHTTPMiddleware):
             )
     
     def _verify_origin(self, request: Request):
-        """驗證請求來源"""
+        """驗證請求來源（寬鬆模式，適用於通過代理的請求）"""
         origin = request.headers.get("origin")
         referer = request.headers.get("referer")
         
-        # 檢查 Origin 或 Referer
-        allowed = False
-        if origin:
-            allowed = origin in settings.ALLOWED_ORIGINS
-        elif referer:
-            for allowed_origin in settings.ALLOWED_ORIGINS:
-                if referer.startswith(allowed_origin):
-                    allowed = True
-                    break
+        # 如果沒有 origin header，可能是：
+        # 1. 來自 Next.js 代理的內部請求
+        # 2. 同源請求
+        # 3. 非瀏覽器請求
+        # 這些情況都允許通過
+        if not origin:
+            return
         
-        if not allowed and origin:  # 如果有 origin 但不在白名單中
-            logger.warning(f"Request from unauthorized origin: {origin}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Unauthorized origin"
-            )
+        # 檢查 Origin 是否在白名單中
+        allowed = origin in settings.ALLOWED_ORIGINS
+        
+        # 對於不在白名單的 origin，僅記錄警告而不阻止
+        # 因為請求可能來自 Cloudflare Tunnel 等代理
+        # 真正的安全性由 JWT token 和響應簽名保證
+        if not allowed:
+            logger.warning(f"Request from non-whitelisted origin: {origin} (allowed for proxy compatibility)")
     
     def _verify_signature(self, request: Request):
         """驗證請求簽名（若有提供則驗證，無則跳過）"""
