@@ -324,6 +324,25 @@ export default function HistoryPage() {
 
     setSharingState(prev => ({ ...prev, [item.id]: 'loading' }));
 
+    // Safari 修復：在 async 操作之前就創建並 focus textarea
+    // 這樣可以保持用戶手勢上下文，讓之後的 copy 操作能成功
+    const textArea = document.createElement('textarea');
+    textArea.style.position = 'fixed';
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.width = '2em';
+    textArea.style.height = '2em';
+    textArea.style.padding = '0';
+    textArea.style.border = 'none';
+    textArea.style.outline = 'none';
+    textArea.style.boxShadow = 'none';
+    textArea.style.background = 'transparent';
+    textArea.style.opacity = '0';
+    textArea.value = 'loading...';  // 暫時值
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
     try {
       const res = await fetch('/api/share/create', {
         method: 'POST',
@@ -335,48 +354,27 @@ export default function HistoryPage() {
       });
 
       if (!res.ok) {
+        document.body.removeChild(textArea);
         throw new Error('建立分享連結失敗');
       }
 
       const data = await res.json();
       const shareUrl = `${window.location.origin}${data.share_url}`;
 
-      // 複製到剪貼簿 - 使用 execCommand 作為主要方法（Safari 相容）
-      // Safari 在 async 操作後會阻止 Clipboard API，但 execCommand 仍然有效
-      const copyToClipboard = (text: string): boolean => {
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        // 避免頁面滾動
-        textArea.style.position = 'fixed';
-        textArea.style.top = '0';
-        textArea.style.left = '0';
-        textArea.style.width = '2em';
-        textArea.style.height = '2em';
-        textArea.style.padding = '0';
-        textArea.style.border = 'none';
-        textArea.style.outline = 'none';
-        textArea.style.boxShadow = 'none';
-        textArea.style.background = 'transparent';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
+      // 更新 textarea 的值並複製
+      textArea.value = shareUrl;
+      textArea.select();
 
-        let success = false;
-        try {
-          success = document.execCommand('copy');
-        } catch (err) {
-          console.warn('execCommand copy failed:', err);
-        }
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch (err) {
+        console.warn('execCommand copy failed:', err);
+      }
 
-        document.body.removeChild(textArea);
-        return success;
-      };
+      document.body.removeChild(textArea);
 
-      // 優先使用 execCommand（Safari 相容）
-      let copied = copyToClipboard(shareUrl);
-
-      // 如果 execCommand 失敗，嘗試 Clipboard API（可能在某些情況下有效）
+      // 如果 execCommand 失敗，嘗試 Clipboard API
       if (!copied && navigator.clipboard && navigator.clipboard.writeText) {
         try {
           await navigator.clipboard.writeText(shareUrl);
@@ -398,11 +396,16 @@ export default function HistoryPage() {
         setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
       }, 3000);
     } catch (err) {
+      // 確保 textarea 被移除
+      if (textArea.parentNode) {
+        document.body.removeChild(textArea);
+      }
       console.error('Share error:', err);
       alert('建立分享連結失敗');
       setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
     }
   };
+
 
   const toggleExpand = async (item: HistoryItem) => {
     if (expandedId === item.id) {
