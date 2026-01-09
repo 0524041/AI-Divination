@@ -207,12 +207,13 @@ def change_password(
 def get_client_config():
     """
     獲取客戶端配置
-    提供簽名密鑰給前端（僅開發環境）
+    注意：已移除簽名密鑰暴露（不再使用簽名驗證）
     """
     from app.core.config import get_settings
     settings = get_settings()
     
     return {
-        "signature_key": settings.API_REQUEST_SIGNATURE_KEY,
-        "allowed_origins": settings.ALLOWED_ORIGINS
+        "app_name": settings.APP_NAME,
+        "version": "2.0.0"
     }
+

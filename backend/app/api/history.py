@@ -301,6 +301,10 @@ def delete_history_item(
             detail="紀錄不存在"
         )
     
+    # 先刪除關聯的 share_tokens（避免外鍵約束錯誤）
+    db.query(ShareToken).filter(ShareToken.history_id == history_id).delete()
+    
+    # 刪除歷史紀錄
     db.delete(history)
     db.commit()
     
