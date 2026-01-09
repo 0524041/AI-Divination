@@ -324,26 +324,12 @@ export default function HistoryPage() {
 
     setSharingState(prev => ({ ...prev, [item.id]: 'loading' }));
 
-    // Safari 修復：在 async 操作之前就創建並 focus textarea
-    // 這樣可以保持用戶手勢上下文，讓之後的 copy 操作能成功
-    const textArea = document.createElement('textarea');
-    textArea.style.position = 'fixed';
-    textArea.style.top = '0';
-    textArea.style.left = '0';
-    textArea.style.width = '2em';
-    textArea.style.height = '2em';
-    textArea.style.padding = '0';
-    textArea.style.border = 'none';
-    textArea.style.outline = 'none';
-    textArea.style.boxShadow = 'none';
-    textArea.style.background = 'transparent';
-    textArea.style.opacity = '0';
-    textArea.value = 'loading...';  // 暫時值
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
+    // Safari 修復：使用 ClipboardItem + Promise 方式
+    // 關鍵：navigator.clipboard.write() 必須在用戶手勢上下文中同步呼叫
+    // 但可以傳入一個 Promise 給 ClipboardItem，讓 async 操作在 Promise 內執行
 
-    try {
+    // 創建一個 Promise 來獲取分享連結
+    const getShareUrl = async (): Promise<string> => {
       const res = await fetch('/api/share/create', {
         method: 'POST',
         headers: {
@@ -354,52 +340,71 @@ export default function HistoryPage() {
       });
 
       if (!res.ok) {
-        document.body.removeChild(textArea);
         throw new Error('建立分享連結失敗');
       }
 
       const data = await res.json();
-      const shareUrl = `${window.location.origin}${data.share_url}`;
+      return `${window.location.origin}${data.share_url}`;
+    };
 
-      // 更新 textarea 的值並複製
-      textArea.value = shareUrl;
-      textArea.select();
+    try {
+      // 檢查是否支援 ClipboardItem（Safari 13.1+, Chrome 66+）
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        // Safari 相容方案：使用 ClipboardItem + Promise
+        // 這樣 write() 是同步呼叫（保持用戶手勢上下文），但內容是 async 獲取
+        const textPromise = getShareUrl().then(url => new Blob([url], { type: 'text/plain' }));
+        const clipboardItem = new ClipboardItem({
+          'text/plain': textPromise
+        });
 
-      let copied = false;
-      try {
-        copied = document.execCommand('copy');
-      } catch (err) {
-        console.warn('execCommand copy failed:', err);
+        await navigator.clipboard.write([clipboardItem]);
+
+        setSharingState(prev => ({ ...prev, [item.id]: 'success' }));
+        setTimeout(() => {
+          setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
+        }, 3000);
+        return;
       }
 
-      document.body.removeChild(textArea);
+      // Fallback：傳統方式（Chrome 等較寬容的瀏覽器）
+      const shareUrl = await getShareUrl();
 
-      // 如果 execCommand 失敗，嘗試 Clipboard API
-      if (!copied && navigator.clipboard && navigator.clipboard.writeText) {
+      // 嘗試 Clipboard API
+      if (navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(shareUrl);
-          copied = true;
+          setSharingState(prev => ({ ...prev, [item.id]: 'success' }));
+          setTimeout(() => {
+            setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
+          }, 3000);
+          return;
         } catch (clipboardErr) {
           console.warn('Clipboard API failed:', clipboardErr);
         }
       }
 
-      if (!copied) {
-        // 如果都失敗，顯示 URL 讓用戶手動複製
+      // Fallback: execCommand
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      textArea.style.cssText = 'position:fixed;top:0;left:0;width:2em;height:2em;opacity:0';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textArea);
+
+      if (copied) {
+        setSharingState(prev => ({ ...prev, [item.id]: 'success' }));
+        setTimeout(() => {
+          setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
+        }, 3000);
+      } else {
+        // 最後手段：顯示連結讓用戶手動複製
         prompt('請手動複製分享連結:', shareUrl);
-      }
-
-      setSharingState(prev => ({ ...prev, [item.id]: 'success' }));
-
-      // 3 秒後重置狀態
-      setTimeout(() => {
         setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
-      }, 3000);
-    } catch (err) {
-      // 確保 textarea 被移除
-      if (textArea.parentNode) {
-        document.body.removeChild(textArea);
       }
+    } catch (err) {
       console.error('Share error:', err);
       alert('建立分享連結失敗');
       setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
