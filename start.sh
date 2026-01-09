@@ -150,12 +150,54 @@ stop_services() {
 }
 
 # ============================================
-# 重啟服務
+# 重啟服務（自動檢測前端變更並重新構建）
 # ============================================
 restart_services() {
     echo -e "\n${YELLOW}[重啟] 正在重啟所有服務...${NC}"
+    
+    # 停止服務
     stop_services
     sleep 2
+    
+    # 檢查前端是否有變更
+    cd "$FRONTEND_DIR"
+    FRONTEND_CHANGED=false
+    
+    # 使用 git 檢測 frontend 目錄的變更
+    if git diff --quiet HEAD -- . 2>/dev/null; then
+        # 沒有未提交的變更，檢查 .next 是否比 src 更舊
+        if [ -d ".next" ]; then
+            # 找出 src 目錄中最新修改的檔案時間
+            NEWEST_SRC=$(find src -type f -name "*.tsx" -o -name "*.ts" -o -name "*.css" 2>/dev/null | xargs stat -f "%m" 2>/dev/null | sort -nr | head -1)
+            BUILD_TIME=$(stat -f "%m" .next/BUILD_ID 2>/dev/null || echo "0")
+            
+            if [ -n "$NEWEST_SRC" ] && [ "$NEWEST_SRC" -gt "$BUILD_TIME" ]; then
+                echo -e "${YELLOW}檢測到前端原始碼比構建更新${NC}"
+                FRONTEND_CHANGED=true
+            fi
+        else
+            echo -e "${YELLOW}未找到構建目錄${NC}"
+            FRONTEND_CHANGED=true
+        fi
+    else
+        echo -e "${YELLOW}檢測到前端有未提交的變更${NC}"
+        FRONTEND_CHANGED=true
+    fi
+    
+    if [ "$FRONTEND_CHANGED" = true ]; then
+        echo -e "${CYAN}正在重新構建前端...${NC}"
+        npm run build
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}✗ 前端構建失敗${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✓ 前端重新構建完成${NC}"
+    else
+        echo -e "${GREEN}✓ 前端無變更，使用現有構建${NC}"
+    fi
+    
+    # 啟動服務
+    cd "$PROJECT_DIR"
     start_services
 }
 
@@ -333,58 +375,14 @@ init_database() {
 }
 
 # ============================================
-# 配置安全機制（自動執行）
+# 配置安全機制（簡化版 - 不再使用簽名密鑰）
 # ============================================
 configure_security() {
     echo -e "\n${YELLOW}[5/8] 配置安全機制...${NC}"
     
-    SIGNATURE_KEY_FILE="$BACKEND_DIR/.api_signature_key"
-    FRONTEND_ENV_FILE="$FRONTEND_DIR/.env.local"
-    
-    # 檢查並生成後端密鑰（後端會在 Settings 初始化時自動生成）
+    # 後端會在 Settings 初始化時自動生成 SECRET_KEY 和 ENCRYPTION_KEY
     cd "$BACKEND_DIR"
     "$VENV_DIR/bin/python" -c "from app.core.config import get_settings; get_settings()"
-    
-    if [ -f "$SIGNATURE_KEY_FILE" ]; then
-        SIGNATURE_KEY=$(cat "$SIGNATURE_KEY_FILE")
-        echo -e "${GREEN}✓ API 簽名密鑰已就緒${NC}"
-    else
-        echo -e "${RED}✗ API 簽名密鑰生成失敗${NC}"
-        return 1
-    fi
-    
-    # 檢查並同步前端配置
-    if [ -f "$FRONTEND_ENV_FILE" ]; then
-        # 檢查現有配置中的密鑰是否正確
-        EXISTING_KEY=$(grep "NEXT_PUBLIC_API_SIGNATURE_KEY=" "$FRONTEND_ENV_FILE" 2>/dev/null | cut -d'=' -f2)
-        if [ "$EXISTING_KEY" != "$SIGNATURE_KEY" ]; then
-            echo "更新前端 API 簽名密鑰..."
-            # 使用 sed 更新密鑰
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                sed -i '' "s|NEXT_PUBLIC_API_SIGNATURE_KEY=.*|NEXT_PUBLIC_API_SIGNATURE_KEY=$SIGNATURE_KEY|" "$FRONTEND_ENV_FILE"
-            else
-                sed -i "s|NEXT_PUBLIC_API_SIGNATURE_KEY=.*|NEXT_PUBLIC_API_SIGNATURE_KEY=$SIGNATURE_KEY|" "$FRONTEND_ENV_FILE"
-            fi
-            echo -e "${GREEN}✓ 前端密鑰已更新${NC}"
-            # 標記需要重新構建
-            FORCE_BUILD=true
-        else
-            echo -e "${GREEN}✓ 前端密鑰已同步${NC}"
-        fi
-    else
-        # 創建新的 .env.local
-        echo "創建前端環境配置..."
-        cat > "$FRONTEND_ENV_FILE" << EOF
-# API 配置 (由 start.sh 自動生成)
-NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# API 簽名密鑰
-NEXT_PUBLIC_API_SIGNATURE_KEY=$SIGNATURE_KEY
-EOF
-        echo -e "${GREEN}✓ 前端配置已創建${NC}"
-        # 新配置需要重新構建
-        FORCE_BUILD=true
-    fi
     
     echo -e "${GREEN}✓ 安全機制配置完成${NC}"
 }

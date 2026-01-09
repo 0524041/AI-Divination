@@ -28,12 +28,14 @@ logging.basicConfig(
 settings = get_settings()
 
 # 建立應用程式
+# 生產環境隱藏 API 文件
 app = FastAPI(
     title=settings.APP_NAME,
     description="AI 算命網頁 API",
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
+    openapi_url="/openapi.json" if settings.DEBUG else None
 )
 
 # 全局異常處理
@@ -45,10 +47,18 @@ import traceback
 async def global_exception_handler(request: Request, exc: Exception):
     error_msg = f"Global Error: {str(exc)}\n{traceback.format_exc()}"
     print(error_msg)  # 確保印在後端終端機
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc), "traceback": traceback.format_exc()},
-    )
+    
+    # 生產環境隱藏詳細錯誤
+    if settings.DEBUG:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc), "traceback": traceback.format_exc()},
+        )
+    else:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
 
 # API 安全中間件（最優先）
 app.add_middleware(APISecurityMiddleware)

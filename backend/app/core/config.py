@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # 應用程式
     APP_NAME: str = "AI-Divination"
-    DEBUG: bool = True
+    DEBUG: bool = False  # 生產環境
     
     # 資料庫
     DATABASE_URL: str = f"sqlite:///{BASE_DIR}/divination.db"
@@ -29,13 +29,11 @@ class Settings(BaseSettings):
     # 加密金鑰 (用於加密 API Key)
     ENCRYPTION_KEY: str = ""
     
-    # API 安全設定
-    API_REQUEST_SIGNATURE_KEY: str = ""
+    # CORS 設定
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000"
     ]
-    API_RATE_LIMIT: int = 100  # 每分鐘請求次數
     
     class Config:
         env_file = ".env"
@@ -68,13 +66,7 @@ class Settings(BaseSettings):
                 self.ENCRYPTION_KEY = Fernet.generate_key().decode()
                 encryption_key_file.write_text(self.ENCRYPTION_KEY)
         
-        # API Signature Key
-        if not self.API_REQUEST_SIGNATURE_KEY:
-            if api_signature_key_file.exists():
-                self.API_REQUEST_SIGNATURE_KEY = api_signature_key_file.read_text().strip()
-            else:
-                self.API_REQUEST_SIGNATURE_KEY = secrets.token_urlsafe(32)
-                api_signature_key_file.write_text(self.API_REQUEST_SIGNATURE_KEY)
+        # 注意: API_REQUEST_SIGNATURE_KEY 已移除，不再使用簽名驗證
 
 
 @lru_cache()

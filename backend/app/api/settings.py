@@ -254,6 +254,7 @@ def delete_ai_config(
 
 @router.post("/ai/test", response_model=TestConnectionResponse)
 async def test_ai_connection(
+    request: Request,
     body: TestConnectionRequest,
     current_user: User = Depends(get_current_user),
     _: None = Depends(RateLimitDep(max_requests=5, window_seconds=60))
@@ -263,12 +264,25 @@ async def test_ai_connection(
     
     注意：只有管理員可以使用 localhost/私有 IP 進行測試
     """
-    # 檢查用戶是否為管理員（允許 localhost 測試）
+    import logging
+    security_logger = logging.getLogger("security.audit")
+    
+    # 記錄連線測試嘗試
+    client_ip = request.client.host if request.client else "unknown"
     is_admin = current_user.role == 'admin'
+    
+    security_logger.info(
+        f"AI Connection Test | IP: {client_ip} | User: {current_user.username} | "
+        f"Admin: {is_admin} | URL: {body.url}"
+    )
     
     try:
         url = sanitize_url(body.url, allow_private=is_admin)
     except ValueError as e:
+        security_logger.warning(
+            f"AI Connection Test BLOCKED | IP: {client_ip} | User: {current_user.username} | "
+            f"URL: {body.url} | Reason: {str(e)}"
+        )
         if is_admin:
             return TestConnectionResponse(success=False, error=str(e))
         else:
@@ -276,6 +290,20 @@ async def test_ai_connection(
                 success=False, 
                 error="禁止連線到私有網路。只有管理員可以測試 localhost。"
             )
-        
+    
     result = await CustomAIService.test_connection(url)
+    
+    # 記錄結果
+    if result.get("success"):
+        security_logger.info(
+            f"AI Connection Test SUCCESS | IP: {client_ip} | URL: {url} | "
+            f"Models: {len(result.get('models', []))}"
+        )
+    else:
+        security_logger.warning(
+            f"AI Connection Test FAILED | IP: {client_ip} | URL: {url} | "
+            f"Error: {result.get('error', 'unknown')}"
+        )
+    
     return TestConnectionResponse(**result)
+
