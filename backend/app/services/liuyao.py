@@ -503,7 +503,7 @@ class LiuYaoChart:
     
     def format_for_ai(self) -> str:
         """
-        格式化為 AI 可讀的文字
+        格式化為 AI 可讀的文字，包含卦象結構與六十四卦解釋
         
         輸出格式範例：
         
@@ -513,7 +513,7 @@ class LiuYaoChart:
         神煞：驛馬-寅 桃花-酉 日祿-巳 貴人-丑,未
 
         【卦象結構】
-        本卦：兌宮: 澤山咸 (世)             變卦：   坎宮: 水火既濟
+        本卦：兌宮: 澤山咸 (六世卦)        變卦：坎宮: 水火既濟
         ------------------------------------------------------------
         六神  伏神        本      卦                  變      卦
         ------------------------------------------------------------
@@ -524,8 +524,24 @@ class LiuYaoChart:
         青龍              官鬼午火     ▅▅　▅▅ X       → 官鬼丑土 ▅▅　▅▅
         玄武              父母辰土     ▅▅　▅▅          
         ------------------------------------------------------------
+
+        【本卦：澤山咸】
+        卦辭：咸亨，利貞，取女吉。
+        象傳：山上有澤，咸，君子以虛受人。
+        諸事：與事情有所感應；若問身體，有受傷、病痛的危險。
+        愛情：男女心心相映，婚姻大吉。
+        事業：多傾聽他人的意見，以同理心做事。
+        建議：如何正確使用感情來處世...
+        詳解：感，感應，感動...
+
+        【變卦：水火既濟】
+        卦辭：既濟，亨小，利貞，初吉終亂。
+        ...
         """
-        self._find_fushen() # 確保伏神已計算
+        # 導入卦象資料庫
+        from app.utils.hexagram_db import get_hexagram_by_name
+        
+        self._find_fushen()  # 確保伏神已計算
         
         lines = []
         lines.append(f"【基本資訊】")
@@ -541,17 +557,14 @@ class LiuYaoChart:
         
         bian_gong_info = ""
         if self.biangua_name:
-            # 簡單推算變卦宮位
             bg_gong, _, _ = self._find_gong_and_shi(self.bian_upper_gua, self.bian_lower_gua)
-            bian_gong_info = f"   {bg_gong}宮: {self.biangua_name}"
+            bian_gong_info = f"{bg_gong}宮: {self.biangua_name}"
             
         lines.append(f"【卦象結構】")
         lines.append(f"本卦：{ben_gong_info:<20} 變卦：{bian_gong_info}")
         lines.append("-" * 60)
         lines.append(f"六神  伏神        本      卦                  變      卦")
         lines.append("-" * 60)
-        
-        yao_names = ['初爻', '二爻', '三爻', '四爻', '五爻', '六爻']
         
         # 倒序輸出 (從上爻到初爻)
         for i in range(5, -1, -1):
@@ -575,8 +588,6 @@ class LiuYaoChart:
             if yao['is_moving']:
                  ben_line += " O" if yao['is_yang'] else " X"
                  
-            ben_str = f"{ben_info} {ben_line} {''.join(ben_marks)}"
-            
             # 4. 變卦爻
             bian_str = ""
             if yao.get('variant'):
@@ -587,6 +598,50 @@ class LiuYaoChart:
             lines.append(f"{ls:<4} {fs:<10} {ben_info:<8} {ben_line:<8} {','.join(ben_marks):<4} {bian_str}")
             
         lines.append("-" * 60)
+        lines.append("")
+        
+        # ========== 添加六十四卦解釋 ==========
+        
+        # 本卦解釋
+        ben_hexagram = get_hexagram_by_name(self.bengua_name)
+        if ben_hexagram:
+            lines.append(f"【本卦：{self.bengua_name}】")
+            lines.append(f"卦辭：{ben_hexagram.get('core_text', '')}")
+            lines.append(f"象傳：{ben_hexagram.get('xiang_text', '')}")
+            if ben_hexagram.get('general'):
+                lines.append(f"諸事：{ben_hexagram['general']}")
+            if ben_hexagram.get('love'):
+                lines.append(f"愛情：{ben_hexagram['love']}")
+            if ben_hexagram.get('career'):
+                lines.append(f"事業：{ben_hexagram['career']}")
+            if ben_hexagram.get('wealth'):
+                lines.append(f"財運：{ben_hexagram['wealth']}")
+            if ben_hexagram.get('advice'):
+                lines.append(f"建議：{ben_hexagram['advice']}")
+            if ben_hexagram.get('detailed_explanation'):
+                lines.append(f"詳解：{ben_hexagram['detailed_explanation']}")
+            lines.append("")
+        
+        # 變卦解釋
+        if self.biangua_name and self.biangua_name != '無變卦':
+            bian_hexagram = get_hexagram_by_name(self.biangua_name)
+            if bian_hexagram:
+                lines.append(f"【變卦：{self.biangua_name}】")
+                lines.append(f"卦辭：{bian_hexagram.get('core_text', '')}")
+                lines.append(f"象傳：{bian_hexagram.get('xiang_text', '')}")
+                if bian_hexagram.get('general'):
+                    lines.append(f"諸事：{bian_hexagram['general']}")
+                if bian_hexagram.get('love'):
+                    lines.append(f"愛情：{bian_hexagram['love']}")
+                if bian_hexagram.get('career'):
+                    lines.append(f"事業：{bian_hexagram['career']}")
+                if bian_hexagram.get('wealth'):
+                    lines.append(f"財運：{bian_hexagram['wealth']}")
+                if bian_hexagram.get('advice'):
+                    lines.append(f"建議：{bian_hexagram['advice']}")
+                if bian_hexagram.get('detailed_explanation'):
+                    lines.append(f"詳解：{bian_hexagram['detailed_explanation']}")
+                lines.append("")
         
         return "\n".join(lines)
 
