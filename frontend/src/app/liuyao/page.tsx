@@ -365,17 +365,19 @@ export default function LiuYaoPage() {
       const shareUrl = `${window.location.origin}${data.share_url}`;
 
       // 複製到剪貼簿
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-      } else {
-        const textArea = document.createElement('textarea');
-        textArea.value = shareUrl;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
+      // 複製到剪貼簿 (Mobile Safari 若因 async 延遲導致失敗，改為顯示 URL)
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+          alert('連結已複製到剪貼簿');
+        } else {
+          throw new Error('Clipboard API unavailable');
+        }
+      } catch (copyErr) {
+        console.warn('Auto-copy failed:', copyErr);
+        // Fallback: 提示用戶手動複製
+        prompt('連結已建立，請手動複製：', shareUrl);
+        // 不拋出錯誤，讓流程繼續顯示成功狀態
       }
 
       setSharingState('success');
@@ -836,8 +838,8 @@ export default function LiuYaoPage() {
                               onClick={handleShare}
                               disabled={sharingState === 'loading'}
                               className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg transition ${sharingState === 'success'
-                                  ? 'bg-green-600 text-white'
-                                  : 'text-gray-400 hover:text-[var(--gold)] hover:bg-gray-800'
+                                ? 'bg-green-600 text-white'
+                                : 'text-gray-400 hover:text-[var(--gold)] hover:bg-gray-800'
                                 }`}
                             >
                               {sharingState === 'loading' ? (
