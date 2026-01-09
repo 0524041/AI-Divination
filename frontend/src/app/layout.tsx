@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Noto_Serif_TC } from 'next/font/google';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 const notoSerifTC = Noto_Serif_TC({
   subsets: ['latin'],
@@ -26,7 +27,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-TW" className={notoSerifTC.className}>
-      <body className="font-chinese antialiased">{children}</body>
+      <body className="font-chinese antialiased">
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
