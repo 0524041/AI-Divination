@@ -349,17 +349,29 @@ def create_share_token(
     db: Session = Depends(get_db)
 ):
     """建立分享連結（需登入）"""
+    print(f"[DEBUG] create_share_token called. User: {current_user.id} ({current_user.username}), Role: {current_user.role}, HistoryID: {request.history_id}")
+
     # 確認該紀錄屬於當前用戶 (或是管理員)
     query = db.query(History).filter(History.id == request.history_id)
     
     # 如果不是管理員，只能讀取自己的紀錄
     if current_user.role != 'admin':
+        print(f"[DEBUG] User is not admin. Applying filter: user_id == {current_user.id}")
         query = query.filter(History.user_id == current_user.id)
+    else:
+        print(f"[DEBUG] User is admin. No user_id filter applied.")
     
     history = query.first()
     
     if not history:
-        print(f"Share failed: User {current_user.id} ({current_user.role}) tried to share History {request.history_id}")
+        print(f"[ERROR] Share failed: History not found. User {current_user.id} ({current_user.role}) tried to share History {request.history_id}")
+        # 查詢不加過濾條件的結果，看看紀錄到底存不存在以及屬於誰
+        raw_check = db.query(History).filter(History.id == request.history_id).first()
+        if raw_check:
+             print(f"[DEBUG] Record EXISTS but access denied. Record owner: {raw_check.user_id}, Requester: {current_user.id}")
+        else:
+             print(f"[DEBUG] Record DOES NOT EXIST in DB.")
+        
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="紀錄不存在或無權限分享"
