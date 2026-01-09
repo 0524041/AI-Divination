@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
-import { ArrowLeft, History, Sparkles, RotateCcw, Play, Check, ChevronDown, Bot, Settings, Copy, Loader2, X, Eye } from 'lucide-react';
+import { ArrowLeft, History, Sparkles, RotateCcw, Play, Check, ChevronDown, Bot, Settings, Copy, Share2, Loader2, X, Eye } from 'lucide-react';
 import { TAROT_CARDS, TarotCardData } from '@/lib/tarot-data';
 
 interface AIConfig {
@@ -19,7 +19,7 @@ interface AIConfig {
 
 // 牌背組件 - 增加質感與光澤
 const CardBack = ({ onClick, className = "", style, glow = false }: { onClick?: () => void, className?: string, style?: React.CSSProperties, glow?: boolean }) => (
-  <div 
+  <div
     onClick={onClick}
     style={style}
     className={`
@@ -31,7 +31,7 @@ const CardBack = ({ onClick, className = "", style, glow = false }: { onClick?: 
   >
     {/* 紋理背景 */}
     <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_var(--gold)_1px,_transparent_1px)] bg-[length:12px_12px]"></div>
-    
+
     {/* 神秘符號中心 */}
     <div className="absolute inset-0 flex items-center justify-center">
       <div className="w-16 h-16 border border-[var(--gold)] rounded-full flex items-center justify-center opacity-80">
@@ -40,7 +40,7 @@ const CardBack = ({ onClick, className = "", style, glow = false }: { onClick?: 
         </div>
       </div>
     </div>
-    
+
     {/* 邊框裝飾 */}
     <div className="absolute inset-1 border border-[var(--gold)] border-opacity-30 rounded-md"></div>
   </div>
@@ -59,9 +59,9 @@ const TarotCard = ({ card, isRevealed, onClick, positionLabel, size = "normal" }
         {/* Front (Image) */}
         <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-0 rounded-lg overflow-hidden border-2 border-[var(--gold)] shadow-[0_0_20px_rgba(212,175,55,0.2)] bg-black">
           <div className={`w-full h-full h-full relative ${card.reversed ? 'rotate-180' : ''}`}>
-            <img 
-              src={`/tarot-cards/${card.image}`} 
-              alt={card.name} 
+            <img
+              src={`/tarot-cards/${card.image}`}
+              alt={card.name}
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pb-2 px-2 text-center">
@@ -70,7 +70,7 @@ const TarotCard = ({ card, isRevealed, onClick, positionLabel, size = "normal" }
             </div>
           </div>
         </div>
-        
+
         {/* Back */}
         <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180">
           <CardBack className="w-full h-full" />
@@ -131,6 +131,7 @@ export default function TarotPage() {
   const [historyId, setHistoryId] = useState<number | null>(null);
   const [htmlContent, setHtmlContent] = useState<{ mainHtml: string; thinkContent: string } | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [sharingState, setSharingState] = useState<'idle' | 'loading' | 'success'>('idle');
 
   // 洗牌動畫狀態
   const [isShuffling, setIsShuffling] = useState(false);
@@ -274,7 +275,7 @@ export default function TarotPage() {
     }
     setStep('shuffle');
     setIsShuffling(true);
-    
+
     // 模擬洗牌動畫
     setTimeout(() => {
       setIsShuffling(false);
@@ -289,7 +290,7 @@ export default function TarotPage() {
     setIsShuffling(true);
     setReshuffleCount(prev => prev + 1);
     setSelectedCards([]); // 重洗時清空選擇
-    
+
     setTimeout(() => {
       setIsShuffling(false);
       performShuffle();
@@ -303,7 +304,7 @@ export default function TarotPage() {
       ...card,
       reversed: Math.random() < 0.5
     }));
-    
+
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -322,7 +323,7 @@ export default function TarotPage() {
 
     // Select (limit to maxCards)
     if (selectedCards.length >= maxCards) return;
-    
+
     setSelectedCards([...selectedCards, card]);
   };
 
@@ -351,7 +352,7 @@ export default function TarotPage() {
         if (data.status === 'completed') {
           // AI已经完成，直接显示结果
           setInterpretation(data.interpretation);
-          
+
           // 解析 Markdown
           try {
             const result = await parseMarkdown(data.interpretation);
@@ -390,7 +391,7 @@ export default function TarotPage() {
           const data = await res.json();
           if (data.status === 'completed') {
             setInterpretation(data.interpretation);
-            
+
             // 解析 Markdown
             try {
               const result = await parseMarkdown(data.interpretation);
@@ -443,10 +444,10 @@ export default function TarotPage() {
 
   const handleCopy = async () => {
     // 使用正確的牌陣位置標籤
-    const cardText = selectedCards.map((c, i) => 
+    const cardText = selectedCards.map((c, i) =>
       `${getPositionLabel(i)}: ${c.name_cn} (${c.name})`
     ).join('\n');
-    
+
     const spreadName = getCurrentSpreadConfig().name;
     const markdownText = `## 問題\n${question}\n\n## 牌陣類型\n${spreadName}\n\n## 抽到的牌\n${cardText}\n\n## AI 解盤\n${interpretation}`;
 
@@ -460,6 +461,60 @@ export default function TarotPage() {
       }
     }
     alert('複製失敗，請手動複製內容');
+  };
+
+  const handleShare = async () => {
+    if (!historyId) {
+      alert('系統錯誤：找不到占卜記錄');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setSharingState('loading');
+
+    try {
+      const res = await fetch('/api/share/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ history_id: historyId }),
+      });
+
+      if (!res.ok) {
+        throw new Error('建立分享連結失敗');
+      }
+
+      const data = await res.json();
+      const shareUrl = `${window.location.origin}${data.share_url}`;
+
+      // 複製到剪貼簿
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+
+      setSharingState('success');
+
+      setTimeout(() => {
+        setSharingState('idle');
+      }, 3000);
+    } catch (err) {
+      console.error('Share error:', err);
+      alert('建立分享連結失敗');
+      setSharingState('idle');
+    }
   };
 
   return (
@@ -491,23 +546,23 @@ export default function TarotPage() {
 
       {/* 主要內容區域 */}
       <main className={`relative z-10 pt-24 px-4 transition-all duration-500 ${step === 'select' ? 'w-full max-w-[1800px] mx-auto' : (step === 'reveal' || step === 'interpreting' || step === 'result' ? 'w-full max-w-[1600px] mx-auto' : 'max-w-4xl mx-auto')}`}>
-        
+
         {/* Intro Phase */}
         {step === 'intro' && (
           <div className="flex flex-col items-center text-center space-y-12 fade-in min-h-[70vh] justify-center">
             <div className="relative w-64 h-96 animate-float">
-               <div className="absolute inset-0 bg-indigo-900 rounded-xl border border-[var(--gold)] transform rotate-6 opacity-30 blur-sm"></div>
-               <div className="absolute inset-0 bg-indigo-900 rounded-xl border border-[var(--gold)] transform -rotate-6 opacity-30 blur-sm"></div>
-               <CardBack className="w-full h-full absolute inset-0 shadow-[0_0_50px_rgba(212,175,55,0.2)]" glow />
+              <div className="absolute inset-0 bg-indigo-900 rounded-xl border border-[var(--gold)] transform rotate-6 opacity-30 blur-sm"></div>
+              <div className="absolute inset-0 bg-indigo-900 rounded-xl border border-[var(--gold)] transform -rotate-6 opacity-30 blur-sm"></div>
+              <CardBack className="w-full h-full absolute inset-0 shadow-[0_0_50px_rgba(212,175,55,0.2)]" glow />
             </div>
-            
+
             <div className="space-y-6 max-w-2xl">
               <h2 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[var(--gold)] to-white">
                 探索內心的指引
               </h2>
               <p className="text-gray-300 text-lg leading-relaxed font-light">
-                塔羅牌是連結潛意識的鑰匙。<br/>
-                透過「過去、現在、未來」的三張牌陣，<br/>
+                塔羅牌是連結潛意識的鑰匙。<br />
+                透過「過去、現在、未來」的三張牌陣，<br />
                 洞察當下的處境，回顧過去的影響，並展望未來的可能性。
               </p>
             </div>
@@ -538,17 +593,17 @@ export default function TarotPage() {
                   <div className="text-6xl mb-4 transition-transform group-hover:scale-110">
                     {spread.icon}
                   </div>
-                  
+
                   {/* Title */}
                   <h3 className="text-2xl font-bold text-[var(--gold)] mb-2">
                     {spread.name}
                   </h3>
-                  
+
                   {/* Description */}
                   <p className="text-gray-400 text-sm leading-relaxed mb-4">
                     {spread.description}
                   </p>
-                  
+
                   {/* Card Count Badge */}
                   <div className="inline-block px-4 py-2 bg-[var(--gold)]/10 border border-[var(--gold)]/30 rounded-full">
                     <span className="text-[var(--gold)] font-semibold">{spread.cardCount} 張牌</span>
@@ -616,9 +671,8 @@ export default function TarotPage() {
                     <button
                       key={config.id}
                       onClick={() => handleSwitchAI(config.id)}
-                      className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800 transition ${
-                        config.is_active ? 'bg-[var(--gold)]/5' : ''
-                      }`}
+                      className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800 transition ${config.is_active ? 'bg-[var(--gold)]/5' : ''
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-2 h-2 rounded-full ${config.is_active ? 'bg-[var(--gold)] shadow-[0_0_10px_var(--gold)]' : 'bg-gray-600'}`} />
@@ -639,7 +693,7 @@ export default function TarotPage() {
                 </div>
               )}
             </div>
-            
+
             <div className="relative">
               <textarea
                 value={question}
@@ -652,8 +706,8 @@ export default function TarotPage() {
               </div>
             </div>
 
-            <button 
-              onClick={handleShuffle} 
+            <button
+              onClick={handleShuffle}
               className="btn-gold w-full py-5 text-xl flex items-center justify-center gap-3 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RotateCcw size={24} />
@@ -679,7 +733,7 @@ export default function TarotPage() {
             <div className="relative w-64 h-64 flex items-center justify-center">
               {/* 圓形洗牌動畫 */}
               {[...Array(12)].map((_, i) => (
-                <div 
+                <div
                   key={i}
                   className="absolute w-32 h-48 origin-bottom transition-all duration-500"
                   style={{
@@ -720,20 +774,20 @@ export default function TarotPage() {
                 {shuffledDeck.map((card, index) => {
                   const isSelected = selectedCards.find(c => c.id === card.id);
                   return (
-                    <div 
+                    <div
                       key={card.id}
                       className={`
                         relative transition-all duration-500 ease-out
                         ${isSelected ? 'opacity-0 scale-0' : 'opacity-100 scale-100 hover:-translate-y-4 hover:z-10'}
                       `}
-                      style={{ 
+                      style={{
                         animationDelay: `${index * 0.015}s`,
                         animationFillMode: 'both'
                       }}
                     >
                       <div className="animate-deal">
-                        <CardBack 
-                          onClick={() => handleSelectCard(card)} 
+                        <CardBack
+                          onClick={() => handleSelectCard(card)}
                           className={`w-full shadow-lg hover:shadow-[0_0_15px_rgba(212,175,55,0.4)] hover:border-[var(--gold)] transition-all duration-300`}
                         />
                       </div>
@@ -746,7 +800,7 @@ export default function TarotPage() {
             {/* Selected Cards Bar - Fixed Bottom - Optimized for Zoom/Responsive */}
             <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-[var(--gold)]/30 pb-2 pt-2 md:pb-4 md:pt-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all duration-300">
               <div className="w-full max-w-[98%] 2xl:max-w-[1800px] mx-auto px-2 md:px-6 flex flex-row items-center justify-between gap-4">
-                
+
                 {/* Selected Cards Slots - Scrollable Area with Centering */}
                 <div className="flex-1 overflow-x-auto custom-scrollbar flex items-center justify-start xl:justify-center px-1">
                   <div className="flex gap-2 md:gap-4 flex-nowrap min-w-max py-2 px-1">
@@ -761,7 +815,7 @@ export default function TarotPage() {
                             {card ? (
                               <div className="w-full h-full animate-deal relative">
                                 <CardBack className="w-full h-full border-[var(--gold)] shadow-[0_0_15px_rgba(212,175,55,0.3)]" />
-                                <button 
+                                <button
                                   onClick={() => handleSelectCard(card)}
                                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg hover:bg-red-600 transition opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 z-10"
                                 >
@@ -784,7 +838,7 @@ export default function TarotPage() {
                 {/* Actions - Fixed Right, non-shrinking */}
                 <div className="flex-shrink-0 flex flex-row items-center gap-2 md:gap-4 pl-2 md:pl-6 border-l border-gray-800/50">
                   {reshuffleCount < 3 && selectedCards.length === 0 && (
-                    <button 
+                    <button
                       onClick={handleReshuffle}
                       className="p-3 md:px-6 md:py-3 rounded-xl border border-gray-700 text-gray-400 hover:text-[var(--gold)] hover:border-[var(--gold)] transition flex items-center gap-2 whitespace-nowrap"
                       title="重新洗牌"
@@ -794,7 +848,7 @@ export default function TarotPage() {
                     </button>
                   )}
 
-                  <button 
+                  <button
                     onClick={confirmSelection}
                     disabled={selectedCards.length !== getCurrentSpreadConfig().cardCount}
                     className={`
@@ -827,15 +881,14 @@ export default function TarotPage() {
             {/* Cards Display */}
             <div className={`flex ${spreadType === 'celtic_cross' ? 'flex-wrap' : 'flex-col md:flex-row'} justify-center items-center gap-6 md:gap-8 lg:gap-10 min-h-[600px]`}>
               {selectedCards.map((card, index) => (
-                <div 
-                  key={card.id} 
-                  className={`transition-all duration-700 ${
-                    step === 'reveal' && index > revealedCount ? 'opacity-50 scale-90 blur-[1px]' : 'opacity-100 scale-100'
-                  } ${spreadType === 'celtic_cross' ? 'w-[20vw] md:w-[15vw] max-w-[180px]' : ''}`}
+                <div
+                  key={card.id}
+                  className={`transition-all duration-700 ${step === 'reveal' && index > revealedCount ? 'opacity-50 scale-90 blur-[1px]' : 'opacity-100 scale-100'
+                    } ${spreadType === 'celtic_cross' ? 'w-[20vw] md:w-[15vw] max-w-[180px]' : ''}`}
                 >
-                  <TarotCard 
-                    card={card} 
-                    isRevealed={index < revealedCount || step !== 'reveal'} 
+                  <TarotCard
+                    card={card}
+                    isRevealed={index < revealedCount || step !== 'reveal'}
                     onClick={() => step === 'reveal' && handleReveal(index)}
                     positionLabel={getPositionLabel(index)}
                     size={spreadType === 'celtic_cross' ? 'normal' : 'large'}
@@ -870,7 +923,7 @@ export default function TarotPage() {
                   <h3 className="text-xl text-[var(--gold)] font-medium mb-2">AI 正在連結宇宙能量...</h3>
                   <p className="text-gray-500">正在分析牌陣與問題的關聯</p>
                 </div>
-                
+
                 <button
                   onClick={handleCancel}
                   disabled={isCancelling}
@@ -887,22 +940,44 @@ export default function TarotPage() {
               <div className="max-w-4xl mx-auto bg-[#16162a]/80 backdrop-blur-md rounded-2xl p-8 md:p-12 border border-[var(--gold)]/20 shadow-2xl fade-in relative overflow-hidden">
                 {/* Decorative Elements */}
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-[var(--gold)] to-transparent opacity-50"></div>
-                
-                {/* Copy Button */}
-                <button
-                  onClick={handleCopy}
-                  className="absolute top-6 right-6 p-2.5 bg-gray-800 hover:bg-[var(--gold)] text-gray-400 hover:text-gray-900 rounded-xl transition-all shadow-lg flex items-center gap-2 group"
-                  title="複製完整內容"
-                >
-                  <Copy size={18} />
-                  <span className="text-sm font-medium hidden group-hover:inline">複製</span>
-                </button>
+
+                {/* Action Buttons */}
+                <div className="absolute top-6 right-6 flex items-center gap-2">
+                  <button
+                    onClick={handleShare}
+                    disabled={sharingState === 'loading'}
+                    className={`p-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 group ${sharingState === 'success'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-800 hover:bg-[var(--gold)] text-gray-400 hover:text-gray-900'
+                      }`}
+                    title="分享結果"
+                  >
+                    {sharingState === 'loading' ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : sharingState === 'success' ? (
+                      <Check size={18} />
+                    ) : (
+                      <Share2 size={18} />
+                    )}
+                    <span className="text-sm font-medium hidden group-hover:inline">
+                      {sharingState === 'success' ? '已複製連結' : '分享'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="p-2.5 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 rounded-xl transition-all shadow-lg flex items-center gap-2 group"
+                    title="複製完整內容"
+                  >
+                    <Copy size={18} />
+                    <span className="text-sm font-medium hidden group-hover:inline">複製</span>
+                  </button>
+                </div>
 
                 <h3 className="text-2xl font-bold text-[var(--gold)] mb-8 flex items-center gap-3 border-b border-gray-800 pb-4">
                   <Sparkles size={24} />
                   牌義解析
                 </h3>
-                
+
                 {htmlContent ? (
                   <div className="space-y-6">
                     {/* Think Content */}

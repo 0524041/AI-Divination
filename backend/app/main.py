@@ -11,7 +11,8 @@ from app.api import (
     liuyao_router,
     history_router,
     admin_router,
-    tarot_router
+    tarot_router,
+    share_router
 )
 from app.api.debug import router as debug_router
 from app.middleware.performance import PerformanceMiddleware
@@ -71,6 +72,7 @@ app.include_router(liuyao_router)
 app.include_router(history_router)
 app.include_router(admin_router)
 app.include_router(tarot_router)
+app.include_router(share_router)  # 公開分享 API
 app.include_router(debug_router)  # 除錯 API
 
 

@@ -11,6 +11,7 @@ import {
   Settings,
   Trash2,
   Copy,
+  Share2,
   ChevronDown,
   ChevronUp,
   User,
@@ -21,6 +22,8 @@ import {
   TrendingUp,
   Calendar,
   BarChart3,
+  Check,
+  Loader2,
 } from 'lucide-react';
 
 interface HistoryItem {
@@ -87,6 +90,9 @@ export default function HistoryPage() {
   const [allUsers, setAllUsers] = useState<UserInfo[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null); // null = 自己, 0 = 全部
   const [showUserFilter, setShowUserFilter] = useState(false);
+
+  // 分享狀態
+  const [sharingState, setSharingState] = useState<Record<number, 'idle' | 'loading' | 'success'>>({});
 
   useEffect(() => {
     checkAuth();
@@ -309,6 +315,57 @@ export default function HistoryPage() {
       alert('已複製到剪貼簿');
     } else {
       alert('複製失敗，請手動複製內容');
+    }
+  };
+
+  const handleShare = async (item: HistoryItem) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setSharingState(prev => ({ ...prev, [item.id]: 'loading' }));
+
+    try {
+      const res = await fetch('/api/share/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ history_id: item.id }),
+      });
+
+      if (!res.ok) {
+        throw new Error('建立分享連結失敗');
+      }
+
+      const data = await res.json();
+      const shareUrl = `${window.location.origin}${data.share_url}`;
+
+      // 複製到剪貼簿
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        // Fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+
+      setSharingState(prev => ({ ...prev, [item.id]: 'success' }));
+
+      // 3 秒後重置狀態
+      setTimeout(() => {
+        setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
+      }, 3000);
+    } catch (err) {
+      console.error('Share error:', err);
+      alert('建立分享連結失敗');
+      setSharingState(prev => ({ ...prev, [item.id]: 'idle' }));
     }
   };
 
@@ -646,11 +703,36 @@ export default function HistoryPage() {
                     {/* 操作按鈕 */}
                     <div className="flex justify-end gap-3">
                       <button
+                        onClick={() => handleShare(item)}
+                        disabled={sharingState[item.id] === 'loading'}
+                        className={`px-4 py-2 rounded-lg transition shadow-md flex items-center gap-2 ${sharingState[item.id] === 'success'
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-700 hover:bg-[var(--gold)] text-gray-300 hover:text-gray-900'
+                          }`}
+                      >
+                        {sharingState[item.id] === 'loading' ? (
+                          <>
+                            <Loader2 size={18} className="animate-spin" />
+                            <span className="font-medium">生成中...</span>
+                          </>
+                        ) : sharingState[item.id] === 'success' ? (
+                          <>
+                            <Check size={18} />
+                            <span className="font-medium">已複製連結！</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 size={18} />
+                            <span className="font-medium">分享</span>
+                          </>
+                        )}
+                      </button>
+                      <button
                         onClick={() => handleCopy(item)}
-                        className="px-4 py-2 bg-gray-700 hover:bg-[var(--gold)] text-gray-300 hover:text-gray-900 rounded-lg transition shadow-md flex items-center gap-2"
+                        className="px-4 py-2 border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-gray-200 rounded-lg transition flex items-center gap-2"
                       >
                         <Copy size={18} />
-                        <span className="font-medium">複製內容</span>
+                        複製
                       </button>
                       <button
                         onClick={() => handleDelete(item.id)}
@@ -765,8 +847,8 @@ export default function HistoryPage() {
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
                   className={`p-2 rounded-lg border transition ${currentPage === 1
-                      ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                      : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
                     }`}
                 >
                   <ChevronLeft size={20} />
@@ -791,8 +873,8 @@ export default function HistoryPage() {
                         key={pageNum}
                         onClick={() => handlePageChange(pageNum)}
                         className={`w-10 h-10 rounded-lg border transition ${currentPage === pageNum
-                            ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)] font-bold'
-                            : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                          ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)] font-bold'
+                          : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
                           }`}
                       >
                         {pageNum}
@@ -805,8 +887,8 @@ export default function HistoryPage() {
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
                   className={`p-2 rounded-lg border transition ${currentPage === totalPages
-                      ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                      : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
+                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
+                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
                     }`}
                 >
                   <ChevronRight size={20} />

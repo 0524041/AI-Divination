@@ -15,6 +15,8 @@ import {
   Send,
   Loader2,
   Copy,
+  Share2,
+  Check,
   X,
   AlertTriangle,
   Bot,
@@ -82,6 +84,9 @@ export default function LiuYaoPage() {
   const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
   const [activeAI, setActiveAI] = useState<AIConfig | null>(null);
   const [showAISelector, setShowAISelector] = useState(false);
+
+  // 分享狀態
+  const [sharingState, setSharingState] = useState<'idle' | 'loading' | 'success'>('idle');
 
   // 控制器用於取消請求
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -335,6 +340,53 @@ export default function LiuYaoPage() {
       alert('已複製到剪貼簿');
     } else {
       alert('複製失敗，請手動複製內容');
+    }
+  };
+
+  const handleShare = async () => {
+    if (!result) {
+      alert('沒有可分享的內容');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setSharingState('loading');
+
+    try {
+      const res = await apiPost('/api/share/create', { history_id: result.id });
+
+      if (!res.ok) {
+        throw new Error('建立分享連結失敗');
+      }
+
+      const data = await res.json();
+      const shareUrl = `${window.location.origin}${data.share_url}`;
+
+      // 複製到剪貼簿
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+
+      setSharingState('success');
+
+      setTimeout(() => {
+        setSharingState('idle');
+      }, 3000);
+    } catch (err) {
+      console.error('Share error:', err);
+      alert('建立分享連結失敗');
+      setSharingState('idle');
     }
   };
 
@@ -779,10 +831,28 @@ export default function LiuYaoPage() {
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-bold">大師解盤</h3>
                         {interpretation && (
-                          <button onClick={handleCopy} className="text-gray-400 hover:text-[var(--gold)] flex items-center gap-1 text-sm">
-                            <Copy size={16} />
-                            複製
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={handleShare}
+                              disabled={sharingState === 'loading'}
+                              className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg transition ${sharingState === 'success'
+                                  ? 'bg-green-600 text-white'
+                                  : 'text-gray-400 hover:text-[var(--gold)] hover:bg-gray-800'
+                                }`}
+                            >
+                              {sharingState === 'loading' ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : sharingState === 'success' ? (
+                                <><Check size={16} />已複製連結</>
+                              ) : (
+                                <><Share2 size={16} />分享</>
+                              )}
+                            </button>
+                            <button onClick={handleCopy} className="text-gray-400 hover:text-[var(--gold)] flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-800 transition">
+                              <Copy size={16} />
+                              複製
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -808,7 +878,24 @@ export default function LiuYaoPage() {
                               <span>完整卦象盤面（點擊展開）</span>
                             </summary>
                             <div className="px-4 pb-4 text-gray-300 text-sm whitespace-pre-wrap border-t border-gray-700 pt-3 leading-relaxed">
-                              {result.chart_data.formatted || JSON.stringify(result.chart_data, null, 2)}
+                              {(() => {
+                                // 只顯示到第三條 ---- 線（卦象結構結束）
+                                const formatted = result.chart_data.formatted || '';
+                                const lines = formatted.split('\n');
+                                const resultLines = [];
+                                let dashCount = 0;
+                                for (const line of lines) {
+                                  if (line.trim().startsWith('----')) {
+                                    dashCount++;
+                                    resultLines.push(line);
+                                    if (dashCount >= 3) break;
+                                    continue;
+                                  }
+                                  if (line.startsWith('【本卦：') || line.startsWith('【變卦：')) break;
+                                  resultLines.push(line);
+                                }
+                                return resultLines.join('\n');
+                              })()}
                             </div>
                           </details>
 
