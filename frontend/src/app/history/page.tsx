@@ -341,19 +341,54 @@ export default function HistoryPage() {
       const data = await res.json();
       const shareUrl = `${window.location.origin}${data.share_url}`;
 
-      // 複製到剪貼簿
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareUrl);
-      } else {
-        // Fallback
+      // 複製到剪貼簿 - 使用 execCommand 作為主要方法（Safari 相容）
+      // Safari 在 async 操作後會阻止 Clipboard API，但 execCommand 仍然有效
+      const copyToClipboard = (text: string): boolean => {
         const textArea = document.createElement('textarea');
-        textArea.value = shareUrl;
+        textArea.value = text;
+        // 避免頁面滾動
         textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = '0';
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
+        textArea.style.opacity = '0';
         document.body.appendChild(textArea);
+        textArea.focus();
         textArea.select();
-        document.execCommand('copy');
+
+        let success = false;
+        try {
+          success = document.execCommand('copy');
+        } catch (err) {
+          console.warn('execCommand copy failed:', err);
+        }
+
         document.body.removeChild(textArea);
+        return success;
+      };
+
+      // 優先使用 execCommand（Safari 相容）
+      let copied = copyToClipboard(shareUrl);
+
+      // 如果 execCommand 失敗，嘗試 Clipboard API（可能在某些情況下有效）
+      if (!copied && navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          copied = true;
+        } catch (clipboardErr) {
+          console.warn('Clipboard API failed:', clipboardErr);
+        }
+      }
+
+      if (!copied) {
+        // 如果都失敗，顯示 URL 讓用戶手動複製
+        prompt('請手動複製分享連結:', shareUrl);
       }
 
       setSharingState(prev => ({ ...prev, [item.id]: 'success' }));
@@ -706,8 +741,8 @@ export default function HistoryPage() {
                         onClick={() => handleShare(item)}
                         disabled={sharingState[item.id] === 'loading'}
                         className={`px-4 py-2 rounded-lg transition shadow-md flex items-center gap-2 ${sharingState[item.id] === 'success'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-700 hover:bg-[var(--gold)] text-gray-300 hover:text-gray-900'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-700 hover:bg-[var(--gold)] text-gray-300 hover:text-gray-900'
                           }`}
                       >
                         {sharingState[item.id] === 'loading' ? (
