@@ -20,6 +20,7 @@ function generateNonce(): string {
  */
 interface SecureRequestOptions extends RequestInit {
   skipAuth?: boolean;
+  skipSignature?: boolean;  // 保留向後相容（目前為 no-op，已移除簽名驗證）
 }
 
 /**
@@ -29,7 +30,7 @@ export async function secureApiRequest(
   endpoint: string,
   options: SecureRequestOptions = {}
 ): Promise<Response> {
-  const { skipAuth = false, ...fetchOptions } = options;
+  const { skipAuth = false, skipSignature = false, ...fetchOptions } = options;
 
   // 構建 URL - 使用相對路徑
   const url = endpoint.startsWith('http')
