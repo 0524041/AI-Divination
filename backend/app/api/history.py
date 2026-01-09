@@ -349,13 +349,17 @@ def create_share_token(
     db: Session = Depends(get_db)
 ):
     """建立分享連結（需登入）"""
-    # 確認該紀錄屬於當前用戶
-    history = db.query(History).filter(
-        History.id == request.history_id,
-        History.user_id == current_user.id
-    ).first()
+    # 確認該紀錄屬於當前用戶 (或是管理員)
+    query = db.query(History).filter(History.id == request.history_id)
+    
+    # 如果不是管理員，只能讀取自己的紀錄
+    if current_user.role != 'admin':
+        query = query.filter(History.user_id == current_user.id)
+    
+    history = query.first()
     
     if not history:
+        print(f"Share failed: User {current_user.id} ({current_user.role}) tried to share History {request.history_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="紀錄不存在或無權限分享"
