@@ -354,43 +354,58 @@ export default function LiuYaoPage() {
 
     setSharingState('loading');
 
-    try {
-      const res = await apiPost('/api/share/create', { history_id: result.id });
+    // Safari 修復：使用 ClipboardItem + Promise 方式
+    // 關鍵：navigator.clipboard.write() 必須在用戶手勢上下文中同步呼叫
+    // 但可以傳入一個 Promise 給 ClipboardItem，讓 async 操作在 Promise 內執行
 
+    const getShareUrl = async (): Promise<string> => {
+      const res = await apiPost('/api/share/create', { history_id: result.id });
       if (!res.ok) {
         throw new Error('建立分享連結失敗');
       }
-
       const data = await res.json();
-      const shareUrl = `${window.location.origin}${data.share_url}`;
+      return `${window.location.origin}${data.share_url}`;
+    };
 
-      // 複製到剪貼簿
-      // 複製到剪貼簿 (Mobile Safari 若因 async 延遲導致失敗，改為顯示 URL)
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(shareUrl);
-          alert('連結已複製到剪貼簿');
-        } else {
-          throw new Error('Clipboard API unavailable');
-        }
-      } catch (copyErr) {
-        console.warn('Auto-copy failed:', copyErr);
-        // Fallback: 提示用戶手動複製
-        prompt('連結已建立，請手動複製：', shareUrl);
-        // 不拋出錯誤，讓流程繼續顯示成功狀態
+    try {
+      // 檢查是否支援 ClipboardItem（Safari 13.1+, Chrome 66+）
+      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        const textPromise = getShareUrl().then(url => new Blob([url], { type: 'text/plain' }));
+        const clipboardItem = new ClipboardItem({
+          'text/plain': textPromise
+        });
+        await navigator.clipboard.write([clipboardItem]);
+        alert('連結已複製到剪貼簿');
+        setSharingState('success');
+        setTimeout(() => setSharingState('idle'), 3000);
+        return;
       }
 
-      setSharingState('success');
+      // Fallback：傳統方式
+      const shareUrl = await getShareUrl();
 
-      setTimeout(() => {
-        setSharingState('idle');
-      }, 3000);
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          alert('連結已複製到剪貼簿');
+          setSharingState('success');
+          setTimeout(() => setSharingState('idle'), 3000);
+          return;
+        } catch (clipboardErr) {
+          console.warn('Clipboard API failed:', clipboardErr);
+        }
+      }
+
+      // 最後手段：顯示連結讓用戶手動複製
+      prompt('連結已建立，請手動複製：', shareUrl);
+      setSharingState('idle');
     } catch (err) {
       console.error('Share error:', err);
       alert('建立分享連結失敗');
       setSharingState('idle');
     }
   };
+
 
   // 解析 Markdown
   const [parsedContent, setParsedContent] = useState<{ mainHtml: string; thinkContent: string }>({ mainHtml: '', thinkContent: '' });
