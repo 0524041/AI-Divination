@@ -159,29 +159,30 @@ restart_services() {
     stop_services
     sleep 2
     
-    # 檢查前端是否有變更
+    # 檢查前端是否需要重新構建
     cd "$FRONTEND_DIR"
     FRONTEND_CHANGED=false
     
-    # 使用 git 檢測 frontend 目錄的變更
-    if git diff --quiet HEAD -- . 2>/dev/null; then
-        # 沒有未提交的變更，檢查 .next 是否比 src 更舊
-        if [ -d ".next" ]; then
-            # 找出 src 目錄中最新修改的檔案時間
-            NEWEST_SRC=$(find src -type f -name "*.tsx" -o -name "*.ts" -o -name "*.css" 2>/dev/null | xargs stat -f "%m" 2>/dev/null | sort -nr | head -1)
-            BUILD_TIME=$(stat -f "%m" .next/BUILD_ID 2>/dev/null || echo "0")
-            
-            if [ -n "$NEWEST_SRC" ] && [ "$NEWEST_SRC" -gt "$BUILD_TIME" ]; then
-                echo -e "${YELLOW}檢測到前端原始碼比構建更新${NC}"
-                FRONTEND_CHANGED=true
+    if [ ! -d ".next" ] || [ ! -f ".next/BUILD_ID" ]; then
+        echo -e "${YELLOW}未找到構建目錄，需要重新構建${NC}"
+        FRONTEND_CHANGED=true
+    else
+        # 比較 src 目錄最新修改時間與 .next/BUILD_ID 時間
+        BUILD_TIME=$(stat -f "%m" .next/BUILD_ID 2>/dev/null || echo "0")
+        
+        # 找出所有原始碼檔案中最新的修改時間
+        NEWEST_SRC=0
+        while IFS= read -r file; do
+            FILE_TIME=$(stat -f "%m" "$file" 2>/dev/null || echo "0")
+            if [ "$FILE_TIME" -gt "$NEWEST_SRC" ]; then
+                NEWEST_SRC=$FILE_TIME
             fi
-        else
-            echo -e "${YELLOW}未找到構建目錄${NC}"
+        done < <(find src -type f \( -name "*.tsx" -o -name "*.ts" -o -name "*.css" -o -name "*.json" \) 2>/dev/null)
+        
+        if [ "$NEWEST_SRC" -gt "$BUILD_TIME" ]; then
+            echo -e "${YELLOW}檢測到前端原始碼比構建更新 (最新: $(date -r $NEWEST_SRC '+%Y-%m-%d %H:%M:%S'), 構建: $(date -r $BUILD_TIME '+%Y-%m-%d %H:%M:%S'))${NC}"
             FRONTEND_CHANGED=true
         fi
-    else
-        echo -e "${YELLOW}檢測到前端有未提交的變更${NC}"
-        FRONTEND_CHANGED=true
     fi
     
     if [ "$FRONTEND_CHANGED" = true ]; then
@@ -633,8 +634,11 @@ main() {
                 exit 0
                 ;;
             --clean-cache)
-                CLEAN_CACHE=true
-                shift
+                echo -e "\n${YELLOW}[清理快取] 停止服務並清除快取...${NC}"
+                stop_services
+                clean_cache
+                echo -e "${GREEN}✓ 快取清理完成${NC}"
+                exit 0
                 ;;
             --stop)
                 stop_services
