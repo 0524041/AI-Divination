@@ -1,11 +1,11 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
-import { ArrowLeft, History, Sparkles, RotateCcw, Play, Check, ChevronDown, Bot, Settings, Copy, Share2, Loader2, X, Eye } from 'lucide-react';
+import { Navbar } from '@/components/layout/Navbar';
+import { Sparkles, RotateCcw, Play, Check, ChevronDown, Bot, Copy, Share2, Loader2, X, Eye, Settings, History, ArrowLeft } from 'lucide-react';
 import { TAROT_CARDS, TarotCardData } from '@/lib/tarot-data';
 
 interface AIConfig {
@@ -542,27 +542,16 @@ export default function TarotPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--gold)] opacity-[0.03] blur-[100px] rounded-full"></div>
       </div>
 
-      {/* 導航 */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-4">
-        <div className="glass-card w-full px-6 py-3 flex items-center justify-between shadow-lg shadow-black/20">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-400 hover:text-[var(--gold)] transition-colors">
-              <ArrowLeft size={24} />
-            </Link>
-            <div className="flex items-center gap-3">
-              <Sparkles className="text-[var(--gold)] animate-pulse" size={24} />
-              <h1 className="text-xl font-bold text-[var(--gold)] tracking-wider">塔羅占卜</h1>
-            </div>
-          </div>
-          <Link href="/history" className="text-gray-400 hover:text-[var(--gold)] transition-colors flex items-center gap-2">
-            <span className="hidden sm:inline text-sm">歷史紀錄</span>
-            <History size={24} />
-          </Link>
-        </div>
-      </nav>
+      {/* 使用共用 Navbar */}
+      <Navbar
+        pageTitle="塔羅占卜"
+        pageIcon={<Sparkles className="text-[var(--gold)]" size={24} />}
+        showBackButton
+        backHref="/"
+      />
 
       {/* 主要內容區域 */}
-      <main className={`relative z-10 pt-24 px-4 transition-all duration-500 ${step === 'select' ? 'w-full max-w-[1800px] mx-auto' : (step === 'reveal' || step === 'interpreting' || step === 'result' ? 'w-full max-w-[1600px] mx-auto' : 'max-w-4xl mx-auto')}`}>
+      <main className={`relative z-10 pt-8 px-4 transition-all duration-500 ${step === 'select' ? 'w-full max-w-[1800px] mx-auto' : (step === 'reveal' || step === 'interpreting' || step === 'result' ? 'w-full max-w-[1600px] mx-auto' : 'max-w-4xl mx-auto')}`}>
 
         {/* Intro Phase */}
         {step === 'intro' && (

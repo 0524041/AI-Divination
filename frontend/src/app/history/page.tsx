@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { parseMarkdown } from '@/lib/markdown';
 import Link from 'next/link';
+import { parseMarkdown } from '@/lib/markdown';
+import { Navbar } from '@/components/layout/Navbar';
 import {
-  ArrowLeft,
-  Compass,
   History as HistoryIcon,
-  Settings,
   Trash2,
   Copy,
   Share2,
@@ -498,24 +496,22 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-screen">
-      {/* 導航欄 - 增加 z-index 防止下拉選單被遮擋 */}
-      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between relative z-50">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-gray-400 hover:text-[var(--gold)]">
-            <ArrowLeft size={24} />
-          </Link>
-          <div className="flex items-center gap-3">
-            <HistoryIcon className="text-[var(--gold)]" size={24} />
-            <h1 className="text-xl font-bold text-[var(--gold)]">歷史紀錄</h1>
-          </div>
-        </div>
+      {/* 使用共用 Navbar */}
+      <Navbar
+        pageTitle="歷史紀錄"
+        pageIcon={<HistoryIcon className="text-[var(--gold)]" size={24} />}
+        showBackButton
+        backHref="/"
+      />
 
-        <div className="flex items-center gap-4">
-          {/* Admin 用戶篩選器 */}
-          {user?.role === 'admin' && (
+      {/* 主內容 */}
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        {/* Admin 用戶篩選器 - 移動到內容區 */}
+        {user?.role === 'admin' && (
+          <div className="mb-4 flex items-center justify-between">
             <div className="relative user-filter-dropdown">
               <button
-                className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg text-sm hover:bg-gray-700 transition"
+                className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/80 backdrop-blur rounded-xl text-sm hover:bg-gray-700 transition border border-gray-700"
                 onClick={() => setShowUserFilter(!showUserFilter)}
               >
                 <Filter size={16} className="text-[var(--gold)]" />
@@ -530,11 +526,10 @@ export default function HistoryPage() {
               </button>
 
               {showUserFilter && (
-                <div className="absolute top-full right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-2 z-50">
+                <div className="absolute top-full left-0 mt-2 w-56 bg-gray-800 rounded-xl shadow-xl border border-gray-700 py-2 z-50">
                   {/* 我的紀錄 */}
                   <button
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === null ? 'text-[var(--gold)]' : 'text-gray-300'
-                      }`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === null ? 'text-[var(--gold)]' : 'text-gray-300'}`}
                     onClick={() => handleUserFilterChange(null)}
                   >
                     <User size={14} />
@@ -544,8 +539,7 @@ export default function HistoryPage() {
 
                   {/* 全部用戶 */}
                   <button
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === 0 ? 'text-[var(--gold)]' : 'text-gray-300'
-                      }`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === 0 ? 'text-[var(--gold)]' : 'text-gray-300'}`}
                     onClick={() => handleUserFilterChange(0)}
                   >
                     <Users size={14} />
@@ -562,8 +556,7 @@ export default function HistoryPage() {
                   {allUsers.map((u) => (
                     <button
                       key={u.id}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'
-                        }`}
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'}`}
                       onClick={() => handleUserFilterChange(u.id)}
                     >
                       <User size={14} />
@@ -577,21 +570,8 @@ export default function HistoryPage() {
                 </div>
               )}
             </div>
-          )}
-
-          <div className="hidden md:flex items-center gap-4">
-            <Link href="/" className="text-gray-300 hover:text-[var(--gold)]">
-              <Compass size={20} />
-            </Link>
-            <Link href="/settings" className="text-gray-300 hover:text-[var(--gold)]">
-              <Settings size={20} />
-            </Link>
           </div>
-        </div>
-      </nav>
-
-      {/* 主內容 */}
-      <main className="max-w-4xl mx-auto px-4 py-6">
+        )}
         {/* 統計卡片 - 始終顯示統計資訊 */}
         {statistics && (
           <div className="mb-6">

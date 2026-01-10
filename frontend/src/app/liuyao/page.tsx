@@ -4,12 +4,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import CoinTossing from '@/components/CoinTossing';
+import { Navbar } from '@/components/layout/Navbar';
 import { apiGet, apiPost, apiPut } from '@/lib/api-client';
 import {
-  ArrowLeft,
   Compass,
-  History,
-  Settings,
   BookOpen,
   HelpCircle,
   Send,
@@ -465,30 +463,12 @@ export default function LiuYaoPage() {
 
   return (
     <div className="min-h-screen content-stable">
-      {/* 導航欄 */}
-      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-gray-400 hover:text-[var(--gold)]">
-            <ArrowLeft size={24} />
-          </Link>
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">☯</span>
-            <h1 className="text-xl font-bold text-[var(--gold)]">六爻占卜</h1>
-          </div>
-        </div>
-
-        <div className="hidden md:flex items-center gap-4">
-          <Link href="/" className="text-gray-300 hover:text-[var(--gold)]">
-            <Compass size={20} />
-          </Link>
-          <Link href="/history" className="text-gray-300 hover:text-[var(--gold)]">
-            <History size={20} />
-          </Link>
-          <Link href="/settings" className="text-gray-300 hover:text-[var(--gold)]">
-            <Settings size={20} />
-          </Link>
-        </div>
-      </nav>
+      {/* 使用共用 Navbar */}
+      <Navbar
+        pageTitle="六爻占卜"
+        showBackButton
+        backHref="/"
+      />
 
       {/* Intro Phase */}
       {step === 'intro' && (

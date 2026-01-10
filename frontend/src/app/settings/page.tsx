@@ -2,17 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Navbar } from '@/components/layout/Navbar';
 import {
-  ArrowLeft,
   Settings as SettingsIcon,
-  Compass,
-  History,
   Key,
   Server,
   User,
   Users,
-  LogOut,
   X,
   Trash2,
   Plus,
@@ -21,6 +17,7 @@ import {
   RefreshCw,
   Shield,
   Edit2,
+  LogOut,
 } from 'lucide-react';
 
 interface AIConfig {
@@ -489,27 +486,13 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen">
-      {/* 導航欄 */}
-      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-gray-400 hover:text-[var(--gold)]">
-            <ArrowLeft size={24} />
-          </Link>
-          <div className="flex items-center gap-3">
-            <SettingsIcon className="text-[var(--gold)]" size={24} />
-            <h1 className="text-xl font-bold text-[var(--gold)]">設定</h1>
-          </div>
-        </div>
-
-        <div className="hidden md:flex items-center gap-4">
-          <Link href="/" className="text-gray-300 hover:text-[var(--gold)]">
-            <Compass size={20} />
-          </Link>
-          <Link href="/history" className="text-gray-300 hover:text-[var(--gold)]">
-            <History size={20} />
-          </Link>
-        </div>
-      </nav>
+      {/* 使用共用 Navbar */}
+      <Navbar
+        pageTitle="設定"
+        pageIcon={<SettingsIcon className="text-[var(--gold)]" size={24} />}
+        showBackButton
+        backHref="/"
+      />
 
       {/* 主內容 */}
       <main className="max-w-4xl mx-auto px-4 py-6">

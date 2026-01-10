@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Compass, History, Settings, LogOut, Menu, X } from 'lucide-react';
 import { initializeApiClient } from '@/lib/api-init';
 import { apiGet } from '@/lib/api-client';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
 
 // 算命類型卡片
 const divinationTypes = [
@@ -55,7 +55,6 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     // 初始化 API 客戶端
@@ -88,11 +87,6 @@ export default function HomePage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/login');
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -116,7 +110,7 @@ export default function HomePage() {
             <p className="text-gray-400">載入中...</p>
           </div>
 
-          {/* Skeleton cards - reserve space for divination type cards */}
+          {/* Skeleton cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="glass-card p-6 animate-pulse">
@@ -136,64 +130,12 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen">
-      {/* 導航欄 */}
-      <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">☯</span>
-          <h1 className="text-xl font-bold text-[var(--gold)]">玄覺空間</h1>
-        </div>
-
-        {/* 桌面選單 */}
-        <div className="hidden md:flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2 text-[var(--gold)] border-b-2 border-[var(--gold)] pb-1">
-            <Compass size={18} />
-            <span>首頁</span>
-          </Link>
-          <Link href="/history" className="flex items-center gap-2 text-gray-300 hover:text-[var(--gold)] transition">
-            <History size={18} />
-            <span>歷史</span>
-          </Link>
-          <Link href="/settings" className="flex items-center gap-2 text-gray-300 hover:text-[var(--gold)] transition">
-            <Settings size={18} />
-            <span>設定</span>
-          </Link>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-gray-300 hover:text-red-400 transition">
-            <LogOut size={18} />
-            <span>登出</span>
-          </button>
-        </div>
-
-        {/* 手機選單按鈕 */}
-        <button className="md:hidden text-gray-300" onClick={() => setMenuOpen(!menuOpen)}>
-          {menuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </nav>
-
-      {/* 手機選單 */}
-      {menuOpen && (
-        <div className="md:hidden glass-card mx-4 mt-2 p-4 space-y-4">
-          <Link href="/" className="flex items-center gap-2 text-[var(--gold)]">
-            <Compass size={18} />
-            <span>首頁</span>
-          </Link>
-          <Link href="/history" className="flex items-center gap-2 text-gray-300">
-            <History size={18} />
-            <span>歷史</span>
-          </Link>
-          <Link href="/settings" className="flex items-center gap-2 text-gray-300">
-            <Settings size={18} />
-            <span>設定</span>
-          </Link>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-red-400">
-            <LogOut size={18} />
-            <span>登出</span>
-          </button>
-        </div>
-      )}
+    <div className="min-h-screen flex flex-col">
+      {/* 使用共用 Navbar */}
+      <Navbar />
 
       {/* 主內容 */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8 flex-1">
         {/* 歡迎區 */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -230,20 +172,8 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* 頁尾 */}
-      <footer className="text-center py-8 text-gray-500 text-sm">
-        <p>玄覺空間 - 結合傳統智慧與現代科技</p>
-        <p className="mt-2">
-          <a
-            href="https://github.com/0524041/AI-Divination"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[var(--gold)] hover:underline"
-          >
-            GitHub 專案原始碼
-          </a>
-        </p>
-      </footer>
+      {/* 使用共用 Footer */}
+      <Footer />
     </div>
   );
 }
