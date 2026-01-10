@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
@@ -22,6 +22,7 @@ import {
   BarChart3,
   Check,
   Loader2,
+  Search,
 } from 'lucide-react';
 
 interface HistoryItem {
@@ -88,6 +89,15 @@ export default function HistoryPage() {
   const [allUsers, setAllUsers] = useState<UserInfo[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null); // null = 自己, 0 = 全部
   const [showUserFilter, setShowUserFilter] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  // 過濾用戶列表
+  const filteredUsers = useMemo(() => {
+    if (!userSearchTerm.trim()) return allUsers.slice(0, 10);
+    return allUsers
+      .filter(u => u.username.toLowerCase().includes(userSearchTerm.toLowerCase()))
+      .slice(0, 10);
+  }, [allUsers, userSearchTerm]);
 
   // 分享狀態
   const [sharingState, setSharingState] = useState<Record<number, 'idle' | 'loading' | 'success'>>({});
@@ -547,26 +557,49 @@ export default function HistoryPage() {
                     {selectedUserId === 0 && <span className="ml-auto">✓</span>}
                   </button>
 
-                  {/* 分隔線 */}
+                  {/* 分隔線與搜尋 */}
                   {allUsers.length > 0 && (
-                    <div className="border-t border-gray-700 my-2"></div>
+                    <>
+                      <div className="border-t border-gray-700 my-2"></div>
+                      {/* 搜尋框 */}
+                      <div className="px-2 pb-2">
+                        <div className="relative">
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                          <input
+                            type="text"
+                            value={userSearchTerm}
+                            onChange={(e) => setUserSearchTerm(e.target.value)}
+                            placeholder="搜尋用戶..."
+                            className="w-full pl-8 pr-3 py-2 bg-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[var(--gold)]"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
 
-                  {/* 用戶列表 */}
-                  {allUsers.map((u) => (
-                    <button
-                      key={u.id}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'}`}
-                      onClick={() => handleUserFilterChange(u.id)}
-                    >
-                      <User size={14} />
-                      <span className="truncate">{u.username}</span>
-                      {u.role === 'admin' && (
-                        <span className="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-1 rounded">Admin</span>
-                      )}
-                      {selectedUserId === u.id && <span className="ml-auto">✓</span>}
-                    </button>
-                  ))}
+                  {/* 用戶列表 - 可滾動 */}
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredUsers.map((u) => (
+                      <button
+                        key={u.id}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'}`}
+                        onClick={() => handleUserFilterChange(u.id)}
+                      >
+                        <User size={14} />
+                        <span className="truncate">{u.username}</span>
+                        {u.role === 'admin' && (
+                          <span className="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-1 rounded">Admin</span>
+                        )}
+                        {selectedUserId === u.id && <span className="ml-auto">✓</span>}
+                      </button>
+                    ))}
+                    {filteredUsers.length === 0 && userSearchTerm && (
+                      <div className="px-4 py-2 text-sm text-gray-500 text-center">
+                        找不到符合的用戶
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

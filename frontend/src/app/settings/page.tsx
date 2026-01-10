@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
 import {
@@ -18,6 +18,8 @@ import {
   Shield,
   Edit2,
   LogOut,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface AIConfig {
@@ -70,6 +72,15 @@ export default function SettingsPage() {
   const [newUsername, setNewUsername] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
+
+  // 用戶分頁
+  const USERS_PER_PAGE = 20;
+  const [userPage, setUserPage] = useState(1);
+  const paginatedUsers = useMemo(() => {
+    const start = (userPage - 1) * USERS_PER_PAGE;
+    return users.slice(start, start + USERS_PER_PAGE);
+  }, [users, userPage]);
+  const totalUserPages = Math.ceil(users.length / USERS_PER_PAGE);
 
   useEffect(() => {
     checkAuth();
@@ -877,7 +888,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-3">
-                {users.map((user) => (
+                {paginatedUsers.map((user) => (
                   <div key={user.id} className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -912,6 +923,31 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* 分頁控制 */}
+              {totalUserPages > 1 && (
+                <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-700">
+                  <span className="text-sm text-gray-400">
+                    共 {users.length} 位用戶，第 {userPage} / {totalUserPages} 頁
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setUserPage(p => Math.max(1, p - 1))}
+                      disabled={userPage === 1}
+                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <button
+                      onClick={() => setUserPage(p => Math.min(totalUserPages, p + 1))}
+                      disabled={userPage === totalUserPages}
+                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 新增用戶表單 */}
