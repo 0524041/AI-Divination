@@ -1,15 +1,9 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Noto_Serif_TC } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 
-const notoSerifTC = Noto_Serif_TC({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  display: 'optional', // Use 'optional' to prevent layout shift from font swap
-  preload: true,
-  fallback: ['serif', 'system-ui'], // Specify fallback fonts
-});
+// 使用 CSS 字型堆疊，避免建置時需要網路請求
+// Google Fonts 將在客戶端通過 CSS @import 載入（若無法載入則 fallback 到系統字型）
 
 export const metadata: Metadata = {
   title: '玄覺空間 - AI 玄學占卜',
@@ -26,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-TW" className={notoSerifTC.className}>
+    <html lang="zh-TW">
       <body className="font-chinese antialiased">
         <AuthProvider>
           {children}
@@ -35,3 +29,4 @@ export default function RootLayout({
     </html>
   );
 }
+

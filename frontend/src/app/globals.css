@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Google Fonts - 客戶端載入 (若無法連接會 fallback 到系統字型) */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
+
+/* 字型堆疊 - 優雅降級 */
+.font-chinese {
+  font-family: 'Noto Serif TC', 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
+}
+
 :root {
   --gold: #d4af37;
   --gold-dark: #b8962e;
