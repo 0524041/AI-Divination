@@ -530,7 +530,7 @@ export default function HistoryPage() {
       />
 
       {/* 主內容 */}
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="w-full max-w-4xl mx-auto px-4 py-6">
         {/* Admin 用戶篩選器 - 移動到內容區 */}
         {user?.role === 'admin' && (
           <div className="mb-4 flex items-center justify-between">

@@ -458,7 +458,7 @@ export default function LiuYaoPage() {
     if (config.provider === 'gemini') {
       return 'Google Gemini';
     }
-    return `Local AI (${config.local_model})`;
+    return `其他 AI (${config.local_model})`;
   };
 
   return (
@@ -531,7 +531,7 @@ export default function LiuYaoPage() {
           </div>
 
           {/* 內容區 */}
-          <main className="max-w-4xl mx-auto px-4 py-6">
+          <main className="w-full max-w-4xl mx-auto px-4 py-6">
             {/* 占卜頁面 */}
             {activeTab === 'divine' && (
               <div className="space-y-6">
@@ -586,7 +586,7 @@ export default function LiuYaoPage() {
                   {activeAI?.provider === 'local' && (
                     <div className="mt-3 flex items-start gap-2 text-xs text-amber-400/80 bg-amber-400/10 rounded-lg p-2">
                       <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                      <span>使用 Local AI 時，解盤最長可能需要等待 5 分鐘，取決於您的電腦性能。建議升級硬體或是使用雲端 AI 解盤以獲得更快的回應速度。</span>
+                      <span>使用其他 AI 服務時，解盤最長可能需要等待 5 分鐘，取決於伺服器性能。建議使用 Google Gemini 以獲得更快的回應速度。</span>
                     </div>
                   )}
                 </div>

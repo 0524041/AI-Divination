@@ -506,7 +506,7 @@ export default function SettingsPage() {
       />
 
       {/* 主內容 */}
-      <main className="max-w-4xl mx-auto px-4 py-6">
+      <main className="w-full max-w-4xl mx-auto px-4 py-6">
         {/* 分頁選項 */}
         <div className="flex gap-2 border-b border-gray-700 pb-2 mb-6 overflow-x-auto">
           <button

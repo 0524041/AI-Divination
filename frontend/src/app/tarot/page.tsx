@@ -661,7 +661,7 @@ export default function TarotPage() {
                     <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">AI 解盤服務</div>
                     <div className="font-medium text-gray-200 text-lg">
                       {activeAI ? (
-                        activeAI.provider === 'gemini' ? 'Google Gemini Pro' : 'Local AI Model'
+                        activeAI.provider === 'gemini' ? 'Google Gemini' : '其他 AI 服務'
                       ) : (
                         '未設定 AI'
                       )}
@@ -685,7 +685,7 @@ export default function TarotPage() {
                         <div className="flex items-center gap-3">
                           <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--gold)] shadow-[0_0_10px_var(--gold)]' : 'bg-gray-600'}`} />
                           <span className={isSelected ? 'text-[var(--gold)] font-medium' : 'text-gray-300'}>
-                            {config.provider === 'gemini' ? 'Google Gemini' : `Local AI (${config.local_model})`}
+                            {config.provider === 'gemini' ? 'Google Gemini' : `其他 AI (${config.local_model})`}
                           </span>
                         </div>
                         {isSelected && <Check size={18} className="text-[var(--gold)]" />}

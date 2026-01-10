@@ -149,7 +149,7 @@ export default function SharePage() {
             </nav>
 
             {/* 主內容 */}
-            <main className="max-w-4xl mx-auto px-4 py-6">
+            <main className="w-full max-w-4xl mx-auto px-4 py-6">
                 {/* 問題卡片 */}
                 <div className="glass-card p-6 mb-6">
                     <div className="flex items-center gap-2 mb-4">

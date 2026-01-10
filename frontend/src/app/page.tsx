@@ -104,7 +104,7 @@ export default function HomePage() {
         </div>
 
         {/* Skeleton content */}
-        <main className="max-w-6xl mx-auto px-4 py-8">
+        <main className="w-full max-w-6xl mx-auto px-4 py-8">
           <div className="text-center mb-12">
             <div className="text-6xl mb-4 animate-spin-slow">☯</div>
             <p className="text-gray-400">載入中...</p>
@@ -135,7 +135,7 @@ export default function HomePage() {
       <Navbar />
 
       {/* 主內容 */}
-      <main className="max-w-6xl mx-auto px-4 py-8 flex-1">
+      <main className="w-full max-w-6xl mx-auto px-4 py-8 flex-1">
         {/* 歡迎區 */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
