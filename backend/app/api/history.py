@@ -87,6 +87,7 @@ def get_history(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     divination_type: Optional[str] = None,
+    search: Optional[str] = Query(None, description="搜尋問題內容"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -95,6 +96,8 @@ def get_history(
     
     if divination_type:
         query = query.filter(History.divination_type == divination_type)
+    if search:
+        query = query.filter(History.question.ilike(f"%{search}%"))
     
     total = query.count()
     items = query.order_by(History.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
@@ -212,6 +215,7 @@ def get_all_history(
     page_size: int = Query(20, ge=1, le=100),
     user_id: Optional[int] = None,
     divination_type: Optional[str] = None,
+    search: Optional[str] = Query(None, description="搜尋問題內容"),
     admin_user: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -222,6 +226,8 @@ def get_all_history(
         query = query.filter(History.user_id == user_id)
     if divination_type:
         query = query.filter(History.divination_type == divination_type)
+    if search:
+        query = query.filter(History.question.ilike(f"%{search}%"))
     
     total = query.count()
     results = query.order_by(History.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()

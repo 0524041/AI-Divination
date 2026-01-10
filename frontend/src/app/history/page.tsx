@@ -91,6 +91,10 @@ export default function HistoryPage() {
   const [showUserFilter, setShowUserFilter] = useState(false);
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
+  // 歷史紀錄搜尋
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [searchInputValue, setSearchInputValue] = useState('');
+
   // 過濾用戶列表
   const filteredUsers = useMemo(() => {
     if (!userSearchTerm.trim()) return allUsers.slice(0, 10);
@@ -106,13 +110,13 @@ export default function HistoryPage() {
     checkAuth();
   }, []);
 
-  // 換頁或切換用戶時載入歷史和統計
+  // 換頁或切換用戶或搜尋時載入歷史和統計
   useEffect(() => {
     if (user) {
       fetchHistory();
       fetchStatistics(); // 切換用戶時也更新統計資料
     }
-  }, [user, selectedUserId, currentPage]);
+  }, [user, selectedUserId, currentPage, historySearchTerm]);
 
   // 用戶列表只在初始載入時請求一次
   useEffect(() => {
@@ -178,14 +182,25 @@ export default function HistoryPage() {
 
     let endpoint = `/api/history?page=${currentPage}&page_size=${pageSize}`;
 
+    // 加入搜尋參數
+    if (historySearchTerm) {
+      endpoint += `&search=${encodeURIComponent(historySearchTerm)}`;
+    }
+
     // Admin 用戶可以查看其他人的紀錄
     if (user?.role === 'admin') {
       if (selectedUserId === 0) {
         // 查看全部
         endpoint = `/api/history/admin/all?page=${currentPage}&page_size=${pageSize}`;
+        if (historySearchTerm) {
+          endpoint += `&search=${encodeURIComponent(historySearchTerm)}`;
+        }
       } else if (selectedUserId !== null) {
         // 查看特定用戶
         endpoint = `/api/history/admin/all?user_id=${selectedUserId}&page=${currentPage}&page_size=${pageSize}`;
+        if (historySearchTerm) {
+          endpoint += `&search=${encodeURIComponent(historySearchTerm)}`;
+        }
       }
       // selectedUserId === null 時查看自己的（使用預設 /api/history）
     }
@@ -672,6 +687,52 @@ export default function HistoryPage() {
             </div>
           </div>
         )}
+
+        {/* 歷史紀錄搜尋 */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              value={searchInputValue}
+              onChange={(e) => setSearchInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setHistorySearchTerm(searchInputValue);
+                  setCurrentPage(1);
+                }
+              }}
+              placeholder="搜尋問題內容... (按 Enter 搜尋)"
+              className="w-full pl-12 pr-24 py-3 bg-gray-800/80 backdrop-blur rounded-xl text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--gold)]/50 border border-gray-700"
+            />
+            {(searchInputValue || historySearchTerm) && (
+              <button
+                onClick={() => {
+                  setSearchInputValue('');
+                  setHistorySearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="absolute right-16 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 p-1"
+              >
+                ✕
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setHistorySearchTerm(searchInputValue);
+                setCurrentPage(1);
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1 bg-[var(--gold)]/20 text-[var(--gold)] rounded-lg text-sm hover:bg-[var(--gold)]/30 transition"
+            >
+              搜尋
+            </button>
+          </div>
+          {historySearchTerm && (
+            <div className="mt-2 text-sm text-gray-400">
+              搜尋「{historySearchTerm}」的結果，共 {totalCount} 筆
+            </div>
+          )}
+        </div>
 
         {loading ? (
           <div className="text-center py-12">
