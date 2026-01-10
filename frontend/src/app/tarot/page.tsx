@@ -535,7 +535,7 @@ export default function TarotPage() {
 
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 pb-20 overflow-x-hidden">
+    <div className="min-h-screen flex flex-col pb-20 overflow-x-hidden">
       {/* 背景裝飾 */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,_rgba(21,21,40,1)_0%,_rgba(10,10,10,1)_80%)]"></div>

@@ -520,7 +520,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       {/* 使用共用 Navbar */}
       <Navbar
         pageTitle="歷史紀錄"

@@ -496,7 +496,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       {/* 使用共用 Navbar */}
       <Navbar
         pageTitle="設定"

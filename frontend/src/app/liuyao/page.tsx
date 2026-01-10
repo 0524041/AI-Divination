@@ -462,7 +462,7 @@ export default function LiuYaoPage() {
   };
 
   return (
-    <div className="min-h-screen content-stable">
+    <div className="min-h-screen flex flex-col">
       {/* 使用共用 Navbar */}
       <Navbar
         pageTitle="六爻占卜"
