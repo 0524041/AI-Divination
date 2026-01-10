@@ -11,6 +11,13 @@
   --text-secondary: #a0a0a0;
 }
 
+/* 防止過度滾動時顯示白色背景 */
+html {
+  background-color: #0f0f23;
+  /* 可選：禁用橡皮筋效果 */
+  /* overscroll-behavior: none; */
+}
+
 body {
   background: linear-gradient(135deg, var(--bg-dark) 0%, #0f0f23 100%);
   color: var(--text-primary);
