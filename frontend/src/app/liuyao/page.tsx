@@ -556,20 +556,23 @@ export default function LiuYaoPage() {
                         <ChevronDown size={16} />
                       </button>
                       {showAISelector && aiConfigs.length > 0 && (
-                        <div className="absolute right-0 top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 min-w-[200px]">
-                          {aiConfigs.map((config) => (
-                            <button
-                              key={config.id}
-                              onClick={() => handleSwitchAI(config.id)}
-                              className={`w-full text-left px-4 py-3 hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg ${config.is_active ? 'text-[var(--gold)]' : 'text-gray-300'
-                                }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span>{getAIDisplayName(config)}</span>
-                                {config.is_active && <span className="text-xs">✓</span>}
-                              </div>
-                            </button>
-                          ))}
+                        <div className="absolute right-0 top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 min-w-[200px]">
+                          {aiConfigs.map((config) => {
+                            const isSelected = activeAI?.id === config.id;
+                            return (
+                              <button
+                                key={config.id}
+                                onClick={() => handleSwitchAI(config.id)}
+                                className={`w-full text-left px-4 py-3 hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg ${isSelected ? 'text-[var(--gold)]' : 'text-gray-300'
+                                  }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span>{getAIDisplayName(config)}</span>
+                                  {isSelected && <span className="text-xs">✓</span>}
+                                </div>
+                              </button>
+                            );
+                          })}
                           <Link
                             href="/settings"
                             className="block w-full text-center px-4 py-2 text-sm text-gray-500 hover:text-[var(--gold)] border-t border-gray-700"

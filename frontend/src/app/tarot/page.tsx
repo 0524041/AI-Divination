@@ -673,22 +673,25 @@ export default function TarotPage() {
 
               {showAISelector && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a2e] border border-gray-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                  {aiConfigs.map((config) => (
-                    <button
-                      key={config.id}
-                      onClick={() => handleSwitchAI(config.id)}
-                      className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800 transition ${config.is_active ? 'bg-[var(--gold)]/5' : ''
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${config.is_active ? 'bg-[var(--gold)] shadow-[0_0_10px_var(--gold)]' : 'bg-gray-600'}`} />
-                        <span className={config.is_active ? 'text-[var(--gold)] font-medium' : 'text-gray-300'}>
-                          {config.provider === 'gemini' ? 'Google Gemini' : `Local AI (${config.local_model})`}
-                        </span>
-                      </div>
-                      {config.is_active && <Check size={18} className="text-[var(--gold)]" />}
-                    </button>
-                  ))}
+                  {aiConfigs.map((config) => {
+                    const isSelected = activeAI?.id === config.id;
+                    return (
+                      <button
+                        key={config.id}
+                        onClick={() => handleSwitchAI(config.id)}
+                        className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800 transition ${isSelected ? 'bg-[var(--gold)]/5' : ''
+                          }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--gold)] shadow-[0_0_10px_var(--gold)]' : 'bg-gray-600'}`} />
+                          <span className={isSelected ? 'text-[var(--gold)] font-medium' : 'text-gray-300'}>
+                            {config.provider === 'gemini' ? 'Google Gemini' : `Local AI (${config.local_model})`}
+                          </span>
+                        </div>
+                        {isSelected && <Check size={18} className="text-[var(--gold)]" />}
+                      </button>
+                    );
+                  })}
                   <Link
                     href="/settings"
                     className="w-full px-6 py-4 flex items-center gap-3 text-gray-400 hover:bg-gray-800 hover:text-[var(--gold)] border-t border-gray-800 transition"
