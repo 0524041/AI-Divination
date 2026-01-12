@@ -114,39 +114,119 @@ clean_cache() {
 }
 
 # ============================================
-# 停止服務
+# 停止服務（優化版：分層停止 + 端口確認）
 # ============================================
 stop_services() {
     echo -e "\n${YELLOW}[停止] 正在停止所有服務...${NC}"
     
-    # 停止後端
-    pkill -f "uvicorn app.main:app" 2>/dev/null && echo -e "${GREEN}✓ 後端服務已停止${NC}" || echo -e "${CYAN}ℹ 後端服務未運行${NC}"
+    local BACKEND_STOPPED=false
+    local FRONTEND_STOPPED=false
     
-    # 停止前端 - 更徹底的方式
-    # 1. 先嘗試 pkill
-    pkill -f "next-server" 2>/dev/null
-    pkill -f "next dev" 2>/dev/null
-    pkill -f "next start" 2>/dev/null
+    # Step 1: 優雅停止 (SIGTERM)
+    if pgrep -f "uvicorn app.main:app" > /dev/null 2>&1; then
+        pkill -TERM -f "uvicorn app.main:app" 2>/dev/null
+    else
+        BACKEND_STOPPED=true
+        echo -e "${CYAN}ℹ 後端服務未運行${NC}"
+    fi
     
-    # 2. 檢查是否還有進程在運行
-    sleep 1
-    if pgrep -f "next-server|next dev|next start" > /dev/null; then
-        echo -e "${YELLOW}⚠ 前端進程未完全停止，強制終止...${NC}"
-        pkill -9 -f "next-server" 2>/dev/null
-        pkill -9 -f "next dev" 2>/dev/null
-        pkill -9 -f "next start" 2>/dev/null
+    if pgrep -f "next-server|next dev|next start" > /dev/null 2>&1; then
+        pkill -TERM -f "next-server" 2>/dev/null
+        pkill -TERM -f "next dev" 2>/dev/null
+        pkill -TERM -f "next start" 2>/dev/null
+    else
+        FRONTEND_STOPPED=true
+        echo -e "${CYAN}ℹ 前端服務未運行${NC}"
+    fi
+    
+    # Step 2: 等待優雅退出
+    if [ "$BACKEND_STOPPED" = false ] || [ "$FRONTEND_STOPPED" = false ]; then
+        echo -e "${CYAN}等待進程優雅退出...${NC}"
+        sleep 2
+    fi
+    
+    # Step 3: 確認後端停止
+    if [ "$BACKEND_STOPPED" = false ]; then
+        if pgrep -f "uvicorn app.main:app" > /dev/null 2>&1; then
+            echo -e "${YELLOW}⚠ 後端進程未完全停止，強制終止...${NC}"
+            pkill -9 -f "uvicorn app.main:app" 2>/dev/null
+            sleep 1
+        fi
+        
+        if ! pgrep -f "uvicorn app.main:app" > /dev/null 2>&1; then
+            echo -e "${GREEN}✓ 後端服務已停止${NC}"
+        else
+            echo -e "${RED}✗ 後端服務停止失敗${NC}"
+        fi
+    fi
+    
+    # Step 4: 確認前端停止
+    if [ "$FRONTEND_STOPPED" = false ]; then
+        if pgrep -f "next-server|next dev|next start" > /dev/null 2>&1; then
+            echo -e "${YELLOW}⚠ 前端進程未完全停止，強制終止...${NC}"
+            pkill -9 -f "next-server" 2>/dev/null
+            pkill -9 -f "next dev" 2>/dev/null
+            pkill -9 -f "next start" 2>/dev/null
+            sleep 1
+        fi
+        
+        if ! pgrep -f "next-server|next dev|next start" > /dev/null 2>&1; then
+            echo -e "${GREEN}✓ 前端服務已停止${NC}"
+        else
+            echo -e "${RED}✗ 前端服務停止失敗${NC}"
+        fi
+    fi
+    
+    # Step 5: 確保端口已釋放
+    local PORT_ISSUES=false
+    for port in 3000 8000; do
+        if lsof -ti:$port > /dev/null 2>&1; then
+            echo -e "${YELLOW}端口 $port 仍被占用，強制釋放...${NC}"
+            lsof -ti:$port | xargs kill -9 2>/dev/null || true
+            PORT_ISSUES=true
+        fi
+    done
+    
+    if [ "$PORT_ISSUES" = true ]; then
         sleep 1
     fi
     
-    # 3. 確認停止
-    if pgrep -f "next-server|next dev|next start" > /dev/null; then
-        echo -e "${RED}✗ 前端服務停止失敗${NC}"
-        echo -e "${YELLOW}請手動執行: killall -9 node${NC}"
-    else
-        echo -e "${GREEN}✓ 前端服務已停止${NC}"
-    fi
+    # 最終確認
+    local FINAL_OK=true
+    for port in 3000 8000; do
+        if lsof -ti:$port > /dev/null 2>&1; then
+            echo -e "${RED}✗ 端口 $port 仍被占用${NC}"
+            FINAL_OK=false
+        fi
+    done
     
-    echo -e "${GREEN}✓ 服務停止完成${NC}"
+    if [ "$FINAL_OK" = true ]; then
+        echo -e "${GREEN}✓ 服務停止完成，端口已釋放${NC}"
+    else
+        echo -e "${YELLOW}⚠ 請手動執行: killall -9 node; killall -9 python${NC}"
+    fi
+}
+
+# ============================================
+# 清理進程並釋放端口
+# ============================================
+cleanup_processes_and_ports() {
+    echo "清理殘留進程..."
+    pkill -f "uvicorn app.main:app" 2>/dev/null || true
+    pkill -f "next-server" 2>/dev/null || true
+    pkill -f "next dev" 2>/dev/null || true
+    pkill -f "next start" 2>/dev/null || true
+    
+    sleep 2
+    
+    # 檢查端口並強制釋放
+    for port in 3000 8000; do
+        if lsof -ti:$port > /dev/null 2>&1; then
+            echo -e "${YELLOW}端口 $port 仍被占用，強制釋放...${NC}"
+            lsof -ti:$port | xargs kill -9 2>/dev/null || true
+            sleep 1
+        fi
+    done
 }
 
 # ============================================
@@ -548,22 +628,13 @@ start_services() {
 start_dev_services() {
     echo -e "\n${YELLOW}[開發模式] 啟動服務...${NC}"
     
-    # 確保沒有殘留的進程
-    echo "清理殘留進程..."
-    pkill -9 -f "uvicorn app.main:app" 2>/dev/null || true
-    pkill -9 -f "next-server" 2>/dev/null || true
-    pkill -9 -f "next dev" 2>/dev/null || true
-    pkill -9 -f "next start" 2>/dev/null || true
+    cleanup_processes_and_ports
     
-    sleep 2
-    
-    # 啟動後端 (開發模式)
     echo "啟動後端服務 (開發模式 Port 8000)..."
     cd "$BACKEND_DIR"
     nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
     
-    # 啟動前端 (開發模式)
     echo "啟動前端服務 (開發模式 Port 3000, 0.0.0.0)..."
     cd "$FRONTEND_DIR"
     nohup npm run dev -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
