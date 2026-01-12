@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import CoinTossing from '@/components/CoinTossing';
 import { Navbar } from '@/components/layout/Navbar';
-import { apiGet, apiPost, apiPut } from '@/lib/api-client';
+import { AISelector, AIConfig } from '@/components/features/AISelector';
+import { apiGet, apiPost } from '@/lib/api-client';
 import {
   Compass,
   BookOpen,
@@ -16,9 +17,6 @@ import {
   Share2,
   Check,
   X,
-  AlertTriangle,
-  Bot,
-  ChevronDown,
 } from 'lucide-react';
 
 type Tab = 'divine' | 'intro' | 'tutorial';
@@ -41,15 +39,6 @@ interface DivinationResult {
   status: string;
   coins: number[];
   chart_data: ChartData;
-}
-
-interface AIConfig {
-  id: number;
-  provider: string;
-  has_api_key: boolean;
-  local_url: string | null;
-  local_model: string | null;
-  is_active: boolean;
 }
 
 // 最大等待時間常數
@@ -79,9 +68,7 @@ export default function LiuYaoPage() {
   const [aiProgress, setAiProgress] = useState(0);
 
   // AI 設定相關
-  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
   const [activeAI, setActiveAI] = useState<AIConfig | null>(null);
-  const [showAISelector, setShowAISelector] = useState(false);
 
   // 分享狀態
   const [sharingState, setSharingState] = useState<'idle' | 'loading' | 'success'>('idle');
@@ -91,39 +78,14 @@ export default function LiuYaoPage() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const waitingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 檢查登入並載入 AI 設定
+  // 檢查登入
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
     }
-    fetchAIConfigs();
   }, [router]);
-
-  const fetchAIConfigs = async () => {
-    try {
-      const res = await apiGet('/api/settings/ai');
-      if (res.ok) {
-        const configs = await res.json();
-        setAiConfigs(configs);
-        const active = configs.find((c: AIConfig) => c.is_active);
-        setActiveAI(active || null);
-      }
-    } catch (err) {
-      console.error('Fetch AI configs error:', err);
-    }
-  };
-
-  const handleSwitchAI = async (configId: number) => {
-    try {
-      await apiPut(`/api/settings/ai/${configId}/activate`);
-      await fetchAIConfigs();
-      setShowAISelector(false);
-    } catch (err) {
-      console.error('Switch AI error:', err);
-    }
-  };
 
   // 清理計時器
   const clearAllTimers = () => {
@@ -453,14 +415,6 @@ export default function LiuYaoPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // 取得 AI 顯示名稱
-  const getAIDisplayName = (config: AIConfig) => {
-    if (config.provider === 'gemini') {
-      return 'Google Gemini';
-    }
-    return `其他 AI (${config.local_model})`;
-  };
-
   return (
     <div className="min-h-screen flex flex-col">
       {/* 使用共用 Navbar */}
@@ -535,61 +489,12 @@ export default function LiuYaoPage() {
             {/* 占卜頁面 */}
             {activeTab === 'divine' && (
               <div className="space-y-6">
-                {/* 當進 AI 顯示與切換 */}
-                <div className="glass-card p-4 relative z-20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Bot className="text-[var(--gold)]" size={20} />
-                      <span className="text-sm text-gray-400">當前 AI：</span>
-                      {activeAI ? (
-                        <span className="text-[var(--gold)] font-medium">{getAIDisplayName(activeAI)}</span>
-                      ) : (
-                        <span className="text-red-400">未設定</span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowAISelector(!showAISelector)}
-                        className="text-sm text-gray-400 hover:text-[var(--gold)] flex items-center gap-1"
-                      >
-                        切換 AI
-                        <ChevronDown size={16} />
-                      </button>
-                      {showAISelector && aiConfigs.length > 0 && (
-                        <div className="absolute right-0 top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 min-w-[200px]">
-                          {aiConfigs.map((config) => {
-                            const isSelected = activeAI?.id === config.id;
-                            return (
-                              <button
-                                key={config.id}
-                                onClick={() => handleSwitchAI(config.id)}
-                                className={`w-full text-left px-4 py-3 hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg ${isSelected ? 'text-[var(--gold)]' : 'text-gray-300'
-                                  }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span>{getAIDisplayName(config)}</span>
-                                  {isSelected && <span className="text-xs">✓</span>}
-                                </div>
-                              </button>
-                            );
-                          })}
-                          <Link
-                            href="/settings"
-                            className="block w-full text-center px-4 py-2 text-sm text-gray-500 hover:text-[var(--gold)] border-t border-gray-700"
-                          >
-                            管理 AI 設定
-                          </Link>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {activeAI?.provider === 'local' && (
-                    <div className="mt-3 flex items-start gap-2 text-xs text-amber-400/80 bg-amber-400/10 rounded-lg p-2">
-                      <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                      <span>使用其他 AI 服務時，解盤最長可能需要等待 5 分鐘，取決於伺服器性能。建議使用 Google Gemini 以獲得更快的回應速度。</span>
-                    </div>
-                  )}
-                </div>
+                {/* AI 選擇器 */}
+                <AISelector
+                  onConfigChange={(config) => setActiveAI(config)}
+                  showWarning={true}
+                  warningMessage="使用其他 AI 服務時，解盤最長可能需要等待 5 分鐘，取決於伺服器性能。建議使用 Google Gemini 以獲得更快的回應速度。"
+                />
 
                 <form onSubmit={handleSubmit} className="glass-card p-6 space-y-6">
                   {/* 性別選擇 */}

@@ -25,6 +25,7 @@ import {
 interface AIConfig {
   id: number;
   provider: string;
+  name: string | null;
   has_api_key: boolean;
   local_url: string | null;
   local_model: string | null;
@@ -52,6 +53,7 @@ export default function SettingsPage() {
   const [showAddAI, setShowAddAI] = useState(false);
   const [editingConfig, setEditingConfig] = useState<AIConfig | null>(null);
   const [newAIProvider, setNewAIProvider] = useState<'gemini' | 'openai' | 'local'>('gemini');
+  const [newAIName, setNewAIName] = useState('');
   const [newAPIKey, setNewAPIKey] = useState('');
   const [newLocalURL, setNewLocalURL] = useState('');
   const [newLocalModel, setNewLocalModel] = useState('');
@@ -190,6 +192,11 @@ export default function SettingsPage() {
     const token = localStorage.getItem('token');
     const body: Record<string, string> = { provider: newAIProvider };
 
+    // 添加用戶自訂名稱
+    if (newAIName.trim()) {
+      body.name = newAIName.trim();
+    }
+
     if (newAIProvider === 'gemini' || newAIProvider === 'openai') {
       if (!newAPIKey) {
         alert('請輸入 API Key');
@@ -237,6 +244,7 @@ export default function SettingsPage() {
   const handleEditAIConfig = (config: AIConfig) => {
     setEditingConfig(config);
     setNewAIProvider(config.provider as 'gemini' | 'openai' | 'local');
+    setNewAIName(config.name || '');
     setNewAPIKey('');
     setNewLocalURL(config.local_url || '');
     setNewLocalModel(config.local_model || '');
@@ -275,6 +283,11 @@ export default function SettingsPage() {
 
     const token = localStorage.getItem('token');
     const body: Record<string, string> = { provider: newAIProvider };
+
+    // 添加用戶自訂名稱
+    if (newAIName.trim()) {
+      body.name = newAIName.trim();
+    }
 
     if (newAIProvider === 'gemini' || newAIProvider === 'openai') {
       if (newAPIKey) {
@@ -347,6 +360,7 @@ export default function SettingsPage() {
 
   const resetAIForm = () => {
     setNewAIProvider('gemini');
+    setNewAIName('');
     setNewAPIKey('');
     setNewLocalURL('');
     setNewLocalModel('');
@@ -576,8 +590,10 @@ export default function SettingsPage() {
                           )}
                           <div>
                             <p className="font-medium">
-                              {config.provider === 'gemini' ? 'Google Gemini' :
-                                config.provider === 'openai' ? 'OpenAI' : '其他 AI 服務'}
+                              {config.name || (
+                                config.provider === 'gemini' ? 'Google Gemini' :
+                                config.provider === 'openai' ? 'OpenAI' : '其他 AI 服務'
+                              )}
                             </p>
                             {config.provider === 'local' && (
                               <p className="text-sm text-gray-500">
@@ -677,6 +693,24 @@ export default function SettingsPage() {
                       其他 AI
                     </button>
                   </div>
+                </div>
+
+                {/* 自訂名稱輸入框 */}
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-400 mb-2">
+                    服務名稱 (選填)
+                  </label>
+                  <input
+                    type="text"
+                    value={newAIName}
+                    onChange={(e) => setNewAIName(e.target.value)}
+                    className="input-dark w-full"
+                    placeholder={`例如: 我的${newAIProvider === 'gemini' ? 'Gemini' : newAIProvider === 'openai' ? 'OpenAI' : '本地 AI'}`}
+                    maxLength={50}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    可自訂名稱方便識別，留空則使用預設名稱
+                  </p>
                 </div>
 
                 {newAIProvider === 'gemini' || newAIProvider === 'openai' ? (

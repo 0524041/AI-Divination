@@ -5,17 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
 import { Navbar } from '@/components/layout/Navbar';
-import { Sparkles, RotateCcw, Play, Check, ChevronDown, Bot, Copy, Share2, Loader2, X, Eye, Settings, History, ArrowLeft } from 'lucide-react';
+import { AISelector, AIConfig } from '@/components/features/AISelector';
+import { Sparkles, RotateCcw, Play, Check, ChevronDown, Copy, Share2, Loader2, X, Eye, History, ArrowLeft } from 'lucide-react';
 import { TAROT_CARDS, TarotCardData } from '@/lib/tarot-data';
-
-interface AIConfig {
-  id: number;
-  provider: string;
-  has_api_key: boolean;
-  local_url: string | null;
-  local_model: string | null;
-  is_active: boolean;
-}
 
 // 牌背組件 - 增加質感與光澤
 const CardBack = ({ onClick, className = "", style, glow = false }: { onClick?: () => void, className?: string, style?: React.CSSProperties, glow?: boolean }) => (
@@ -138,9 +130,7 @@ export default function TarotPage() {
   const [reshuffleCount, setReshuffleCount] = useState(0);
 
   // AI 設定相關
-  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
   const [activeAI, setActiveAI] = useState<AIConfig | null>(null);
-  const [showAISelector, setShowAISelector] = useState(false);
 
   // 初始化
   useEffect(() => {
@@ -152,38 +142,6 @@ export default function TarotPage() {
     if (!token) {
       router.push('/login');
       return;
-    }
-    fetchAIConfigs();
-  };
-
-  const fetchAIConfigs = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch('/api/settings/ai', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const configs = await res.json();
-        setAiConfigs(configs);
-        const active = configs.find((c: AIConfig) => c.is_active);
-        setActiveAI(active || null);
-      }
-    } catch (err) {
-      console.error('Fetch AI configs error:', err);
-    }
-  };
-
-  const handleSwitchAI = async (configId: number) => {
-    const token = localStorage.getItem('token');
-    try {
-      await fetch(`/api/settings/ai/${configId}/activate`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetchAIConfigs();
-      setShowAISelector(false);
-    } catch (err) {
-      console.error('Switch AI error:', err);
     }
   };
 
@@ -648,60 +606,12 @@ export default function TarotPage() {
             </div>
 
             {/* AI Selector */}
-            <div className="relative group z-20">
-              <button
-                onClick={() => setShowAISelector(!showAISelector)}
-                className="w-full flex items-center justify-between px-6 py-4 bg-gray-800/40 border border-gray-700 rounded-2xl hover:border-[var(--gold)] hover:bg-gray-800/60 transition-all duration-300 backdrop-blur-sm"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-[var(--gold)]/10 rounded-lg">
-                    <Bot className="text-[var(--gold)]" size={24} />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">AI 解盤服務</div>
-                    <div className="font-medium text-gray-200 text-lg">
-                      {activeAI ? (
-                        activeAI.provider === 'gemini' ? 'Google Gemini' : '其他 AI 服務'
-                      ) : (
-                        '未設定 AI'
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <ChevronDown size={20} className={`text-gray-400 transition-transform duration-300 ${showAISelector ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showAISelector && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a2e] border border-gray-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                  {aiConfigs.map((config) => {
-                    const isSelected = activeAI?.id === config.id;
-                    return (
-                      <button
-                        key={config.id}
-                        onClick={() => handleSwitchAI(config.id)}
-                        className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800 transition ${isSelected ? 'bg-[var(--gold)]/5' : ''
-                          }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-[var(--gold)] shadow-[0_0_10px_var(--gold)]' : 'bg-gray-600'}`} />
-                          <span className={isSelected ? 'text-[var(--gold)] font-medium' : 'text-gray-300'}>
-                            {config.provider === 'gemini' ? 'Google Gemini' : `其他 AI (${config.local_model})`}
-                          </span>
-                        </div>
-                        {isSelected && <Check size={18} className="text-[var(--gold)]" />}
-                      </button>
-                    );
-                  })}
-                  <Link
-                    href="/settings"
-                    className="w-full px-6 py-4 flex items-center gap-3 text-gray-400 hover:bg-gray-800 hover:text-[var(--gold)] border-t border-gray-800 transition"
-                  >
-                    <Settings size={18} />
-                    <span>管理 AI 設定</span>
-                  </Link>
-                </div>
-              )}
-            </div>
+            <AISelector
+              variant="card"
+              onConfigChange={(config) => setActiveAI(config)}
+              showWarning={true}
+              warningMessage="使用其他 AI 服務時，解盤最長可能需要等待 5 分鐘，取決於伺服器性能。"
+            />
 
             <div className="relative">
               <textarea
