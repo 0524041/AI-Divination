@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, User, Lock } from 'lucide-react';
+import { Eye, EyeOff, User, Lock, Compass } from 'lucide-react';
 import { initializeApiClient } from '@/lib/api-init';
 import { apiGet, apiPost } from '@/lib/api-client';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -111,24 +113,28 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Skeleton Logo */}
           <div className="text-center mb-8">
-            <div className="text-7xl mb-4">☯</div>
-            <div className="h-9 w-32 bg-gray-700 rounded mx-auto animate-pulse"></div>
-            <div className="h-5 w-48 bg-gray-700 rounded mx-auto mt-2 animate-pulse"></div>
+            <div className="flex justify-center mb-4">
+              <Compass className="w-16 h-16 text-accent animate-pulse" />
+            </div>
+            <div className="h-9 w-32 bg-foreground-muted/20 rounded mx-auto animate-pulse"></div>
+            <div className="h-5 w-48 bg-foreground-muted/20 rounded mx-auto mt-2 animate-pulse"></div>
           </div>
 
           {/* Skeleton Form Card */}
-          <div className="glass-card p-8">
+          <Card variant="glass" padding="lg">
             <div className="text-center mb-6">
-              <div className="text-4xl animate-spin-slow">☯</div>
-              <p className="text-gray-400 mt-2">載入中...</p>
+              <div className="flex justify-center">
+                <Compass className="w-12 h-12 text-accent animate-spin-slow" />
+              </div>
+              <p className="text-foreground-secondary mt-2">載入中...</p>
             </div>
             {/* Skeleton form fields */}
             <div className="space-y-4">
-              <div className="h-12 bg-gray-700 rounded animate-pulse"></div>
-              <div className="h-12 bg-gray-700 rounded animate-pulse"></div>
-              <div className="h-12 bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-12 bg-foreground-muted/20 rounded animate-pulse"></div>
+              <div className="h-12 bg-foreground-muted/20 rounded animate-pulse"></div>
+              <div className="h-12 bg-foreground-muted/20 rounded animate-pulse"></div>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     );
@@ -139,21 +145,23 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-7xl mb-4">☯</div>
-          <h1 className="text-3xl font-bold text-[var(--gold)]">AI 算命</h1>
-          <p className="text-gray-400 mt-2">結合傳統智慧與現代科技</p>
+          <div className="flex justify-center mb-4">
+            <Compass className="w-16 h-16 text-accent" />
+          </div>
+          <h1 className="text-3xl font-bold text-accent">AI 算命</h1>
+          <p className="text-foreground-secondary mt-2">結合傳統智慧與現代科技</p>
         </div>
 
         {/* 表單卡片 */}
-        <div className="glass-card p-8">
-          <h2 className="text-xl font-bold text-center mb-6">
+        <Card variant="glass" padding="lg">
+          <h2 className="text-xl font-bold text-center mb-6 text-foreground-primary">
             {mode === 'init' && '初始化系統'}
             {mode === 'login' && '登入'}
             {mode === 'register' && '註冊帳號'}
           </h2>
 
           {mode === 'init' && (
-            <p className="text-gray-400 text-center mb-6 text-sm">
+            <p className="text-foreground-secondary text-center mb-6 text-sm">
               首次使用，請設定管理員密碼
             </p>
           )}
@@ -162,15 +170,14 @@ export default function LoginPage() {
             {/* 用戶名 (登入和註冊時顯示) */}
             {mode !== 'init' && (
               <div>
-                <label className="block text-sm text-gray-400 mb-2">用戶名</label>
+                <label className="block text-sm text-foreground-secondary mb-2">用戶名</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={18} />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" size={18} />
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="input-dark w-full"
-                    style={{ paddingLeft: '2.5rem', paddingRight: '1rem' }}
+                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     placeholder="請輸入用戶名"
                     required
                   />
@@ -180,24 +187,23 @@ export default function LoginPage() {
 
             {/* 密碼 */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
+              <label className="block text-sm text-foreground-secondary mb-2">
                 {mode === 'init' ? '設定管理員密碼' : '密碼'}
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={18} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" size={18} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="input-dark w-full"
-                  style={{ paddingLeft: '2.5rem', paddingRight: '3rem' }}
+                  className="w-full pl-10 pr-12 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                   placeholder="請輸入密碼"
                   required
                   minLength={6}
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -208,15 +214,14 @@ export default function LoginPage() {
             {/* 確認密碼 (初始化和註冊時) */}
             {(mode === 'init' || mode === 'register') && (
               <div>
-                <label className="block text-sm text-gray-400 mb-2">確認密碼</label>
+                <label className="block text-sm text-foreground-secondary mb-2">確認密碼</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={18} />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" size={18} />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="input-dark w-full"
-                    style={{ paddingLeft: '2.5rem', paddingRight: '1rem' }}
+                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     placeholder="再次輸入密碼"
                     required
                     minLength={6}
@@ -227,26 +232,26 @@ export default function LoginPage() {
 
             {/* 錯誤訊息 */}
             {error && (
-              <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">
                 {error}
               </div>
             )}
 
             {/* 提交按鈕 */}
-            <button type="submit" className="btn-gold w-full" disabled={loading}>
-              {loading ? '處理中...' : mode === 'init' ? '建立管理員帳號' : mode === 'login' ? '登入' : '註冊'}
-            </button>
+            <Button variant="gold" fullWidth loading={loading} type="submit">
+              {mode === 'init' ? '建立管理員帳號' : mode === 'login' ? '登入' : '註冊'}
+            </Button>
           </form>
 
           {/* 切換模式 */}
           {isInit && mode !== 'init' && (
             <div className="mt-6 text-center text-sm">
               {mode === 'login' ? (
-                <p className="text-gray-400">
+                <p className="text-foreground-secondary">
                   還沒有帳號？{' '}
                   <button
                     type="button"
-                    className="text-[var(--gold)] hover:underline"
+                    className="text-accent hover:underline"
                     onClick={() => {
                       setMode('register');
                       setError('');
@@ -256,11 +261,11 @@ export default function LoginPage() {
                   </button>
                 </p>
               ) : (
-                <p className="text-gray-400">
+                <p className="text-foreground-secondary">
                   已有帳號？{' '}
                   <button
                     type="button"
-                    className="text-[var(--gold)] hover:underline"
+                    className="text-accent hover:underline"
                     onClick={() => {
                       setMode('login');
                       setError('');
@@ -272,7 +277,7 @@ export default function LoginPage() {
               )}
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

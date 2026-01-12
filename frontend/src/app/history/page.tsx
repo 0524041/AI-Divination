@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
 import { Navbar } from '@/components/layout/Navbar';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { SkeletonCard } from '@/components/ui/Skeleton';
 import {
   History as HistoryIcon,
   Trash2,
@@ -21,7 +25,6 @@ import {
   Calendar,
   BarChart3,
   Check,
-  Loader2,
   Search,
 } from 'lucide-react';
 
@@ -498,12 +501,12 @@ export default function HistoryPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      completed: 'bg-green-500/20 text-green-400',
-      processing: 'bg-yellow-500/20 text-yellow-400',
-      pending: 'bg-blue-500/20 text-blue-400',
-      error: 'bg-red-500/20 text-red-400',
-      cancelled: 'bg-gray-500/20 text-gray-400',
+    const variants: Record<string, "success" | "warning" | "default" | "error" | "accent"> = {
+      completed: 'success',
+      processing: 'warning',
+      pending: 'default',
+      error: 'error',
+      cancelled: 'default',
     };
     const labels: Record<string, string> = {
       completed: '已完成',
@@ -513,9 +516,9 @@ export default function HistoryPage() {
       cancelled: '已取消',
     };
     return (
-      <span className={`text-xs px-2 py-1 rounded ${styles[status] || styles.pending}`}>
+      <Badge variant={variants[status] || 'default'} size="sm">
         {labels[status] || status}
-      </span>
+      </Badge>
     );
   };
 
@@ -524,7 +527,7 @@ export default function HistoryPage() {
       {/* 使用共用 Navbar */}
       <Navbar
         pageTitle="歷史紀錄"
-        pageIcon={<HistoryIcon className="text-[var(--gold)]" size={24} />}
+        pageIcon={<HistoryIcon className="text-accent" size={24} />}
         showBackButton
         backHref="/"
       />
@@ -535,26 +538,27 @@ export default function HistoryPage() {
         {user?.role === 'admin' && (
           <div className="mb-4 flex items-center justify-between">
             <div className="relative user-filter-dropdown">
-              <button
-                className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/80 backdrop-blur rounded-xl text-sm hover:bg-gray-700 transition border border-gray-700"
+              <Button
+                variant="secondary"
                 onClick={() => setShowUserFilter(!showUserFilter)}
+                className="gap-2"
               >
-                <Filter size={16} className="text-[var(--gold)]" />
-                <span className="text-gray-300">
+                <Filter size={16} className="text-accent" />
+                <span className="text-foreground-secondary">
                   {selectedUserId === null
                     ? '我的紀錄'
                     : selectedUserId === 0
                       ? '全部用戶'
                       : allUsers.find(u => u.id === selectedUserId)?.username || '篩選用戶'}
                 </span>
-                <ChevronDown size={16} className={`text-gray-400 transition ${showUserFilter ? 'rotate-180' : ''}`} />
-              </button>
+                <ChevronDown size={16} className={`text-foreground-muted transition ${showUserFilter ? 'rotate-180' : ''}`} />
+              </Button>
 
               {showUserFilter && (
-                <div className="absolute top-full left-0 mt-2 w-56 bg-gray-800 rounded-xl shadow-xl border border-gray-700 py-2 z-50">
+                <div className="absolute top-full left-0 mt-2 w-56 bg-background-card rounded-xl shadow-xl border border-border py-2 z-50">
                   {/* 我的紀錄 */}
                   <button
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === null ? 'text-[var(--gold)]' : 'text-gray-300'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-foreground-muted/10 flex items-center gap-2 ${selectedUserId === null ? 'text-accent' : 'text-foreground-secondary'}`}
                     onClick={() => handleUserFilterChange(null)}
                   >
                     <User size={14} />
@@ -564,7 +568,7 @@ export default function HistoryPage() {
 
                   {/* 全部用戶 */}
                   <button
-                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === 0 ? 'text-[var(--gold)]' : 'text-gray-300'}`}
+                    className={`w-full px-4 py-2.5 text-left text-sm hover:bg-foreground-muted/10 flex items-center gap-2 ${selectedUserId === 0 ? 'text-accent' : 'text-foreground-secondary'}`}
                     onClick={() => handleUserFilterChange(0)}
                   >
                     <Users size={14} />
@@ -575,17 +579,17 @@ export default function HistoryPage() {
                   {/* 分隔線與搜尋 */}
                   {allUsers.length > 0 && (
                     <>
-                      <div className="border-t border-gray-700 my-2"></div>
+                      <div className="border-t border-border my-2"></div>
                       {/* 搜尋框 */}
                       <div className="px-2 pb-2">
                         <div className="relative">
-                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
                           <input
                             type="text"
                             value={userSearchTerm}
                             onChange={(e) => setUserSearchTerm(e.target.value)}
                             placeholder="搜尋用戶..."
-                            className="w-full pl-8 pr-3 py-2 bg-gray-700 rounded-lg text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[var(--gold)]"
+                            className="w-full pl-8 pr-3 py-2 bg-foreground-muted/20 rounded-lg text-sm text-foreground-primary placeholder-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent"
                             onClick={(e) => e.stopPropagation()}
                           />
                         </div>
@@ -598,19 +602,19 @@ export default function HistoryPage() {
                     {filteredUsers.map((u) => (
                       <button
                         key={u.id}
-                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${selectedUserId === u.id ? 'text-[var(--gold)]' : 'text-gray-300'}`}
+                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-foreground-muted/10 flex items-center gap-2 ${selectedUserId === u.id ? 'text-accent' : 'text-foreground-secondary'}`}
                         onClick={() => handleUserFilterChange(u.id)}
                       >
                         <User size={14} />
                         <span className="truncate">{u.username}</span>
                         {u.role === 'admin' && (
-                          <span className="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-1 rounded">Admin</span>
+                          <span className="text-xs bg-accent/20 text-accent px-1 rounded">Admin</span>
                         )}
                         {selectedUserId === u.id && <span className="ml-auto">✓</span>}
                       </button>
                     ))}
                     {filteredUsers.length === 0 && userSearchTerm && (
-                      <div className="px-4 py-2 text-sm text-gray-500 text-center">
+                      <div className="px-4 py-2 text-sm text-foreground-muted text-center">
                         找不到符合的用戶
                       </div>
                     )}
@@ -625,7 +629,7 @@ export default function HistoryPage() {
           <div className="mb-6">
             {/* 統計標題 - 顯示當前查看的統計範圍 */}
             {user?.role === 'admin' && selectedUserId !== null && (
-              <div className="mb-3 flex items-center gap-2 text-sm text-gray-400">
+              <div className="mb-3 flex items-center gap-2 text-sm text-foreground-muted">
                 <BarChart3 size={16} />
                 <span>
                   {selectedUserId === 0
@@ -636,54 +640,54 @@ export default function HistoryPage() {
             )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* 總計數 */}
-              <div className="glass-card p-4 flex items-center gap-3 hover:border-[var(--gold)]/30 transition-all">
-                <div className="p-2.5 bg-[var(--gold)]/10 text-[var(--gold)] rounded-lg shrink-0">
+              <Card variant="glass" className="p-4 flex items-center gap-3 hover:border-accent/30 transition-all">
+                <div className="p-2.5 bg-accent/10 text-accent rounded-lg shrink-0">
                   <TrendingUp size={20} />
                 </div>
                 <div>
-                  <div className="text-xs text-gray-400 mb-0.5">歷史總計</div>
+                  <div className="text-xs text-foreground-muted mb-0.5">歷史總計</div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-bold text-gray-200">
+                    <span className="text-xl font-bold text-foreground-primary">
                       {statistics.total_count}
                     </span>
-                    <span className="text-xs text-gray-500">次</span>
+                    <span className="text-xs text-foreground-muted">次</span>
                   </div>
                 </div>
-              </div>
+              </Card>
 
               {/* 今日計數 */}
-              <div className="glass-card p-4 flex items-center gap-3 hover:border-blue-500/30 transition-all">
+              <Card variant="glass" className="p-4 flex items-center gap-3 hover:border-blue-500/30 transition-all">
                 <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-lg shrink-0">
                   <Calendar size={20} />
                 </div>
                 <div>
-                  <div className="text-xs text-gray-400 mb-0.5">今日占卜</div>
+                  <div className="text-xs text-foreground-muted mb-0.5">今日占卜</div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-bold text-gray-200">
+                    <span className="text-xl font-bold text-foreground-primary">
                       {statistics.today_count}
                     </span>
-                    <span className="text-xs text-gray-500">次</span>
+                    <span className="text-xs text-foreground-muted">次</span>
                   </div>
                 </div>
-              </div>
+              </Card>
 
               {/* 最常用類型 */}
-              <div className="glass-card p-4 flex items-center gap-3 hover:border-purple-500/30 transition-all">
+              <Card variant="glass" className="p-4 flex items-center gap-3 hover:border-purple-500/30 transition-all">
                 <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-lg shrink-0">
                   <BarChart3 size={20} />
                 </div>
                 <div>
-                  <div className="text-xs text-gray-400 mb-0.5">近期偏好 (7天)</div>
+                  <div className="text-xs text-foreground-muted mb-0.5">近期偏好 (7天)</div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-base font-bold text-gray-200 truncate max-w-[100px]" title={getDivinationTypeName(statistics.last_7_days_most_used_type)}>
+                    <span className="text-base font-bold text-foreground-primary truncate max-w-[100px]" title={getDivinationTypeName(statistics.last_7_days_most_used_type)}>
                       {getDivinationTypeName(statistics.last_7_days_most_used_type)}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-foreground-muted">
                       {statistics.last_7_days_type_counts[statistics.last_7_days_most_used_type] || 0}次
                     </span>
                   </div>
                 </div>
-              </div>
+              </Card>
             </div>
           </div>
         )}
@@ -691,7 +695,7 @@ export default function HistoryPage() {
         {/* 歷史紀錄搜尋 */}
         <div className="mb-4">
           <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-muted" />
             <input
               type="text"
               value={searchInputValue}
@@ -703,7 +707,7 @@ export default function HistoryPage() {
                 }
               }}
               placeholder="搜尋問題內容... (按 Enter 搜尋)"
-              className="w-full pl-12 pr-24 py-3 bg-gray-800/80 backdrop-blur rounded-xl text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--gold)]/50 border border-gray-700"
+              className="w-full pl-12 pr-24 py-3 bg-background-card border border-border rounded-xl text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
             />
             {(searchInputValue || historySearchTerm) && (
               <button
@@ -712,85 +716,91 @@ export default function HistoryPage() {
                   setHistorySearchTerm('');
                   setCurrentPage(1);
                 }}
-                className="absolute right-16 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 p-1"
+                className="absolute right-20 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary p-1"
               >
                 ✕
               </button>
             )}
-            <button
-              onClick={() => {
-                setHistorySearchTerm(searchInputValue);
-                setCurrentPage(1);
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 px-3 py-1 bg-[var(--gold)]/20 text-[var(--gold)] rounded-lg text-sm hover:bg-[var(--gold)]/30 transition"
-            >
-              搜尋
-            </button>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <Button
+                variant="gold"
+                size="sm"
+                onClick={() => {
+                  setHistorySearchTerm(searchInputValue);
+                  setCurrentPage(1);
+                }}
+              >
+                搜尋
+              </Button>
+            </div>
           </div>
           {historySearchTerm && (
-            <div className="mt-2 text-sm text-gray-400">
+            <div className="mt-2 text-sm text-foreground-muted">
               搜尋「{historySearchTerm}」的結果，共 {totalCount} 筆
             </div>
           )}
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="text-4xl mb-4 animate-spin-slow">☯</div>
-            <p className="text-gray-400">載入中...</p>
+          <div className="space-y-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
         ) : history.length === 0 ? (
           <div className="text-center py-12">
-            <HistoryIcon className="mx-auto mb-4 text-gray-600" size={48} />
-            <p className="text-gray-400">還沒有任何紀錄</p>
-            <Link href="/liuyao" className="btn-gold inline-block mt-4">
-              開始占卜
+            <HistoryIcon className="mx-auto mb-4 text-foreground-muted" size={48} />
+            <p className="text-foreground-muted">還沒有任何紀錄</p>
+            <Link href="/liuyao">
+              <Button variant="gold" className="mt-4">
+                開始占卜
+              </Button>
             </Link>
           </div>
         ) : (
           <div className="space-y-4">
             {history.map((item) => (
-              <div key={item.id} className="glass-card overflow-hidden">
+              <Card key={item.id} variant="glass" className="overflow-hidden">
                 {/* 摘要行 */}
                 <div
-                  className="p-4 cursor-pointer hover:bg-white/5 transition"
+                  className="p-4 cursor-pointer hover:bg-foreground-muted/5 transition"
                   onClick={() => toggleExpand(item)}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-2">
-                        <span className="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-2 py-1 rounded">
+                        <Badge variant="accent" size="sm">
                           {getDivinationTypeName(item.divination_type)}
-                        </span>
+                        </Badge>
                         {getStatusBadge(item.status)}
                         {selectedUserId !== null && item.username && (
-                          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded flex items-center gap-1">
+                          <Badge variant="default" size="sm" className="bg-blue-500/20 text-blue-400 gap-1">
                             <User size={12} />
                             {item.username}
-                          </span>
+                          </Badge>
                         )}
                       </div>
-                      <p className={`text-gray-200 ${expandedId === item.id ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                      <p className={`text-foreground-primary ${expandedId === item.id ? 'whitespace-pre-wrap' : 'truncate'}`}>
                         {item.question}
                       </p>
 
                       {expandedId === item.id && (item.target || item.gender || (item.divination_type === 'tarot' && item.chart_data.spread_name)) && (
-                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-400">
+                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-foreground-muted">
                           {/* 塔羅牌顯示牌陣類型 */}
                           {item.divination_type === 'tarot' && item.chart_data.spread_name && (
-                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
-                              牌陣：<span className="text-gray-300">{item.chart_data.spread_name}</span>
+                            <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
+                              牌陣：<span className="text-foreground-secondary">{item.chart_data.spread_name}</span>
                             </span>
                           )}
                           {/* 六爻等其他占卜顯示對象和性別 */}
                           {item.target && (
-                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
-                              對象：<span className="text-gray-300">{item.target}</span>
+                            <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
+                              對象：<span className="text-foreground-secondary">{item.target}</span>
                             </span>
                           )}
                           {item.gender && (
-                            <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
-                              性別：<span className="text-gray-300">{item.gender}</span>
+                            <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
+                              性別：<span className="text-foreground-secondary">{item.gender}</span>
                             </span>
                           )}
                         </div>
@@ -798,17 +808,17 @@ export default function HistoryPage() {
 
                       {/* 塔羅牌不顯示本卦變卦 */}
                       {item.divination_type !== 'tarot' && (
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-foreground-muted mt-1">
                           {item.chart_data.benguaming} → {item.chart_data.bianguaming}
                         </p>
                       )}
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-xs text-gray-500">{formatDate(item.created_at)}</span>
+                      <span className="text-xs text-foreground-muted">{formatDate(item.created_at)}</span>
                       {expandedId === item.id ? (
-                        <ChevronUp size={20} className="text-gray-400" />
+                        <ChevronUp size={20} className="text-foreground-muted" />
                       ) : (
-                        <ChevronDown size={20} className="text-gray-400" />
+                        <ChevronDown size={20} className="text-foreground-muted" />
                       )}
                     </div>
                   </div>
@@ -816,53 +826,51 @@ export default function HistoryPage() {
 
                 {/* 展開內容 */}
                 {expandedId === item.id && (
-                  <div className="border-t border-gray-700 p-4 space-y-4 fade-in">
+                  <div className="border-t border-border p-4 space-y-4 fade-in">
                     {/* 操作按鈕 */}
                     <div className="flex justify-end gap-3">
-                      <button
+                      <Button
                         onClick={() => handleShare(item)}
                         disabled={sharingState[item.id] === 'loading'}
-                        className={`px-4 py-2 rounded-lg transition shadow-md flex items-center gap-2 ${sharingState[item.id] === 'success'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-700 hover:bg-[var(--gold)] text-gray-300 hover:text-gray-900'
-                          }`}
-                      >
-                        {sharingState[item.id] === 'loading' ? (
-                          <>
-                            <Loader2 size={18} className="animate-spin" />
-                            <span className="font-medium">生成中...</span>
-                          </>
-                        ) : sharingState[item.id] === 'success' ? (
-                          <>
+                        variant={sharingState[item.id] === 'success' ? 'primary' : 'secondary'}
+                        className={sharingState[item.id] === 'success' ? 'bg-green-600 hover:bg-green-700 border-transparent text-white' : ''}
+                        leftIcon={
+                          sharingState[item.id] === 'loading' ? (
+                            <></>
+                          ) : sharingState[item.id] === 'success' ? (
                             <Check size={18} />
-                            <span className="font-medium">已複製連結！</span>
-                          </>
-                        ) : (
-                          <>
+                          ) : (
                             <Share2 size={18} />
-                            <span className="font-medium">分享</span>
-                          </>
-                        )}
-                      </button>
-                      <button
+                          )
+                        }
+                        loading={sharingState[item.id] === 'loading'}
+                      >
+                        {sharingState[item.id] === 'loading'
+                          ? '生成中...'
+                          : sharingState[item.id] === 'success'
+                            ? '已複製連結！'
+                            : '分享'}
+                      </Button>
+
+                      <Button
                         onClick={() => handleCopy(item)}
-                        className="px-4 py-2 border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-gray-200 rounded-lg transition flex items-center gap-2"
+                        variant="secondary"
+                        leftIcon={<Copy size={18} />}
                       >
-                        <Copy size={18} />
                         複製
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => handleDelete(item.id)}
-                        className="px-4 py-2 border border-gray-700 hover:border-red-500/50 text-gray-400 hover:text-red-400 rounded-lg transition flex items-center gap-2"
+                        variant="danger"
+                        leftIcon={<Trash2 size={18} />}
                       >
-                        <Trash2 size={18} />
                         刪除
-                      </button>
+                      </Button>
                     </div>
 
                     {/* AI 資訊 */}
                     {item.ai_provider && (
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-foreground-muted">
                         AI: {item.ai_provider} {item.ai_model && `(${item.ai_model})`}
                       </div>
                     )}
@@ -873,24 +881,24 @@ export default function HistoryPage() {
                         <div className="space-y-4">
                           {/* Think 內容（可摺疊） */}
                           {htmlContents[item.id].thinkContent && (
-                            <details className="bg-gray-800/50 rounded-lg border border-gray-700">
-                              <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
+                            <details className="bg-foreground-muted/5 rounded-lg border border-border">
+                              <summary className="px-4 py-3 cursor-pointer text-foreground-muted hover:text-accent flex items-center gap-2">
                                 <span className="text-lg">🧠</span>
                                 <span>AI 思考過程（點擊展開）</span>
                               </summary>
-                              <div className="px-4 pb-4 text-gray-400 text-sm whitespace-pre-wrap border-t border-gray-700 pt-3">
+                              <div className="px-4 pb-4 text-foreground-muted text-sm whitespace-pre-wrap border-t border-border pt-3">
                                 {htmlContents[item.id].thinkContent}
                               </div>
                             </details>
                           )}
 
                           {/* Raw Data Content */}
-                          <details className="bg-gray-800/50 rounded-lg border border-gray-700">
-                            <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
+                          <details className="bg-foreground-muted/5 rounded-lg border border-border">
+                            <summary className="px-4 py-3 cursor-pointer text-foreground-muted hover:text-accent flex items-center gap-2">
                               <span className="text-lg">{item.divination_type === 'tarot' ? '🎴' : '☯'}</span>
                               <span>{item.divination_type === 'tarot' ? '牌陣詳情' : '完整卦象盤面'}（點擊展開）</span>
                             </summary>
-                            <div className="px-4 pb-4 text-gray-300 text-sm border-t border-gray-700 pt-3 leading-relaxed">
+                            <div className="px-4 pb-4 text-foreground-secondary text-sm border-t border-border pt-3 leading-relaxed">
                               {(() => {
                                 try {
                                   const data = typeof item.chart_data === 'string' ? JSON.parse(item.chart_data) : item.chart_data;
@@ -901,10 +909,10 @@ export default function HistoryPage() {
                                         data.spread === 'celtic_cross' ? '凱爾特十字' : '未知牌陣';
                                     return (
                                       <div className="space-y-3">
-                                        <div className="font-bold text-[var(--gold)] mb-3">{spreadName}</div>
+                                        <div className="font-bold text-accent mb-3">{spreadName}</div>
                                         {data.cards?.map((card: any, idx: number) => (
-                                          <div key={idx} className="flex items-start gap-3 py-2 border-b border-gray-800 last:border-0">
-                                            <span className="text-[var(--gold)] font-bold min-w-[60px]">
+                                          <div key={idx} className="flex items-start gap-3 py-2 border-b border-border last:border-0">
+                                            <span className="text-accent font-bold min-w-[60px]">
                                               {card.position === 'past' ? '過去' :
                                                 card.position === 'present' ? '現在' :
                                                   card.position === 'future' ? '未來' :
@@ -931,45 +939,44 @@ export default function HistoryPage() {
 
                           {/* 主要內容 */}
                           <div
-                            className="markdown-content bg-gray-800/30 rounded-xl p-4"
+                            className="markdown-content bg-foreground-muted/10 rounded-xl p-4"
                             dangerouslySetInnerHTML={{ __html: htmlContents[item.id].mainHtml }}
                           />
                         </div>
                       ) : (
                         <div className="text-center py-4">
                           <div className="text-2xl animate-spin-slow">☯</div>
-                          <p className="text-gray-500 text-sm mt-2">解析中...</p>
+                          <p className="text-foreground-muted text-sm mt-2">解析中...</p>
                         </div>
                       )
                     ) : (
-                      <p className="text-gray-500">暫無解盤結果</p>
+                      <p className="text-foreground-muted">暫無解盤結果</p>
                     )}
                   </div>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         )}
 
         {/* 分頁控制 */}
         {!loading && history.length > 0 && (
-          <div className="glass-card p-4 mt-6 flex items-center justify-between">
-            <div className="text-sm text-gray-400">
+          <Card variant="glass" className="p-4 mt-6 flex items-center justify-between">
+            <div className="text-sm text-foreground-muted">
               顯示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalCount)} / 共 {totalCount} 筆
             </div>
 
             {totalPages > 1 ? (
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`p-2 rounded-lg border transition ${currentPage === 1
-                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
-                    }`}
+                  className="w-9 h-9 p-0"
                 >
                   <ChevronLeft size={20} />
-                </button>
+                </Button>
 
                 {/* 頁碼按鈕 */}
                 <div className="flex gap-2">
@@ -986,35 +993,33 @@ export default function HistoryPage() {
                     }
 
                     return (
-                      <button
+                      <Button
                         key={pageNum}
+                        variant={currentPage === pageNum ? 'gold' : 'outline'}
+                        size="sm"
                         onClick={() => handlePageChange(pageNum)}
-                        className={`w-10 h-10 rounded-lg border transition ${currentPage === pageNum
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/10 text-[var(--gold)] font-bold'
-                          : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
-                          }`}
+                        className="w-9 h-9 p-0 font-mono"
                       >
                         {pageNum}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
 
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className={`p-2 rounded-lg border transition ${currentPage === totalPages
-                    ? 'border-gray-700 text-gray-600 cursor-not-allowed'
-                    : 'border-gray-700 text-gray-300 hover:border-[var(--gold)] hover:text-[var(--gold)]'
-                    }`}
+                  className="w-9 h-9 p-0"
                 >
                   <ChevronRight size={20} />
-                </button>
+                </Button>
               </div>
             ) : (
-              <div className="text-sm text-gray-500">第 1 頁，共 1 頁</div>
+              <div className="text-sm text-foreground-muted">第 1 頁，共 1 頁</div>
             )}
-          </div>
+          </Card>
         )}
       </main>
     </div>
