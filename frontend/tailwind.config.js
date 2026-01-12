@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -8,6 +9,28 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        background: {
+          primary: 'var(--bg-primary)',
+          secondary: 'var(--bg-secondary)',
+          card: 'var(--bg-card)',
+        },
+        foreground: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          light: 'var(--accent-light)',
+          secondary: 'var(--accent-secondary)',
+        },
+        border: {
+          DEFAULT: 'var(--border)',
+          accent: 'var(--border-accent)',
+        },
+        // Legacy support
+        gold: '#d4af37',
         primary: {
           50: '#fef7ee',
           100: '#fcecd8',
@@ -20,9 +43,11 @@ module.exports = {
           800: '#90361b',
           900: '#742f19',
         },
-        gold: '#d4af37',
       },
       fontFamily: {
+        serif: ['Noto Serif TC', 'serif'],
+        sans: ['Inter', 'sans-serif'],
+        // Legacy support
         chinese: ['Noto Serif TC', 'serif'],
       },
     },

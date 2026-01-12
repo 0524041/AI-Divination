@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import CoinTossing from '@/components/CoinTossing';
 import { Navbar } from '@/components/layout/Navbar';
 import { AISelector, AIConfig } from '@/components/features/AISelector';
@@ -428,26 +431,30 @@ export default function LiuYaoPage() {
       {step === 'intro' && (
         <div className="flex flex-col items-center text-center space-y-8 fade-in py-12 px-4 min-h-[500px]">
           <div className="w-48 h-48 relative mb-4 flex items-center justify-center">
-            <div className="absolute inset-0 bg-indigo-900/50 rounded-full border-2 border-[var(--gold)] animate-pulse-slow"></div>
+            <div className="absolute inset-0 bg-background-card/50 rounded-full border-2 border-accent animate-pulse-slow"></div>
             <div className="text-8xl">☯</div>
           </div>
 
           <div className="space-y-4 max-w-2xl">
-            <h2 className="text-3xl font-bold text-[var(--gold)]">探尋易經的智慧</h2>
-            <p className="text-gray-300 leading-relaxed">
+            <h2 className="text-3xl font-bold text-accent">探尋易經的智慧</h2>
+            <p className="text-foreground-secondary leading-relaxed">
               六爻占卜源於《易經》，透過三次擲幣的變化，
               洞察事物發展的規律與吉凶。
               結合現代 AI 技術，為您提供深入淺出的解讀。
             </p>
-            <p className="text-gray-400 text-sm">
+            <p className="text-foreground-muted text-sm">
               心誠則靈，請保持內心平靜，專注於您想詢問的問題。
             </p>
           </div>
 
-          <button onClick={() => setStep('divine')} className="btn-gold px-12 py-4 text-lg flex items-center gap-2">
-            <Compass size={20} />
+          <Button 
+            onClick={() => setStep('divine')} 
+            variant="gold"
+            className="px-12 py-6 text-lg"
+          >
+            <Compass size={20} className="mr-2" />
             開始占卜
-          </button>
+          </Button>
         </div>
       )}
 
@@ -456,29 +463,29 @@ export default function LiuYaoPage() {
         <>
           {/* 分頁選項 */}
           <div className="max-w-4xl mx-auto px-4 mt-6">
-            <div className="flex gap-2 border-b border-gray-700 pb-2">
+            <div className="flex gap-2 border-b border-border pb-2">
               <button
-                className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'divine' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+                className={`px-4 py-2 rounded-t-lg transition flex items-center ${activeTab === 'divine' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
                   }`}
                 onClick={() => setActiveTab('divine')}
               >
-                <Compass size={18} className="inline mr-2" />
+                <Compass size={18} className="mr-2" />
                 占卜
               </button>
               <button
-                className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'intro' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+                className={`px-4 py-2 rounded-t-lg transition flex items-center ${activeTab === 'intro' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
                   }`}
                 onClick={() => setActiveTab('intro')}
               >
-                <BookOpen size={18} className="inline mr-2" />
+                <BookOpen size={18} className="mr-2" />
                 說明
               </button>
               <button
-                className={`px-4 py-2 rounded-t-lg transition ${activeTab === 'tutorial' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+                className={`px-4 py-2 rounded-t-lg transition flex items-center ${activeTab === 'tutorial' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
                   }`}
                 onClick={() => setActiveTab('tutorial')}
               >
-                <HelpCircle size={18} className="inline mr-2" />
+                <HelpCircle size={18} className="mr-2" />
                 教學
               </button>
             </div>
@@ -496,103 +503,105 @@ export default function LiuYaoPage() {
                   warningMessage="使用其他 AI 服務時，解盤最長可能需要等待 5 分鐘，取決於伺服器性能。建議使用 Google Gemini 以獲得更快的回應速度。"
                 />
 
-                <form onSubmit={handleSubmit} className="glass-card p-6 space-y-6">
-                  {/* 性別選擇 */}
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">性別</label>
-                    <div className="flex gap-4">
-                      <button
-                        type="button"
-                        className={`flex-1 py-3 rounded-lg border transition ${gender === 'male'
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
-                          : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                          }`}
-                        onClick={() => setGender('male')}
-                      >
-                        ♂ 男
-                      </button>
-                      <button
-                        type="button"
-                        className={`flex-1 py-3 rounded-lg border transition ${gender === 'female'
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
-                          : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                          }`}
-                        onClick={() => setGender('female')}
-                      >
-                        ♀ 女
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 對象選擇 */}
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">算命對象</label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {[
-                        { value: 'self', label: '自己' },
-                        { value: 'parent', label: '父母' },
-                        { value: 'friend', label: '朋友' },
-                        { value: 'other', label: '對方' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.value}
+                <Card variant="glass" className="p-6">
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* 性別選擇 */}
+                    <div>
+                      <label className="block text-sm text-foreground-secondary mb-2">性別</label>
+                      <div className="flex gap-4">
+                        <Button
                           type="button"
-                          className={`py-2 rounded-lg border transition ${target === opt.value
-                            ? 'border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)]'
-                            : 'border-gray-600 text-gray-400 hover:border-gray-500'
-                            }`}
-                          onClick={() => setTarget(opt.value as typeof target)}
+                          variant={gender === 'male' ? 'gold' : 'outline'}
+                          className={`flex-1 ${gender === 'male' ? 'bg-accent/20' : ''}`}
+                          onClick={() => setGender('male')}
                         >
-                          {opt.label}
-                        </button>
-                      ))}
+                          ♂ 男
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={gender === 'female' ? 'gold' : 'outline'}
+                          className={`flex-1 ${gender === 'female' ? 'bg-accent/20' : ''}`}
+                          onClick={() => setGender('female')}
+                        >
+                          ♀ 女
+                        </Button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 問題輸入 */}
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">請輸入您想詢問的問題</label>
-                    <textarea
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                      className="input-dark w-full h-32 resize-none"
-                      placeholder="例如：我近期的事業運勢如何？這份工作是否適合我？"
-                      maxLength={500}
-                    />
-                    <p className="text-right text-xs text-gray-500 mt-1">{question.length}/500</p>
-                  </div>
+                    {/* 對象選擇 */}
+                    <div>
+                      <label className="block text-sm text-foreground-secondary mb-2">算命對象</label>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {[
+                          { value: 'self', label: '自己' },
+                          { value: 'parent', label: '父母' },
+                          { value: 'friend', label: '朋友' },
+                          { value: 'other', label: '對方' },
+                        ].map((opt) => (
+                          <Button
+                            key={opt.value}
+                            type="button"
+                            variant={target === opt.value ? 'gold' : 'outline'}
+                            className={`${target === opt.value ? 'bg-accent/20' : ''}`}
+                            onClick={() => setTarget(opt.value as typeof target)}
+                          >
+                            {opt.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
 
-                  {/* 錯誤訊息 */}
-                  {error && (
-                    <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">{error}</div>
-                  )}
+                    {/* 問題輸入 */}
+                    <div>
+                      <label className="block text-sm text-foreground-secondary mb-2">請輸入您想詢問的問題</label>
+                      <textarea
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent h-32 resize-none"
+                        placeholder="例如：我近期的事業運勢如何？這份工作是否適合我？"
+                        maxLength={500}
+                      />
+                      <p className="text-right text-xs text-foreground-muted mt-1">{question.length}/500</p>
+                    </div>
 
-                  {/* 提交按鈕 */}
-                  <button type="submit" className="btn-gold w-full flex items-center justify-center gap-2" disabled={loading || !question.trim() || !activeAI}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="animate-spin" size={20} />
-                        準備中...
-                      </>
-                    ) : (
-                      <>
-                        <Send size={20} />
-                        開始擲幣
-                      </>
+                    {/* 錯誤訊息 */}
+                    {error && (
+                      <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">{error}</div>
                     )}
-                  </button>
-                  {!activeAI && (
-                    <p className="text-center text-sm text-amber-400">
-                      請先到<Link href="/settings" className="underline hover:text-[var(--gold)]">設定頁面</Link>配置 AI 服務
-                    </p>
-                  )}
-                </form>
+
+                    {/* 提交按鈕 */}
+                    <Button 
+                      type="submit" 
+                      variant="gold" 
+                      fullWidth 
+                      disabled={loading || !question.trim() || !activeAI}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="animate-spin" size={20} />
+                          準備中...
+                        </>
+                      ) : (
+                        <>
+                          <Send size={20} />
+                          開始擲幣
+                        </>
+                      )}
+                    </Button>
+                    {!activeAI && (
+                      <p className="text-center text-sm text-amber-400">
+                        請先到<Link href="/settings" className="underline hover:text-accent">設定頁面</Link>配置 AI 服務
+                      </p>
+                    )}
+                  </form>
+                </Card>
               </div>
             )}
 
             {/* 說明頁面 */}
             {activeTab === 'intro' && (
-              <div className="glass-card p-6 markdown-content">
+              <Card variant="glass" className="p-6 markdown-content">
                 <h2>什麼是六爻占卜？</h2>
                 <p>
                   六爻占卜是中國傳統易經占卜術的一種，源自《周易》。透過擲硬幣的方式，產生六個爻位，組成卦象，再根據卦象的變化來預測吉凶。
@@ -635,12 +644,12 @@ export default function LiuYaoPage() {
                     <strong>官鬼</strong>：事業、官運、丈夫
                   </li>
                 </ul>
-              </div>
+              </Card>
             )}
 
             {/* 教學頁面 */}
             {activeTab === 'tutorial' && (
-              <div className="glass-card p-6 markdown-content">
+              <Card variant="glass" className="p-6 markdown-content">
                 <h2>如何使用六爻占卜？</h2>
 
                 <h3>步驟一：準備</h3>
@@ -665,7 +674,7 @@ export default function LiuYaoPage() {
                   <li>問題要具體明確</li>
                   <li>保持誠心，信則靈</li>
                 </ul>
-              </div>
+              </Card>
             )}
           </main>
 
@@ -682,37 +691,37 @@ export default function LiuYaoPage() {
           {showResult && result && (
             <div className="fixed inset-0 z-50 bg-black/80 overflow-y-auto">
               <div className="min-h-screen flex items-start justify-center p-4 pt-8">
-                <div className="glass-card w-full max-w-4xl">
+                <Card variant="glass" className="w-full max-w-4xl">
                   {/* 標題 */}
-                  <div className="flex items-center justify-between p-6 border-b border-gray-700">
-                    <h2 className="text-xl font-bold text-[var(--gold)] flex items-center gap-2">
+                  <div className="flex items-center justify-between p-6 border-b border-border">
+                    <h2 className="text-xl font-bold text-accent flex items-center gap-2">
                       <span className="text-2xl">☯</span>
                       卦象解析
                     </h2>
-                    <button onClick={() => setShowResult(false)} className="text-gray-400 hover:text-white">
+                    <Button variant="ghost" onClick={() => setShowResult(false)} className="text-foreground-muted hover:text-foreground-primary p-2 h-auto">
                       <X size={24} />
-                    </button>
+                    </Button>
                   </div>
 
                   {/* 內容 */}
                   <div className="p-6 space-y-6">
                     {/* 卦象信息 */}
-                    <div className="bg-[var(--gold)]/10 border border-[var(--gold)]/30 rounded-xl p-4">
+                    <div className="bg-accent/10 border border-accent/30 rounded-xl p-4">
                       <div className="flex flex-wrap gap-4 text-sm">
                         <div>
-                          <span className="text-gray-400">本卦：</span>
-                          <span className="text-[var(--gold)] font-bold">{result.chart_data.benguaming}</span>
+                          <span className="text-foreground-secondary">本卦：</span>
+                          <span className="text-accent font-bold">{result.chart_data.benguaming}</span>
                         </div>
                         <div>
-                          <span className="text-gray-400">變卦：</span>
-                          <span className="text-[var(--gold)] font-bold">{result.chart_data.bianguaming}</span>
+                          <span className="text-foreground-secondary">變卦：</span>
+                          <span className="text-accent font-bold">{result.chart_data.bianguaming}</span>
                         </div>
                         <div>
-                          <span className="text-gray-400">卦宮：</span>
+                          <span className="text-foreground-secondary">卦宮：</span>
                           <span>{result.chart_data.guashen}宮</span>
                         </div>
                         <div>
-                          <span className="text-gray-400">空亡：</span>
+                          <span className="text-foreground-secondary">空亡：</span>
                           <span>{result.chart_data.kongwang}</span>
                         </div>
                       </div>
@@ -723,9 +732,9 @@ export default function LiuYaoPage() {
                       <h3 className="text-lg font-bold mb-3">擲幣結果（從下到上）</h3>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                         {coinDescriptions.map((desc, i) => (
-                          <div key={i} className="bg-gray-800/50 rounded-lg p-3 flex justify-between items-center">
-                            <span className="text-gray-400">第 {i + 1} 爻</span>
-                            <span className={desc.type === '動' ? 'text-[var(--gold)]' : 'text-gray-300'}>{desc.text}</span>
+                          <div key={i} className="bg-background-card/50 rounded-lg p-3 flex justify-between items-center">
+                            <span className="text-foreground-secondary">第 {i + 1} 爻</span>
+                            <span className={desc.type === '動' ? 'text-accent' : 'text-foreground-primary'}>{desc.text}</span>
                           </div>
                         ))}
                       </div>
@@ -737,12 +746,14 @@ export default function LiuYaoPage() {
                         <h3 className="text-lg font-bold">大師解盤</h3>
                         {interpretation && (
                           <div className="flex items-center gap-2">
-                            <button
+                            <Button
                               onClick={handleShare}
                               disabled={sharingState === 'loading'}
-                              className={`flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg transition ${sharingState === 'success'
-                                ? 'bg-green-600 text-white'
-                                : 'text-gray-400 hover:text-[var(--gold)] hover:bg-gray-800'
+                              variant="ghost"
+                              size="sm"
+                              className={`gap-2 ${sharingState === 'success'
+                                ? 'bg-green-600 text-white hover:bg-green-700 hover:text-white'
+                                : 'text-foreground-secondary hover:text-accent hover:bg-background-card'
                                 }`}
                             >
                               {sharingState === 'loading' ? (
@@ -752,11 +763,16 @@ export default function LiuYaoPage() {
                               ) : (
                                 <><Share2 size={16} />分享</>
                               )}
-                            </button>
-                            <button onClick={handleCopy} className="text-gray-400 hover:text-[var(--gold)] flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg hover:bg-gray-800 transition">
+                            </Button>
+                            <Button 
+                              onClick={handleCopy} 
+                              variant="ghost"
+                              size="sm"
+                              className="text-foreground-secondary hover:text-accent hover:bg-background-card gap-2"
+                            >
                               <Copy size={16} />
                               複製
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -765,24 +781,24 @@ export default function LiuYaoPage() {
                         <div className="space-y-4">
                           {/* Think 內容（可摺疊） */}
                           {parsedContent.thinkContent && (
-                            <details className="bg-gray-800/50 rounded-lg border border-gray-700">
-                              <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
+                            <details className="bg-background-card/50 rounded-lg border border-border">
+                              <summary className="px-4 py-3 cursor-pointer text-foreground-secondary hover:text-accent flex items-center gap-2">
                                 <span className="text-lg">🧠</span>
                                 <span>AI 思考過程（點擊展開）</span>
                               </summary>
-                              <div className="px-4 pb-4 text-gray-400 text-sm whitespace-pre-wrap border-t border-gray-700 pt-3">
+                              <div className="px-4 pb-4 text-foreground-secondary text-sm whitespace-pre-wrap border-t border-border pt-3">
                                 {parsedContent.thinkContent}
                               </div>
                             </details>
                           )}
 
                           {/* Raw Data Content */}
-                          <details className="bg-gray-800/50 rounded-lg border border-gray-700">
-                            <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
+                          <details className="bg-background-card/50 rounded-lg border border-border">
+                            <summary className="px-4 py-3 cursor-pointer text-foreground-secondary hover:text-accent flex items-center gap-2">
                               <span className="text-lg">☯</span>
                               <span>完整卦象盤面（點擊展開）</span>
                             </summary>
-                            <div className="px-4 pb-4 text-gray-300 text-sm whitespace-pre-wrap border-t border-gray-700 pt-3 leading-relaxed">
+                            <div className="px-4 pb-4 text-foreground-secondary text-sm whitespace-pre-wrap border-t border-border pt-3 leading-relaxed">
                               {(() => {
                                 // 只顯示到第三條 ---- 線（卦象結構結束）
                                 const formatted = result.chart_data.formatted || '';
@@ -805,60 +821,61 @@ export default function LiuYaoPage() {
                           </details>
 
                           {/* 主要內容 */}
-                          <div className="markdown-content bg-gray-800/30 rounded-xl p-6" dangerouslySetInnerHTML={{ __html: parsedContent.mainHtml }} />
+                          <div className="markdown-content bg-background-card/30 rounded-xl p-6" dangerouslySetInnerHTML={{ __html: parsedContent.mainHtml }} />
                         </div>
                       ) : (
                         <div className="text-center py-12">
-                          <Loader2 className="animate-spin mx-auto mb-4 text-[var(--gold)]" size={40} />
-                          <p className="text-gray-400">AI 解盤中，請耐心等待</p>
+                          <Loader2 className="animate-spin mx-auto mb-4 text-accent" size={40} />
+                          <p className="text-foreground-secondary">AI 解盤中，請耐心等待</p>
 
                           {/* 等待時間顯示 */}
-                          <div className="mt-4 text-2xl font-mono text-[var(--gold)]">
+                          <div className="mt-4 text-2xl font-mono text-accent">
                             {Math.floor(waitingTime / 60).toString().padStart(2, '0')}:{(waitingTime % 60).toString().padStart(2, '0')}
                           </div>
 
                           {/* 進度條 */}
-                          <div className="w-full max-w-xs mx-auto mt-4 bg-gray-700 rounded-full h-2 overflow-hidden">
+                          <div className="w-full max-w-xs mx-auto mt-4 bg-foreground-muted/20 rounded-full h-2 overflow-hidden">
                             <div
-                              className="h-full bg-[var(--gold)] transition-all duration-1000 ease-linear"
+                              className="h-full bg-accent transition-all duration-1000 ease-linear"
                               style={{ width: `${Math.min(aiProgress, 100)}%` }}
                             />
                           </div>
 
                           {/* 提示文字 */}
-                          <p className="text-gray-500 text-sm mt-3">
+                          <p className="text-foreground-muted text-sm mt-3">
                             {activeAI?.provider === 'local'
                               ? '本地 AI 解盤最久可能需要 2~3 分鐘'
                               : '雲端 AI 解盤最久約需 1 分鐘'}
                           </p>
 
                           {/* 取消按鈕 */}
-                          <button
+                          <Button
                             onClick={handleCancel}
                             disabled={isCancelling}
-                            className="mt-6 px-6 py-2 border border-red-500/50 text-red-400 rounded-lg hover:bg-red-500/10 transition flex items-center gap-2 mx-auto"
+                            variant="outline"
+                            className="mt-6 border-red-500/50 text-red-400 hover:bg-red-500/10 mx-auto"
                           >
                             {isCancelling ? (
                               <>
-                                <Loader2 className="animate-spin" size={16} />
+                                <Loader2 className="animate-spin mr-2" size={16} />
                                 取消中...
                               </>
                             ) : (
                               <>
-                                <X size={16} />
+                                <X size={16} className="mr-2" />
                                 取消占卜
                               </>
                             )}
-                          </button>
+                          </Button>
 
-                          <p className="text-gray-600 text-xs mt-4">
+                          <p className="text-foreground-muted text-xs mt-4">
                             提示：您可以關閉此視窗，結果會自動存入歷史紀錄
                           </p>
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
+                </Card>
               </div>
             </div>
           )}

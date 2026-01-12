@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import {
   Settings as SettingsIcon,
   Key,
@@ -503,7 +506,7 @@ export default function SettingsPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4 animate-spin-slow">☯</div>
-          <p className="text-gray-400">載入中...</p>
+          <p className="text-foreground-secondary">載入中...</p>
         </div>
       </div>
     );
@@ -514,7 +517,7 @@ export default function SettingsPage() {
       {/* 使用共用 Navbar */}
       <Navbar
         pageTitle="設定"
-        pageIcon={<SettingsIcon className="text-[var(--gold)]" size={24} />}
+        pageIcon={<SettingsIcon className="text-accent" size={24} />}
         showBackButton
         backHref="/"
       />
@@ -522,9 +525,9 @@ export default function SettingsPage() {
       {/* 主內容 */}
       <main className="w-full max-w-4xl mx-auto px-4 py-6">
         {/* 分頁選項 */}
-        <div className="flex gap-2 border-b border-gray-700 pb-2 mb-6 overflow-x-auto">
+        <div className="flex gap-2 border-b border-border pb-2 mb-6 overflow-x-auto">
           <button
-            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'ai' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'ai' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
               }`}
             onClick={() => setActiveTab('ai')}
           >
@@ -532,7 +535,7 @@ export default function SettingsPage() {
             AI 設定
           </button>
           <button
-            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'user' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'user' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
               }`}
             onClick={() => setActiveTab('user')}
           >
@@ -541,7 +544,7 @@ export default function SettingsPage() {
           </button>
           {currentUser?.role === 'admin' && (
             <button
-              className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'admin' ? 'bg-[var(--gold)]/20 text-[var(--gold)]' : 'text-gray-400 hover:text-gray-200'
+              className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'admin' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
                 }`}
               onClick={() => setActiveTab('admin')}
             >
@@ -555,28 +558,29 @@ export default function SettingsPage() {
         {activeTab === 'ai' && (
           <div className="space-y-6">
             {/* 現有設定 */}
-            <div className="glass-card p-6">
+            <Card variant="glass" padding="md">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">AI 服務設定</h2>
-                <button
+                <CardTitle>AI 服務設定</CardTitle>
+                <Button
                   onClick={() => { setShowAddAI(true); setEditingConfig(null); resetAIForm(); }}
-                  className="btn-gold text-sm flex items-center gap-1"
+                  variant="gold"
+                  size="sm"
+                  leftIcon={<Plus size={16} />}
                 >
-                  <Plus size={16} />
                   新增
-                </button>
+                </Button>
               </div>
 
               {aiConfigs.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">尚未設定任何 AI 服務</p>
+                <p className="text-foreground-muted text-center py-8">尚未設定任何 AI 服務</p>
               ) : (
                 <div className="space-y-3">
                   {aiConfigs.map((config) => (
                     <div
                       key={config.id}
                       className={`p-4 rounded-lg border transition ${config.is_active
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/10'
-                        : 'border-gray-700 bg-gray-800/50'
+                        ? 'border-accent bg-accent/10'
+                        : 'border-border bg-background-card/50'
                         }`}
                     >
                       <div className="flex items-center justify-between">
@@ -596,12 +600,12 @@ export default function SettingsPage() {
                               )}
                             </p>
                             {config.provider === 'local' && (
-                              <p className="text-sm text-gray-500">
+                              <p className="text-sm text-foreground-muted">
                                 {config.local_url} - {config.local_model}
                               </p>
                             )}
                             {config.provider === 'openai' && (
-                              <p className="text-sm text-gray-500">
+                              <p className="text-sm text-foreground-muted">
                                 Model: {config.local_model}
                               </p>
                             )}
@@ -609,106 +613,106 @@ export default function SettingsPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {config.is_active ? (
-                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
-                              使用中
-                            </span>
+                            <Badge variant="success">使用中</Badge>
                           ) : (
-                            <button
+                            <Button
                               onClick={() => handleActivateAI(config.id)}
-                              className="text-xs text-gray-400 hover:text-[var(--gold)]"
+                              variant="ghost"
+                              size="sm"
+                              className="text-foreground-muted hover:text-accent"
                             >
                               啟用
-                            </button>
+                            </Button>
                           )}
-                          <button
+                          <Button
                             onClick={() => handleEditAIConfig(config)}
-                            className="text-gray-500 hover:text-[var(--gold)]"
+                            variant="ghost"
+                            size="sm"
+                            className="text-foreground-muted hover:text-accent"
                           >
                             <Edit2 size={16} />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() => handleDeleteAI(config.id)}
-                            className="text-gray-500 hover:text-red-400"
+                            variant="ghost"
+                            size="sm"
+                            className="text-foreground-muted hover:text-red-400"
                           >
                             <Trash2 size={16} />
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* 新增 / 編輯 AI 設定表單 */}
             {(showAddAI || editingConfig) && (
-              <div className="glass-card p-6">
+              <Card variant="glass" padding="md">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold">
+                  <CardTitle>
                     {editingConfig ? '編輯 AI 設定' : '新增 AI 設定'}
-                  </h2>
-                  <button
+                  </CardTitle>
+                  <Button
                     onClick={() => { setShowAddAI(false); setEditingConfig(null); resetAIForm(); }}
-                    className="text-gray-400"
+                    variant="ghost"
+                    size="sm"
+                    className="text-foreground-secondary"
                   >
                     <X size={20} />
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Provider 選擇 */}
                 <div className="mb-4">
-                  <label className="block text-sm text-gray-400 mb-2">類型</label>
+                  <label className="block text-sm text-foreground-secondary mb-2">類型</label>
                   <div className="flex gap-2">
-                    <button
-                      className={`flex-1 py-3 rounded-lg border transition text-sm ${newAIProvider === 'gemini'
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                        : 'border-gray-600 text-gray-400'
-                        }`}
+                    <Button
+                      className={`flex-1 ${newAIProvider === 'gemini' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
+                      variant={newAIProvider === 'gemini' ? 'outline' : 'outline'}
                       onClick={() => setNewAIProvider('gemini')}
                       disabled={!!editingConfig}
                     >
                       <Key className="inline mr-1" size={16} />
                       Gemini
-                    </button>
-                    <button
-                      className={`flex-1 py-3 rounded-lg border transition text-sm ${newAIProvider === 'openai'
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                        : 'border-gray-600 text-gray-400'
-                        }`}
+                    </Button>
+                    <Button
+                      className={`flex-1 ${newAIProvider === 'openai' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
+                      variant={newAIProvider === 'openai' ? 'outline' : 'outline'}
                       onClick={() => setNewAIProvider('openai')}
                       disabled={!!editingConfig}
                     >
                       <Server className="inline mr-1" size={16} />
                       OpenAI
-                    </button>
-                    <button
-                      className={`flex-1 py-3 rounded-lg border transition text-sm ${newAIProvider === 'local'
-                        ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                        : 'border-gray-600 text-gray-400'
-                        }`}
+                    </Button>
+                    <Button
+                      className={`flex-1 ${newAIProvider === 'local' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
+                      variant={newAIProvider === 'local' ? 'outline' : 'outline'}
                       onClick={() => setNewAIProvider('local')}
                       disabled={!!editingConfig}
                     >
                       <Server className="inline mr-1" size={16} />
                       其他 AI
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
                 {/* 自訂名稱輸入框 */}
                 <div className="mb-4">
-                  <label className="block text-sm text-gray-400 mb-2">
+                  <label className="block text-sm text-foreground-secondary mb-2">
                     服務名稱 (選填)
                   </label>
                   <input
                     type="text"
                     value={newAIName}
                     onChange={(e) => setNewAIName(e.target.value)}
-                    className="input-dark w-full"
+                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     placeholder={`例如: 我的${newAIProvider === 'gemini' ? 'Gemini' : newAIProvider === 'openai' ? 'OpenAI' : '本地 AI'}`}
                     maxLength={50}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-foreground-muted mt-1">
                     可自訂名稱方便識別，留空則使用預設名稱
                   </p>
                 </div>
@@ -716,7 +720,7 @@ export default function SettingsPage() {
                 {newAIProvider === 'gemini' || newAIProvider === 'openai' ? (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm text-gray-400 mb-2">
+                      <label className="block text-sm text-foreground-secondary mb-2">
                         API Key {editingConfig && '(留空保持原設定)'}
                       </label>
                       <div className="relative">
@@ -724,12 +728,12 @@ export default function SettingsPage() {
                           type={showAPIKey ? 'text' : 'password'}
                           value={newAPIKey}
                           onChange={(e) => setNewAPIKey(e.target.value)}
-                          className="input-dark w-full pr-10"
+                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent pr-10"
                           placeholder={editingConfig ? '輸入新 API Key 或留空' : `輸入 ${newAIProvider === 'gemini' ? 'Gemini' : 'OpenAI'} API Key`}
                         />
                         <button
                           type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted"
                           onClick={() => setShowAPIKey(!showAPIKey)}
                         >
                           {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -743,12 +747,12 @@ export default function SettingsPage() {
                     )}
                     {newAIProvider === 'openai' && (
                       <div>
-                        <label className="block text-sm text-gray-400 mb-2">模型 (預設 gpt-5.1)</label>
+                        <label className="block text-sm text-foreground-secondary mb-2">模型 (預設 gpt-5.1)</label>
                         <input
                           type="text"
                           value={newLocalModel}
                           onChange={(e) => setNewLocalModel(e.target.value)}
-                          className="input-dark w-full"
+                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                           placeholder="gpt-5.1"
                         />
                       </div>
@@ -757,19 +761,20 @@ export default function SettingsPage() {
                 ) : (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm text-gray-400 mb-2">API URL</label>
+                      <label className="block text-sm text-foreground-secondary mb-2">API URL</label>
                       <div className="flex gap-2">
                         <input
                           type="text"
                           value={newLocalURL}
                           onChange={(e) => setNewLocalURL(e.target.value)}
-                          className="input-dark flex-1"
+                          className="flex-1 px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                           placeholder="請填寫服務商URL"
                         />
-                        <button
+                        <Button
                           onClick={handleTestConnection}
                           disabled={testingConnection || !newLocalURL}
-                          className="btn-gold flex items-center gap-1 whitespace-nowrap"
+                          variant="gold"
+                          className="whitespace-nowrap"
                         >
                           {testingConnection ? (
                             <RefreshCw className="animate-spin" size={16} />
@@ -777,12 +782,12 @@ export default function SettingsPage() {
                             <RefreshCw size={16} />
                           )}
                           測試
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm text-gray-400 mb-2">
+                      <label className="block text-sm text-foreground-secondary mb-2">
                         API Key (選填)
                       </label>
                       <div className="relative">
@@ -790,12 +795,12 @@ export default function SettingsPage() {
                           type={showAPIKey ? 'text' : 'password'}
                           value={newAPIKey}
                           onChange={(e) => setNewAPIKey(e.target.value)}
-                          className="input-dark w-full pr-10"
+                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent pr-10"
                           placeholder="若服務需要驗證請填寫"
                         />
                         <button
                           type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted"
                           onClick={() => setShowAPIKey(!showAPIKey)}
                         >
                           {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -804,12 +809,12 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="relative z-50">
-                      <label className="block text-sm text-gray-400 mb-2">模型名稱</label>
+                      <label className="block text-sm text-foreground-secondary mb-2">模型名稱</label>
                       {availableModels.length > 0 ? (
                         <select
                           value={newLocalModel}
                           onChange={(e) => setNewLocalModel(e.target.value)}
-                          className="input-dark w-full"
+                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         >
                           <option value="">請選擇模型</option>
                           {availableModels.map((model) => (
@@ -821,22 +826,24 @@ export default function SettingsPage() {
                           type="text"
                           value={newLocalModel}
                           onChange={(e) => setNewLocalModel(e.target.value)}
-                          className="input-dark w-full"
+                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                           placeholder="例如: llama3, qwen2.5:14b"
                         />
                       )}
-                      <p className="text-xs text-gray-500 mt-1">可點擊上方「測試」按鈕自動取得模型列表，或直接手動輸入。</p>
+                      <p className="text-xs text-foreground-muted mt-1">可點擊上方「測試」按鈕自動取得模型列表，或直接手動輸入。</p>
                     </div>
                   </div>
                 )}
 
-                <button
+                <Button
                   onClick={editingConfig ? handleUpdateAIConfig : handleAddAIConfig}
-                  className="btn-gold w-full mt-6"
+                  variant="gold"
+                  fullWidth
+                  className="mt-6"
                 >
                   {editingConfig ? '更新設定' : '儲存設定'}
-                </button>
-              </div>
+                </Button>
+              </Card>
             )}
           </div>
         )}
@@ -845,37 +852,37 @@ export default function SettingsPage() {
         {activeTab === 'user' && (
           <div className="space-y-6">
             {/* 修改密碼 */}
-            <div className="glass-card p-6">
-              <h2 className="text-lg font-bold mb-4">修改密碼</h2>
+            <Card variant="glass" padding="md">
+              <CardTitle className="mb-4">修改密碼</CardTitle>
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">舊密碼</label>
+                  <label className="block text-sm text-foreground-secondary mb-2">舊密碼</label>
                   <input
                     type="password"
                     value={oldPassword}
                     onChange={(e) => setOldPassword(e.target.value)}
-                    className="input-dark w-full"
+                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">新密碼</label>
+                  <label className="block text-sm text-foreground-secondary mb-2">新密碼</label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="input-dark w-full"
+                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     required
                     minLength={6}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">確認新密碼</label>
+                  <label className="block text-sm text-foreground-secondary mb-2">確認新密碼</label>
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="input-dark w-full"
+                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                     required
                     minLength={6}
                   />
@@ -892,65 +899,63 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <button type="submit" className="btn-gold w-full">
+                <Button type="submit" variant="gold" fullWidth>
                   更新密碼
-                </button>
+                </Button>
               </form>
-            </div>
+            </Card>
 
             {/* 登出 */}
-            <div className="glass-card p-6">
-              <h2 className="text-lg font-bold mb-4">登出</h2>
-              <button onClick={handleLogout} className="w-full py-3 rounded-lg border border-red-500/50 text-red-400 hover:bg-red-500/10 transition flex items-center justify-center gap-2">
+            <Card variant="glass" padding="md">
+              <CardTitle className="mb-4">登出</CardTitle>
+              <Button onClick={handleLogout} variant="danger" fullWidth className="flex items-center justify-center gap-2">
                 <LogOut size={18} />
                 登出帳號
-              </button>
-            </div>
+              </Button>
+            </Card>
           </div>
         )}
 
         {/* 用戶管理頁面 (Admin) */}
         {activeTab === 'admin' && currentUser?.role === 'admin' && (
           <div className="space-y-6">
-            <div className="glass-card p-6">
+            <Card variant="glass" padding="md">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">用戶管理</h2>
-                <button onClick={() => setShowAddUser(true)} className="btn-gold text-sm flex items-center gap-1">
-                  <Plus size={16} />
+                <CardTitle>用戶管理</CardTitle>
+                <Button onClick={() => setShowAddUser(true)} variant="gold" size="sm" leftIcon={<Plus size={16} />}>
                   新增用戶
-                </button>
+                </Button>
               </div>
 
               <div className="space-y-3">
                 {paginatedUsers.map((user) => (
-                  <div key={user.id} className="p-4 rounded-lg border border-gray-700 bg-gray-800/50">
+                  <div key={user.id} className="p-4 rounded-lg border border-border bg-background-card/50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-[var(--gold)]/20' : 'bg-gray-700'
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-accent/20' : 'bg-background-card'
                           }`}>
-                          {user.role === 'admin' ? <Shield size={18} className="text-[var(--gold)]" /> : <User size={18} />}
+                          {user.role === 'admin' ? <Shield size={18} className="text-accent" /> : <User size={18} />}
                         </div>
                         <div>
                           <p className="font-medium">{user.username}</p>
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-foreground-muted">
                             {user.role === 'admin' ? '管理員' : '一般用戶'}
                           </p>
                         </div>
                       </div>
                       {user.id !== currentUser.id && (
                         <div className="flex items-center gap-2">
-                          <button
+                          <Button
                             onClick={() => handleToggleUserActive(user.id)}
-                            className={`text-xs px-2 py-1 rounded ${user.is_active
-                              ? 'bg-green-500/20 text-green-400'
-                              : 'bg-red-500/20 text-red-400'
-                              }`}
+                            variant={user.is_active ? "ghost" : "danger"}
+                            size="sm"
+                            className={user.is_active ? "text-green-400 bg-green-500/20" : ""}
                           >
                             {user.is_active ? '啟用' : '停用'}
-                          </button>
-                          <button onClick={() => handleDeleteUser(user.id)} className="text-gray-500 hover:text-red-400">
+                          </Button>
+                          <Button onClick={() => handleDeleteUser(user.id)} variant="ghost" size="sm" className="text-foreground-muted hover:text-red-400">
                             <Trash2 size={16} />
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -960,90 +965,88 @@ export default function SettingsPage() {
 
               {/* 分頁控制 */}
               {totalUserPages > 1 && (
-                <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-700">
-                  <span className="text-sm text-gray-400">
+                <div className="mt-4 flex items-center justify-between pt-4 border-t border-border">
+                  <span className="text-sm text-foreground-muted">
                     共 {users.length} 位用戶，第 {userPage} / {totalUserPages} 頁
                   </span>
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       onClick={() => setUserPage(p => Math.max(1, p - 1))}
                       disabled={userPage === 1}
-                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="secondary"
+                      size="sm"
                     >
                       <ChevronLeft size={18} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => setUserPage(p => Math.min(totalUserPages, p + 1))}
                       disabled={userPage === totalUserPages}
-                      className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="secondary"
+                      size="sm"
                     >
                       <ChevronRight size={18} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* 新增用戶表單 */}
             {showAddUser && (
-              <div className="glass-card p-6">
+              <Card variant="glass" padding="md">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold">新增用戶</h2>
-                  <button onClick={() => setShowAddUser(false)} className="text-gray-400">
+                  <CardTitle>新增用戶</CardTitle>
+                  <Button onClick={() => setShowAddUser(false)} variant="ghost" size="sm" className="text-foreground-secondary">
                     <X size={20} />
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">用戶名</label>
+                    <label className="block text-sm text-foreground-secondary mb-2">用戶名</label>
                     <input
                       type="text"
                       value={newUsername}
                       onChange={(e) => setNewUsername(e.target.value)}
-                      className="input-dark w-full"
+                      className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                       placeholder="輸入用戶名"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">密碼</label>
+                    <label className="block text-sm text-foreground-secondary mb-2">密碼</label>
                     <input
                       type="password"
                       value={newUserPassword}
                       onChange={(e) => setNewUserPassword(e.target.value)}
-                      className="input-dark w-full"
+                      className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                       placeholder="輸入密碼"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">角色</label>
+                    <label className="block text-sm text-foreground-secondary mb-2">角色</label>
                     <div className="flex gap-4">
-                      <button
-                        className={`flex-1 py-2 rounded-lg border transition ${newUserRole === 'user'
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                          : 'border-gray-600 text-gray-400'
-                          }`}
+                      <Button
+                        className={`flex-1 ${newUserRole === 'user' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
+                        variant={newUserRole === 'user' ? 'outline' : 'outline'}
                         onClick={() => setNewUserRole('user')}
                       >
                         一般用戶
-                      </button>
-                      <button
-                        className={`flex-1 py-2 rounded-lg border transition ${newUserRole === 'admin'
-                          ? 'border-[var(--gold)] bg-[var(--gold)]/20'
-                          : 'border-gray-600 text-gray-400'
-                          }`}
+                      </Button>
+                      <Button
+                        className={`flex-1 ${newUserRole === 'admin' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
+                        variant={newUserRole === 'admin' ? 'outline' : 'outline'}
                         onClick={() => setNewUserRole('admin')}
                       >
                         管理員
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
-                  <button onClick={handleAddUser} className="btn-gold w-full">
+                  <Button onClick={handleAddUser} variant="gold" fullWidth>
                     建立用戶
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             )}
           </div>
         )}
