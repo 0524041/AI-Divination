@@ -1,6 +1,7 @@
 """
 FastAPI 主應用程式
 """
+
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,20 +13,22 @@ from app.api import (
     history_router,
     admin_router,
     tarot_router,
-    share_router
+    share_router,
 )
 from app.api.debug import router as debug_router
 from app.middleware.performance import PerformanceMiddleware
 from app.middleware.security import APISecurityMiddleware
 from app.core.config import get_settings
+from app.core.database import run_migrations
 
 # 設定日誌
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 settings = get_settings()
+
+run_migrations()
 
 # 建立應用程式
 # 生產環境隱藏 API 文件
@@ -35,7 +38,7 @@ app = FastAPI(
     version="2.0.0",
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
-    openapi_url="/openapi.json" if settings.DEBUG else None
+    openapi_url="/openapi.json" if settings.DEBUG else None,
 )
 
 # 全局異常處理
@@ -43,11 +46,12 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 import traceback
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     error_msg = f"Global Error: {str(exc)}\n{traceback.format_exc()}"
     print(error_msg)  # 確保印在後端終端機
-    
+
     # 生產環境隱藏詳細錯誤
     if settings.DEBUG:
         return JSONResponse(
@@ -59,6 +63,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             status_code=500,
             content={"detail": "Internal server error"},
         )
+
 
 # API 安全中間件（最優先）
 app.add_middleware(APISecurityMiddleware)
@@ -89,11 +94,7 @@ app.include_router(debug_router)  # 除錯 API
 @app.get("/")
 def root():
     """根路由"""
-    return {
-        "name": settings.APP_NAME,
-        "version": "2.0.0",
-        "status": "running"
-    }
+    return {"name": settings.APP_NAME, "version": "2.0.0", "status": "running"}
 
 
 @app.get("/health")
@@ -106,5 +107,6 @@ def health():
 async def cancel_stream(connection_id: str):
     """取消 SSE 連接"""
     from app.utils.sse import cancel_sse_connection
+
     await cancel_sse_connection(connection_id)
     return {"message": "連接已取消", "connection_id": connection_id}
