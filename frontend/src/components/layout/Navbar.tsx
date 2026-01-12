@@ -66,7 +66,7 @@ export function Navbar({
             {/* Main Navbar */}
             <nav
                 className={cn(
-                    'bg-background-card/80 backdrop-blur-md border border-border-accent/50 rounded-2xl mx-4 mt-4 px-4 sm:px-6 py-4 flex items-center justify-between relative z-50 shadow-sm transition-colors duration-300',
+                    'sticky top-4 bg-background-card/80 backdrop-blur-md border border-border-accent/50 rounded-2xl mx-4 mt-4 px-4 sm:px-6 py-4 flex items-center justify-between relative z-50 shadow-sm transition-colors duration-300',
                     className
                 )}
             >
@@ -138,7 +138,7 @@ export function Navbar({
 
             {/* Mobile Menu */}
             {menuOpen && (
-                <div className="md:hidden bg-background-card/95 backdrop-blur-xl border border-border-accent/50 rounded-2xl mx-4 mt-2 p-4 space-y-4 animate-in fade-in slide-in-from-top-2 relative z-40 shadow-lg">
+                <div className="md:hidden fixed inset-x-0 top-[calc(4rem+16px+8px)] mx-4 bg-background-card/95 backdrop-blur-xl border border-border-accent/50 rounded-2xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 z-40 shadow-lg">
                     {navItems.map((item) => (
                         <Link
                             key={item.href}

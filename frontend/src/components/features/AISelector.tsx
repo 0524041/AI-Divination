@@ -110,13 +110,13 @@ export function AISelector({
     if (variant === 'default') {
         return (
             <div className={cn('relative z-20', className)}>
-                <div className="bg-[rgba(22,33,62,0.8)] backdrop-blur-sm border border-[rgba(212,175,55,0.2)] rounded-xl p-4">
+                <div className="bg-background-card/80 backdrop-blur-sm border border-border-accent rounded-xl p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <Bot className="text-[var(--gold)]" size={20} />
-                            <span className="text-sm text-gray-400">當前 AI：</span>
+                            <Bot className="text-accent" size={20} />
+                            <span className="text-sm text-foreground-muted">當前 AI：</span>
                             {currentConfig ? (
-                                <span className="text-[var(--gold)] font-medium">{getAIDisplayName(currentConfig)}</span>
+                                <span className="text-accent font-medium">{getAIDisplayName(currentConfig)}</span>
                             ) : (
                                 <span className="text-red-400">未設定</span>
                             )}
@@ -124,7 +124,7 @@ export function AISelector({
 
                         <button
                             onClick={() => setIsOpen(!isOpen)}
-                            className="text-sm text-gray-400 hover:text-[var(--gold)] flex items-center gap-1 transition-colors"
+                            className="text-sm text-foreground-muted hover:text-accent flex items-center gap-1 transition-colors"
                         >
                             切換 AI
                             <ChevronDown size={16} className={cn('transition-transform', isOpen && 'rotate-180')} />
@@ -132,7 +132,7 @@ export function AISelector({
                     </div>
 
                     {shouldShowWarning && (
-                        <div className="mt-3 flex items-start gap-2 text-xs text-amber-400/80 bg-amber-400/10 rounded-lg p-2">
+                        <div className="mt-3 flex items-start gap-2 text-xs text-amber-500/90 dark:text-amber-400/80 bg-amber-500/10 rounded-lg p-2">
                             <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                             <span>{warningMessage}</span>
                         </div>
@@ -141,14 +141,14 @@ export function AISelector({
 
                 {/* Dropdown */}
                 {isOpen && configs.length > 0 && (
-                    <div className="absolute right-0 top-full mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
+                    <div className="absolute right-0 top-full mt-2 bg-background-card border border-border rounded-lg shadow-xl min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
                         {configs.map((config) => (
                             <button
                                 key={config.id}
                                 onClick={() => handleSwitch(config.id)}
                                 className={cn(
-                                    'w-full text-left px-4 py-3 hover:bg-gray-700 transition-colors flex items-center justify-between',
-                                    config.is_active ? 'text-[var(--gold)]' : 'text-gray-300'
+                                    'w-full text-left px-4 py-3 hover:bg-background-secondary transition-colors flex items-center justify-between',
+                                    config.is_active ? 'text-accent' : 'text-foreground-secondary'
                                 )}
                             >
                                 <span>{getAIDisplayName(config)}</span>
@@ -158,7 +158,7 @@ export function AISelector({
 
                         <Link
                             href="/settings"
-                            className="block w-full text-center px-4 py-2 text-sm text-gray-500 hover:text-[var(--gold)] border-t border-gray-700 transition-colors"
+                            className="block w-full text-center px-4 py-2 text-sm text-foreground-muted hover:text-accent border-t border-border transition-colors"
                         >
                             <Settings size={14} className="inline mr-1" />
                             管理 AI 設定
@@ -175,24 +175,24 @@ export function AISelector({
             <div className={cn('relative z-20', className)}>
                 <button
                     onClick={() => setIsOpen(!isOpen)}
-                    className="w-full flex items-center justify-between px-6 py-4 bg-gray-800/40 border border-gray-700 rounded-2xl hover:border-[var(--gold)] hover:bg-gray-800/60 transition-all duration-300 backdrop-blur-sm"
+                    className="w-full flex items-center justify-between px-6 py-4 bg-background-card border border-border rounded-2xl hover:border-accent hover:shadow-md transition-all duration-300 backdrop-blur-sm group"
                 >
                     <div className="flex items-center gap-4">
-                        <div className="p-2 bg-[var(--gold)]/10 rounded-lg">
-                            <Bot className="text-[var(--gold)]" size={24} />
+                        <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
+                            <Bot className="text-accent" size={24} />
                         </div>
                         <div className="text-left">
-                            <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">AI 解盤服務</div>
-                            <div className="font-medium text-gray-200 text-lg">
+                            <div className="text-xs text-foreground-muted uppercase tracking-wider mb-1">AI 解盤服務</div>
+                            <div className="font-medium text-foreground-primary text-lg">
                                 {currentConfig ? getAIDisplayName(currentConfig) : '未設定 AI'}
                             </div>
                         </div>
                     </div>
-                    <ChevronDown size={20} className={cn('text-gray-400 transition-transform duration-300', isOpen && 'rotate-180')} />
+                    <ChevronDown size={20} className={cn('text-foreground-muted transition-transform duration-300 group-hover:text-accent', isOpen && 'rotate-180')} />
                 </button>
 
                 {isOpen && configs.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a2e] border border-gray-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-background-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         {configs.map((config) => {
                             const isSelected = currentConfig?.id === config.id;
                             return (
@@ -200,26 +200,26 @@ export function AISelector({
                                     key={config.id}
                                     onClick={() => handleSwitch(config.id)}
                                     className={cn(
-                                        'w-full px-6 py-4 flex items-center justify-between hover:bg-gray-800 transition',
-                                        isSelected && 'bg-[var(--gold)]/5'
+                                        'w-full px-6 py-4 flex items-center justify-between hover:bg-background-secondary transition',
+                                        isSelected && 'bg-accent/5'
                                     )}
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className={cn(
                                             'w-2 h-2 rounded-full',
-                                            isSelected ? 'bg-[var(--gold)] shadow-[0_0_10px_var(--gold)]' : 'bg-gray-600'
+                                            isSelected ? 'bg-accent shadow-[0_0_10px_var(--accent)]' : 'bg-gray-400 dark:bg-gray-600'
                                         )} />
-                                        <span className={isSelected ? 'text-[var(--gold)] font-medium' : 'text-gray-300'}>
+                                        <span className={isSelected ? 'text-accent font-medium' : 'text-foreground-secondary'}>
                                             {getAIDisplayName(config)}
                                         </span>
                                     </div>
-                                    {isSelected && <Check size={18} className="text-[var(--gold)]" />}
+                                    {isSelected && <Check size={18} className="text-accent" />}
                                 </button>
                             );
                         })}
                         <Link
                             href="/settings"
-                            className="w-full px-6 py-4 flex items-center gap-3 text-gray-400 hover:bg-gray-800 hover:text-[var(--gold)] border-t border-gray-800 transition"
+                            className="w-full px-6 py-4 flex items-center gap-3 text-foreground-muted hover:bg-background-secondary hover:text-accent border-t border-border transition"
                         >
                             <Settings size={18} />
                             <span>管理 AI 設定</span>
@@ -228,7 +228,7 @@ export function AISelector({
                 )}
 
                 {shouldShowWarning && (
-                    <div className="mt-3 flex items-start gap-2 text-xs text-amber-400/80 bg-amber-400/10 rounded-lg p-3">
+                    <div className="mt-3 flex items-start gap-2 text-xs text-amber-500/90 dark:text-amber-400/80 bg-amber-500/10 rounded-lg p-3">
                         <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                         <span>{warningMessage}</span>
                     </div>
@@ -241,11 +241,11 @@ export function AISelector({
     return (
         <div className={cn('relative z-20', className)}>
             <div className="flex items-center gap-2">
-                <Bot className="text-[var(--gold)]" size={16} />
-                <span className="text-sm text-gray-400">AI:</span>
+                <Bot className="text-accent" size={16} />
+                <span className="text-sm text-foreground-muted">AI:</span>
                 <button
                     onClick={() => setIsOpen(!isOpen)}
-                    className="text-sm text-[var(--gold)] hover:underline flex items-center gap-1"
+                    className="text-sm text-accent hover:underline flex items-center gap-1"
                 >
                     {currentConfig ? getAIDisplayName(currentConfig) : '未設定'}
                     <ChevronDown size={14} className={cn('transition-transform', isOpen && 'rotate-180')} />
@@ -253,14 +253,14 @@ export function AISelector({
             </div>
 
             {isOpen && configs.length > 0 && (
-                <div className="absolute left-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl min-w-[180px] overflow-hidden z-50">
+                <div className="absolute left-0 top-full mt-1 bg-background-card border border-border rounded-lg shadow-xl min-w-[180px] overflow-hidden z-50">
                     {configs.map((config) => (
                         <button
                             key={config.id}
                             onClick={() => handleSwitch(config.id)}
                             className={cn(
-                                'w-full text-left px-3 py-2 text-sm hover:bg-gray-700 transition-colors flex items-center justify-between',
-                                config.is_active ? 'text-[var(--gold)]' : 'text-gray-300'
+                                'w-full text-left px-3 py-2 text-sm hover:bg-background-secondary transition-colors flex items-center justify-between',
+                                config.is_active ? 'text-accent' : 'text-foreground-secondary'
                             )}
                         >
                             <span>{getAIDisplayName(config)}</span>

@@ -499,7 +499,8 @@ export default function TarotPage() {
     <div className="min-h-screen flex flex-col pb-20 overflow-x-hidden">
       {/* 背景裝飾 */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,_rgba(21,21,40,1)_0%,_rgba(10,10,10,1)_80%)]"></div>
+        <div className="absolute inset-0 w-full h-full bg-background-primary transition-colors duration-500"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,_rgba(21,21,40,1)_0%,_rgba(10,10,10,1)_80%)] opacity-0 dark:opacity-100 transition-opacity duration-500"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--gold)] opacity-[0.03] blur-[100px] rounded-full"></div>
       </div>
 
@@ -605,7 +606,7 @@ export default function TarotPage() {
 
         {/* Input Phase */}
         {step === 'input' && (
-          <div className="max-w-2xl mx-auto space-y-8 fade-in pt-10">
+          <div className="max-w-2xl md:max-w-4xl mx-auto space-y-8 fade-in pt-10">
             <div className="text-center space-y-3">
               <div className="flex items-center justify-center gap-3 mb-4">
                 <span className="text-4xl">{SPREAD_CONFIGS.find(s => s.id === spreadType)?.icon}</span>
@@ -732,7 +733,7 @@ export default function TarotPage() {
             </div>
 
             {/* Selected Cards Bar - Fixed Bottom - Optimized for Zoom/Responsive */}
-            <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-t border-accent/30 pb-2 pt-2 md:pb-4 md:pt-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all duration-300">
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-background-primary/95 backdrop-blur-xl border-t border-accent/30 pb-2 pt-2 md:pb-4 md:pt-4 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all duration-300">
               <div className="w-full max-w-[98%] 2xl:max-w-[1800px] mx-auto px-2 md:px-6 flex flex-row items-center justify-between gap-4">
 
                 {/* Selected Cards Slots - Scrollable Area with Centering */}
