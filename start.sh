@@ -230,7 +230,58 @@ cleanup_processes_and_ports() {
 }
 
 # ============================================
-# 重啟服務（自動檢測前端變更並重新構建）
+# 顯示啟動完成訊息
+# ============================================
+show_startup_info() {
+    echo -e "\n${BLUE}============================================${NC}"
+    echo -e "${GREEN}       服務已啟動！${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "前端:    ${GREEN}http://localhost:3000${NC}"
+    echo -e "後端:    ${GREEN}http://localhost:8000${NC}"
+    echo -e "API 文檔: ${GREEN}http://localhost:8000/docs${NC}"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "後端 PID: $BACKEND_PID"
+    echo -e "前端 PID: $FRONTEND_PID"
+    echo -e "日誌檔案: backend.log, frontend.log"
+    echo -e "${BLUE}============================================${NC}"
+    echo -e "\n${CYAN}提示: 使用 ${GREEN}./start.sh --stop${CYAN} 停止服務${NC}"
+    echo -e "${CYAN}      使用 ${GREEN}./start.sh --status${CYAN} 查看狀態${NC}"
+    echo -e "${CYAN}      使用 ${GREEN}./start.sh --logs${CYAN} 查看日誌${NC}"
+}
+
+# ============================================
+# 純啟動服務（用於 restart，不構建前端）
+# ============================================
+start_services_only() {
+    echo -e "\n${YELLOW}[啟動] 啟動服務（不重新構建）...${NC}"
+    
+    # 清理殘留進程並釋放端口
+    cleanup_processes_and_ports
+    
+    # 啟動後端
+    echo "啟動後端服務 (Port 8000, localhost only)..."
+    cd "$BACKEND_DIR"
+    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
+    BACKEND_PID=$!
+    
+    # 啟動前端（使用現有構建）
+    echo "啟動前端服務 (Port 3000, 使用現有構建)..."
+    cd "$FRONTEND_DIR"
+    
+    if [ ! -d ".next" ] || [ ! -f ".next/BUILD_ID" ]; then
+        echo -e "${RED}✗ 未找到前端構建檔案，請先執行 ./start.sh --build${NC}"
+        exit 1
+    fi
+    
+    nohup npm start -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
+    FRONTEND_PID=$!
+    
+    sleep 3
+    show_startup_info
+}
+
+# ============================================
+# 重啟服務（單純重啟，不檢查前端更新）
 # ============================================
 restart_services() {
     echo -e "\n${YELLOW}[重啟] 正在重啟所有服務...${NC}"
@@ -239,47 +290,11 @@ restart_services() {
     stop_services
     sleep 2
     
-    # 檢查前端是否需要重新構建
-    cd "$FRONTEND_DIR"
-    FRONTEND_CHANGED=false
-    
-    if [ ! -d ".next" ] || [ ! -f ".next/BUILD_ID" ]; then
-        echo -e "${YELLOW}未找到構建目錄，需要重新構建${NC}"
-        FRONTEND_CHANGED=true
-    else
-        # 比較 src 目錄最新修改時間與 .next/BUILD_ID 時間
-        BUILD_TIME=$(stat -f "%m" .next/BUILD_ID 2>/dev/null || echo "0")
-        
-        # 找出所有原始碼檔案中最新的修改時間
-        NEWEST_SRC=0
-        while IFS= read -r file; do
-            FILE_TIME=$(stat -f "%m" "$file" 2>/dev/null || echo "0")
-            if [ "$FILE_TIME" -gt "$NEWEST_SRC" ]; then
-                NEWEST_SRC=$FILE_TIME
-            fi
-        done < <(find src -type f \( -name "*.tsx" -o -name "*.ts" -o -name "*.css" -o -name "*.json" \) 2>/dev/null)
-        
-        if [ "$NEWEST_SRC" -gt "$BUILD_TIME" ]; then
-            echo -e "${YELLOW}檢測到前端原始碼比構建更新 (最新: $(date -r $NEWEST_SRC '+%Y-%m-%d %H:%M:%S'), 構建: $(date -r $BUILD_TIME '+%Y-%m-%d %H:%M:%S'))${NC}"
-            FRONTEND_CHANGED=true
-        fi
-    fi
-    
-    if [ "$FRONTEND_CHANGED" = true ]; then
-        echo -e "${CYAN}正在重新構建前端...${NC}"
-        npm run build
-        if [ $? -ne 0 ]; then
-            echo -e "${RED}✗ 前端構建失敗${NC}"
-            exit 1
-        fi
-        echo -e "${GREEN}✓ 前端重新構建完成${NC}"
-    else
-        echo -e "${GREEN}✓ 前端無變更，使用現有構建${NC}"
-    fi
-    
-    # 啟動服務
+    # 直接啟動服務，不檢查前端變更
+    # 使用 SKIP_FRONTEND_BUILD 標記跳過前端構建
+    SKIP_FRONTEND_BUILD=true
     cd "$PROJECT_DIR"
-    start_services
+    start_services_only
 }
 
 # ============================================
