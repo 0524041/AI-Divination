@@ -247,6 +247,9 @@ export default function ZiweiPage() {
         const offsetInt = Math.round(offsetMinutes);
         const sign = offsetInt >= 0 ? '+' : '';
         correctionNote = `經真太陽時校正：時辰由【${originalHourChar}】變更為【${solarHourChar}】（調整 ${sign}${offsetInt} 分）`;
+        // Inject original hour for display
+        (solarTime as any).originalHourChar = originalHourChar; 
+        (solarTime as any).finalHourChar = solarHourChar;
       }
 
       // Generate Chart using Solar Date/Time
@@ -520,7 +523,13 @@ export default function ZiweiPage() {
           const timeIndex = getChineseTimeIndex(h);
           const timeChar = getChineseHourName(timeIndex);
           
-          return `農曆:${y}/${m.toString().padStart(2,'0')}/${d.toString().padStart(2,'0')} ${h.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}分 ${timeChar}時(${timeChar})`;
+          let timeDisplay = `${timeChar}時(${timeChar})`;
+          
+          if ((tst as any).originalHourChar && (tst as any).finalHourChar) {
+              timeDisplay = `${timeChar}時 (${(tst as any).originalHourChar}時 -> ${(tst as any).finalHourChar}時)`;
+          }
+          
+          return `農曆:${y}/${m.toString().padStart(2,'0')}/${d.toString().padStart(2,'0')} ${h.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}分 ${timeDisplay}`;
       } catch (e) {
           return '';
       }
@@ -776,35 +785,80 @@ export default function ZiweiPage() {
                <div className="flex gap-2 items-center">
                   {viewMode === 'yearly' && (
                     dateType === 'solar' ? (
-                        <Select
-                        value={queryDate.slice(0, 4)}
-                        onChange={(e) => setQueryDate(`${e.target.value}-01-01`)}
-                        options={Array.from({ length: 100 }, (_, i) => {
-                            const year = new Date().getFullYear() - 50 + i;
-                            return { value: year.toString(), label: `${year} 年` };
-                        })}
-                        className="w-32 py-1.5 text-sm"
-                        />
+                        <div className="flex gap-1">
+                            <Select
+                                value={queryDate.slice(0, 4)}
+                                onChange={(e) => setQueryDate(`${e.target.value}-01-01`)}
+                                options={Array.from({ length: 100 }, (_, i) => {
+                                    const year = new Date().getFullYear() - 50 + i;
+                                    return { value: year.toString(), label: `${year} 年` };
+                                })}
+                                className="w-24 py-1.5 text-sm"
+                            />
+                            <Select
+                                value="1"
+                                disabled={true}
+                                options={[{ value: '1', label: '1月' }]}
+                                className="w-20 py-1.5 text-sm opacity-50"
+                            />
+                            <Select
+                                value="1"
+                                disabled={true}
+                                options={[{ value: '1', label: '1日' }]}
+                                className="w-20 py-1.5 text-sm opacity-50"
+                            />
+                        </div>
                     ) : (
-                        <Select
-                            value={currentLunarDate.getYear().toString()}
-                            onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
-                            options={Array.from({ length: 100 }, (_, i) => {
-                                const year = new Date().getFullYear() - 50 + i;
-                                return { value: year.toString(), label: `農曆 ${year} 年` };
-                            })}
-                            className="w-32 py-1.5 text-sm"
-                        />
+                        <div className="flex gap-1">
+                            <Select
+                                value={currentLunarDate.getYear().toString()}
+                                onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
+                                options={Array.from({ length: 100 }, (_, i) => {
+                                    const year = new Date().getFullYear() - 50 + i;
+                                    return { value: year.toString(), label: `${year} 年` };
+                                })}
+                                className="w-24 py-1.5 text-sm"
+                            />
+                            <Select
+                                value="1"
+                                disabled={true}
+                                options={[{ value: '1', label: '1月' }]}
+                                className="w-20 py-1.5 text-sm opacity-50"
+                            />
+                            <Select
+                                value="1"
+                                disabled={true}
+                                options={[{ value: '1', label: '1日' }]}
+                                className="w-20 py-1.5 text-sm opacity-50"
+                            />
+                        </div>
                     )
                   )}
                   {viewMode === 'monthly' && (
                      dateType === 'solar' ? (
-                        <input
-                        type="month"
-                        value={queryDate.slice(0, 7)}
-                        onChange={(e) => setQueryDate(e.target.value + '-01')}
-                        className="px-3 py-1.5 rounded-lg bg-background-card border border-border text-foreground-primary text-sm"
-                        />
+                         <div className="flex gap-1">
+                             <Select
+                                value={queryDate.slice(0, 4)}
+                                onChange={(e) => setQueryDate(`${e.target.value}-${queryDate.slice(5, 7)}-01`)}
+                                options={Array.from({ length: 50 }, (_, i) => {
+                                    const year = new Date().getFullYear() - 25 + i;
+                                    return { value: year.toString(), label: `${year}年` };
+                                })}
+                                className="w-24 py-1.5 text-sm"
+                             />
+                             <Select
+                                value={parseInt(queryDate.slice(5, 7)).toString()}
+                                onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${e.target.value.padStart(2, '0')}-01`)}
+                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
+                                className="w-20 py-1.5 text-sm"
+                             />
+                             <Select
+                                value="1"
+                                disabled={true}
+                                options={[{ value: '1', label: '1日' }]}
+                                className="w-20 py-1.5 text-sm opacity-50"
+                             />
+                         </div>
                      ) : (
                          <div className="flex gap-1">
                              <Select
@@ -822,17 +876,40 @@ export default function ZiweiPage() {
                                 options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
                                 className="w-20 py-1.5 text-sm"
                              />
+                             <Select
+                                value="1"
+                                disabled={true}
+                                options={[{ value: '1', label: '1日' }]}
+                                className="w-20 py-1.5 text-sm opacity-50"
+                             />
                          </div>
                      )
                   )}
                   {viewMode === 'daily' && (
                      dateType === 'solar' ? (
-                        <input
-                        type="date"
-                        value={queryDate.slice(0, 10)}
-                        onChange={(e) => setQueryDate(e.target.value)}
-                        className="px-3 py-1.5 rounded-lg bg-background-card border border-border text-foreground-primary text-sm"
-                        />
+                        <div className="flex gap-1">
+                             <Select
+                                value={queryDate.slice(0, 4)}
+                                onChange={(e) => setQueryDate(`${e.target.value}-${queryDate.slice(5, 7)}-${queryDate.slice(8, 10)}`)}
+                                options={Array.from({ length: 50 }, (_, i) => {
+                                    const year = new Date().getFullYear() - 25 + i;
+                                    return { value: year.toString(), label: `${year}年` };
+                                })}
+                                className="w-24 py-1.5 text-sm"
+                             />
+                             <Select
+                                value={parseInt(queryDate.slice(5, 7)).toString()}
+                                onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${e.target.value.padStart(2, '0')}-${queryDate.slice(8, 10)}`)}
+                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
+                                className="w-20 py-1.5 text-sm"
+                             />
+                             <Select
+                                value={parseInt(queryDate.slice(8, 10)).toString()}
+                                onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${queryDate.slice(5, 7)}-${e.target.value.padStart(2, '0')}`)}
+                                options={Array.from({ length: 31 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}日` }))}
+                                className="w-20 py-1.5 text-sm"
+                             />
+                        </div>
                      ) : (
                         <div className="flex gap-1">
                              <Select
@@ -885,7 +962,7 @@ export default function ZiweiPage() {
               birthDate: birthData.birth_date.replace('T', ' '),
               solarDate: displayChart.solarDate,
               lunarDate: displayChart.lunarDate.toString(),
-              bazi: formatBazi(displayChart.chineseDate),
+              bazi: formatBazi(chartData.natalChart.chineseDate),
               lunarInfo: {
                 description: `${displayChart.lunarDate.toString()} ${displayChart.timeChar || (chartData.natalChart as any).timeChar || ''}時`,
               },

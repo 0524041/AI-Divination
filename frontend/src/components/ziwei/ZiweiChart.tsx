@@ -160,7 +160,11 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
     const relatedIndices = focusedIndex !== null ? getRelatedIndices(focusedIndex) : [];
 
     const handlePalaceClick = (index: number) => {
-        setFocusedIndex(index);
+        if (focusedIndex === index) {
+            setFocusedIndex(null);
+        } else {
+            setFocusedIndex(index);
+        }
     };
 
     const handlePalaceKeyDown = (e: React.KeyboardEvent, index: number) => {
@@ -304,12 +308,12 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                 className={`
                                     relative p-[2px] flex flex-col justify-between overflow-hidden cursor-pointer
                                     hover:z-30 hover:shadow-2xl transition-all duration-200 border
-                                    ${isCore ? 'bg-orange-100 dark:bg-orange-900/40 border-orange-300' : 
-                                      hasPositiveEnergy ? 'bg-green-50 dark:bg-green-900/20 border-green-200' :
+                                    ${isCore ? 'bg-orange-200 dark:bg-orange-800/60 border-orange-400' : 
+                                      hasPositiveEnergy ? 'bg-green-100 dark:bg-green-800/40 border-green-300' :
                                       'bg-white dark:bg-[#1f1137] border-gray-200 dark:border-white/10'}
                                     
-                                    ${isRelated ? 'bg-yellow-50 dark:bg-yellow-900/30 !border-yellow-400 ring-1 ring-yellow-400' : ''}
-                                    ${isFocused ? 'ring-2 ring-accent z-10' : ''}
+                                    ${isRelated ? 'bg-yellow-100 dark:bg-yellow-800/50 !border-yellow-500 ring-2 ring-yellow-500' : ''}
+                                    ${isFocused ? 'ring-4 ring-accent z-20 shadow-xl scale-[1.02]' : ''}
                                     ${isSoul ? 'ring-2 ring-inset ring-red-500' : ''}
                                 `}
                                 style={{
