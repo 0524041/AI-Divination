@@ -107,7 +107,17 @@ class ZiweiService:
             "five_elements_class": str(chart.five_elements_class) if chart.five_elements_class else "",
             "gender": chart.gender,
             "solar_date": str(chart.solar_date) if chart.solar_date else "",
-            "lunar_date": str(chart.lunar_date) if chart.lunar_date else "",
+            "lunar_date": str(chart.lunar_date), # iztro-py LunarDate __str__ should be sufficient, typically "YYYY年MM月DD日"
+            "lunar_info": {
+                "year": chart.lunar_date.year,
+                "month": chart.lunar_date.month,
+                "day": chart.lunar_date.day,
+                "leap": chart.lunar_date.leap,
+                "heavenly_stem_earthly_branch_year": chart.lunar_date.heavenly_stem_earthly_branch_year,
+                "heavenly_stem_earthly_branch_month": chart.lunar_date.heavenly_stem_earthly_branch_month,
+                "heavenly_stem_earthly_branch_day": chart.lunar_date.heavenly_stem_earthly_branch_day,
+                "description": str(chart.lunar_date)
+            },
             "time_range": str(chart.time_range) if chart.time_range else "",
         }
 

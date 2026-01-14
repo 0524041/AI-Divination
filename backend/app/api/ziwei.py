@@ -37,6 +37,7 @@ class CalculateResponse(BaseModel):
     message: str
 
 
+
 class ZiweiDivinationRequest(BaseModel):
     birth_data_id: Optional[int] = None
     name: str
@@ -48,6 +49,8 @@ class ZiweiDivinationRequest(BaseModel):
     query_type: str = Field(..., pattern="^(natal|yearly|monthly|daily)$")
     query_date: Optional[datetime] = None
     question: str = Field(..., min_length=1, max_length=500)
+    chart_data: Optional[dict] = None  # Frontend generated chart JSON
+    prompt_context: Optional[str] = None  # Frontend generated AI prompt text
 
 
 class DivinationResponse(BaseModel):
@@ -86,13 +89,16 @@ async def process_ziwei_divination(history_id: int, db_url: str):
             return
 
         try:
-            if ai_config.provider == "gemini":
+            api_key = None
+            if ai_config.api_key_encrypted:
                 api_key = decrypt_api_key(ai_config.api_key_encrypted)
-                ai_service = get_ai_service("gemini", api_key=api_key)
-            else:
-                ai_service = get_ai_service(
-                    "local", base_url=ai_config.local_url, model=ai_config.local_model
-                )
+
+            ai_service = get_ai_service(
+                ai_config.provider,
+                api_key=api_key,
+                base_url=ai_config.local_url,
+                model=ai_config.effective_model
+            )
         except Exception as e:
             history.status = "error"
             history.interpretation = f"錯誤：AI 服務初始化失敗 - {str(e)}"
@@ -103,15 +109,20 @@ async def process_ziwei_divination(history_id: int, db_url: str):
         if SYSTEM_PROMPT_PATH.exists():
             system_prompt = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
 
-        chart_data = json.loads(history.chart_data)
-        natal_chart = chart_data["natal_chart"]
-        horoscope = chart_data.get("horoscope")
-        is_twin_younger = (
-            chart_data["birth_info"].get("is_twin")
-            and chart_data["birth_info"].get("twin_order") == "younger"
-        )
-
-        chart_text = ZiweiService.format_for_ai(natal_chart, horoscope, is_twin_younger)
+        chart_data_json = json.loads(history.chart_data)
+        
+        # Check if we have pre-generated prompt context from frontend
+        if "prompt_context" in chart_data_json:
+             chart_text = chart_data_json["prompt_context"]
+        else:
+            # Fallback to backend formatting (legacy)
+            natal_chart = chart_data_json["natal_chart"]
+            horoscope = chart_data_json.get("horoscope")
+            is_twin_younger = (
+                chart_data_json["birth_info"].get("is_twin")
+                and chart_data_json["birth_info"].get("twin_order") == "younger"
+            )
+            chart_text = ZiweiService.format_for_ai(natal_chart, horoscope, is_twin_younger)
 
         user_prompt = f"""
 【用戶問題】
@@ -129,7 +140,7 @@ async def process_ziwei_divination(history_id: int, db_url: str):
             history.interpretation = interpretation
             history.status = "completed"
             history.ai_provider = ai_config.provider
-            history.ai_model = ai_config.local_model if ai_config.provider == "local" else "gemini-3-flash-preview"
+            history.ai_model = ai_config.effective_model
         except Exception as e:
             history.status = "error"
             history.interpretation = f"AI 解讀失敗：{str(e)}"
@@ -186,38 +197,46 @@ async def create_divination(
         raise HTTPException(status_code=400, detail="流年/流月/流日需要提供查詢日期")
 
     try:
-        # Generate chart first to validate data
-        natal_chart = ZiweiService.generate_natal_chart(
-            name=data.name,
-            gender=data.gender,
-            birth_datetime=data.birth_date,
-            location=data.birth_location,
-            is_twin=data.is_twin,
-            twin_order=data.twin_order,
-        )
-
-        horoscope = None
-        if data.query_type != "natal":
-            natal_chart_json = json.dumps(natal_chart, ensure_ascii=False)
-            horoscope = ZiweiService.generate_horoscope(
-                natal_chart_json, data.query_date, data.query_type
+        if data.chart_data:
+            # Frontend provided chart data
+            final_chart_data = data.chart_data
+            # Inject prompt context if provided
+            if data.prompt_context:
+                final_chart_data["prompt_context"] = data.prompt_context
+        else:
+            # Backward compatibility: Backend calculation
+            # Generate chart first to validate data
+            natal_chart = ZiweiService.generate_natal_chart(
+                name=data.name,
+                gender=data.gender,
+                birth_datetime=data.birth_date,
+                location=data.birth_location,
+                is_twin=data.is_twin,
+                twin_order=data.twin_order,
             )
 
-        chart_data = {
-            "natal_chart": natal_chart,
-            "horoscope": horoscope,
-            "birth_info": natal_chart["birth_info"],
-            "query_type": data.query_type,
-            "query_date": data.query_date.isoformat() if data.query_date else None,
-            "birth_data_id": data.birth_data_id  # Store the reference
-        }
+            horoscope = None
+            if data.query_type != "natal":
+                natal_chart_json = json.dumps(natal_chart, ensure_ascii=False)
+                horoscope = ZiweiService.generate_horoscope(
+                    natal_chart_json, data.query_date, data.query_type
+                )
+
+            final_chart_data = {
+                "natal_chart": natal_chart,
+                "horoscope": horoscope,
+                "birth_info": natal_chart["birth_info"],
+                "query_type": data.query_type,
+                "query_date": data.query_date.isoformat() if data.query_date else None,
+                "birth_data_id": data.birth_data_id
+            }
 
         history = History(
             user_id=current_user.id,
             divination_type="ziwei",
             question=data.question,
             gender=data.gender,
-            chart_data=json.dumps(chart_data, ensure_ascii=False),
+            chart_data=json.dumps(final_chart_data, ensure_ascii=False),
             status="pending",
         )
         db.add(history)
