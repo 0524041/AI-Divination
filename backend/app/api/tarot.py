@@ -91,15 +91,21 @@ async def process_tarot_divination(history_id: int, db_url: str):
         
         # 準備 AI 服務
         try:
-            if ai_config.provider == "gemini":
+            api_key = None
+            if ai_config.api_key_encrypted:
                 api_key = decrypt_api_key(ai_config.api_key_encrypted)
-                ai_service = get_ai_service("gemini", api_key=api_key)
-            else:
-                ai_service = get_ai_service(
-                    "local",
-                    base_url=ai_config.local_url,
-                    model=ai_config.local_model
-                )
+
+            ai_service = get_ai_service(
+                ai_config.provider,
+                api_key=api_key,
+                base_url=ai_config.local_url,
+                model=ai_config.effective_model
+            )
+        except Exception as e:
+            history.status = "error"
+            history.interpretation = f"錯誤：AI 服務初始化失敗 - {str(e)}"
+            db.commit()
+            return
         except Exception as e:
             history.status = "error"
             history.interpretation = f"錯誤：AI 服務初始化失敗 - {str(e)}"
@@ -176,9 +182,10 @@ Please interpret this Celtic Cross spread.
             return
 
         # 呼叫 AI
-        try:
             response = await ai_service.generate(user_prompt, system_prompt)
             history.interpretation = response
+            history.ai_provider = ai_config.provider
+            history.ai_model = ai_config.effective_model
             history.status = "completed"
             db.commit()
         except Exception as e:

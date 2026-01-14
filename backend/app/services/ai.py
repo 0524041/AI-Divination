@@ -33,9 +33,9 @@ class AIService:
 class GeminiService(AIService):
     """Google Gemini AI 服務"""
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, model: str = "gemini-3-flash-preview"):
         self.api_key = api_key
-        self.model = "gemini-3-flash-preview"
+        self.model = model or "gemini-3-flash-preview"
         self.client = genai.Client(api_key=api_key, http_options={'api_version': 'v1alpha'})
     
     async def _retry_async(self, func: Callable, *args, max_retries: int = 3, base_delay: float = 2.0, **kwargs) -> Any:
@@ -227,16 +227,17 @@ def get_ai_service(provider: str, **kwargs) -> AIService:
     """取得 AI 服務實例"""
     if provider == "gemini":
         api_key = kwargs.get("api_key")
+        model = kwargs.get("model")
         if not api_key:
             raise ValueError("Gemini API Key 未提供")
-        return GeminiService(api_key)
+        return GeminiService(api_key, model=model)
     
     elif provider == "openai":
         api_key = kwargs.get("api_key")
         model = kwargs.get("model")
         if not api_key:
             raise ValueError("OpenAI API Key 未提供")
-        return OpenAIService(api_key, model)
+        return OpenAIService(api_key, model=model)
         
     elif provider == "local" or provider == "custom":
         base_url = kwargs.get("base_url") or kwargs.get("local_url")

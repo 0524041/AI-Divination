@@ -76,21 +76,22 @@ async def process_divination(history_id: int, db_url: str):
         
         # 準備 AI 服務
         try:
-            if ai_config.provider == "gemini":
+            api_key = None
+            if ai_config.api_key_encrypted:
                 api_key = decrypt_api_key(ai_config.api_key_encrypted)
-                ai_service = get_ai_service("gemini", api_key=api_key)
-            else:
-                ai_service = get_ai_service(
-                    "local",
-                    base_url=ai_config.local_url,
-                    model=ai_config.local_model
-                )
+
+            ai_service = get_ai_service(
+                ai_config.provider,
+                api_key=api_key,
+                base_url=ai_config.local_url,
+                model=ai_config.effective_model
+            )
         except Exception as e:
             history.status = "error"
             history.interpretation = f"錯誤：AI 服務初始化失敗 - {str(e)}"
             db.commit()
             return
-        
+
         # 讀取 system prompt
         system_prompt = ""
         if SYSTEM_PROMPT_PATH.exists():
@@ -117,7 +118,7 @@ async def process_divination(history_id: int, db_url: str):
             result = await ai_service.generate(user_prompt, system_prompt)
             history.interpretation = result
             history.ai_provider = ai_config.provider
-            history.ai_model = ai_config.local_model if ai_config.provider == "local" else "gemini-3-flash-preview"
+            history.ai_model = ai_config.effective_model
             history.status = "completed"
         except Exception as e:
             history.status = "error"

@@ -27,9 +27,10 @@ class AIConfigRequest(BaseModel):
     name: Optional[str] = Field(
         None, description="用戶自訂的 AI 服務名稱", max_length=50
     )
+    model: Optional[str] = Field(None, description="AI 模型名稱（OpenAI/Local 必填）")
     api_key: Optional[str] = Field(None, description="Gemini/OpenAI API Key")
     local_url: Optional[str] = Field(None, description="Local AI URL")
-    local_model: Optional[str] = Field(None, description="Local AI Model")
+    local_model: Optional[str] = Field(None, description="Local AI Model (向後相容)")
 
 
 class AIConfigResponse(BaseModel):
@@ -38,6 +39,7 @@ class AIConfigResponse(BaseModel):
     id: int
     provider: str
     name: Optional[str]
+    model: Optional[str]  # 實際使用的模型名稱
     has_api_key: bool
     local_url: Optional[str]
     local_model: Optional[str]
@@ -73,6 +75,7 @@ def get_ai_configs(
             id=c.id,
             provider=c.provider,
             name=c.name,
+            model=c.effective_model,  # 使用 property 取得實際模型
             has_api_key=bool(c.api_key_encrypted),
             local_url=c.local_url,
             local_model=c.local_model,
@@ -124,14 +127,28 @@ def create_ai_config(
         AIConfig.user_id == current_user.id, AIConfig.provider == request.provider
     ).update({"is_active": False})
 
+    # 設定模型名稱
+    model_name = request.model
+    
+    if request.provider == "gemini":
+        # Gemini 強制使用 gemini-3-flash-preview
+        model_name = "gemini-3-flash-preview"
+    elif request.provider == "openai":
+        # OpenAI 使用用戶輸入，若無則預設 gpt-4o
+        model_name = request.model or "gpt-4o"
+    elif request.provider == "local":
+        # Local 優先使用 model，若無則使用 local_model (向後相容)
+        model_name = request.model or request.local_model
+
     # 建立新設定
     config = AIConfig(
         user_id=current_user.id,
         provider=request.provider,
         name=request.name,
+        model=model_name,
         api_key_encrypted=encrypt_api_key(request.api_key) if request.api_key else None,
         local_url=request.local_url,
-        local_model=request.local_model,
+        local_model=request.local_model, # 保留向後相容
         is_active=True,
     )
     db.add(config)
@@ -142,6 +159,7 @@ def create_ai_config(
         id=config.id,
         provider=config.provider,
         name=config.name,
+        model=config.effective_model,
         has_api_key=bool(config.api_key_encrypted),
         local_url=config.local_url,
         local_model=config.local_model,
@@ -168,6 +186,15 @@ def update_ai_config(
 
     config.provider = request.provider
     config.name = request.name
+    
+    # 更新模型名稱
+    if request.provider == "gemini":
+        config.model = "gemini-3-flash-preview"
+    elif request.provider == "openai":
+        config.model = request.model or "gpt-4o"
+    elif request.provider == "local":
+        config.model = request.model or request.local_model
+
     if request.api_key:
         config.api_key_encrypted = encrypt_api_key(request.api_key)
 
