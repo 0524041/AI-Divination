@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "google-genai>=0.3.0",
     "openai>=1.0.0",
+    "iztro-py>=0.3.3",
 ]
 
 [project.scripts]

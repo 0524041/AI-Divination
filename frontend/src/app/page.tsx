@@ -34,8 +34,8 @@ const divinationTypes = [
     name: '紫微斗數',
     description: '中國傳統命理學，推算人生運勢走向',
     icon: Star,
-    available: false,
-    href: '#',
+    available: true,
+    href: '/ziwei',
   },
   {
     id: 'bazi',
