@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -13,10 +13,9 @@ import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
 import { apiGet, apiPost, apiDelete } from '@/lib/api-client';
 import { TAIWAN_CITIES } from '@/lib/taiwan-cities';
+import { generateNatalChart, getChineseTimeIndex, Gender } from '@/lib/astro';
 import {
   Compass,
-  BookOpen,
-  HelpCircle,
   Send,
   Loader2,
   Copy,
@@ -24,13 +23,13 @@ import {
   Check,
   X,
   User,
+  Save,
   Calendar,
   MapPin,
   Users,
 } from 'lucide-react';
 
 type Step = 'intro' | 'input' | 'chart' | 'result';
-type Tab = 'divine' | 'intro' | 'tutorial';
 type QueryType = 'natal' | 'yearly' | 'monthly' | 'daily';
 
 interface BirthData {
@@ -44,32 +43,9 @@ interface BirthData {
 }
 
 interface ChartData {
-  natal_chart: {
-    palaces: Array<{
-      index: number;
-      name: string;
-      heavenly_stem: string;
-      earthly_branch: string;
-      major_stars: Array<{ name: string; brightness?: string }>;
-      minor_stars: Array<{ name: string }>;
-      decadal?: { range: string };
-    }>;
-    earthly_branch_of_soul_palace: string;
-    earthly_branch_of_body_palace: string;
-    five_elements_class: string;
-    birth_info: {
-      name: string;
-      gender: string;
-      original_time: string;
-      adjusted_time: string;
-      location: string;
-      is_twin: boolean;
-      twin_order?: string;
-    };
-  };
-  horoscope?: Record<string, unknown>;
-  query_type: string;
-  query_date?: string;
+  natalChart: any; // FunctionalAstrolabe
+  queryType: string;
+  queryDate?: string;
 }
 
 interface DivinationResult {
@@ -86,7 +62,6 @@ const AI_TIMEOUT = 5 * 60 * 1000;
 export default function ZiweiPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>('intro');
-  const [activeTab, setActiveTab] = useState<Tab>('divine');
 
   // Birth Data Form
   const [savedBirthDataList, setSavedBirthDataList] = useState<BirthData[]>([]);
@@ -148,8 +123,8 @@ export default function ZiweiPage() {
   const handleSelectSavedData = (id: number) => {
     const data = savedBirthDataList.find(d => d.id === id);
     if (data) {
-      // Parse the date and format for datetime-local input (handle timezone)
-      const date = new Date(data.birth_date);
+      const dateStr = data.birth_date.endsWith('Z') ? data.birth_date : `${data.birth_date}Z`;
+      const date = new Date(dateStr);
       const localDateStr = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
         .toISOString()
         .slice(0, 16);
@@ -169,7 +144,6 @@ export default function ZiweiPage() {
         await loadSavedBirthData();
         if (selectedBirthDataId === id) {
           setSelectedBirthDataId(null);
-          // Reset form
           setBirthData({
             name: '',
             gender: 'male',
@@ -181,12 +155,11 @@ export default function ZiweiPage() {
       } else {
         alert('刪除失敗');
       }
-    } catch (err) {
+    } catch {
       alert('刪除失敗');
     }
   };
 
-  // Calculate chart and auto-save
   const handleCalculateChart = async () => {
     if (!birthData.name.trim()) {
       setError('請輸入姓名');
@@ -197,43 +170,26 @@ export default function ZiweiPage() {
     setIsProcessing(true);
 
     try {
-      // Auto-save birth data first
-      const saveRes = await apiPost('/api/birth-data', {
-        name: birthData.name,
-        gender: birthData.gender,
-        birth_date: new Date(birthData.birth_date).toISOString(),
-        birth_location: birthData.birth_location,
-        is_twin: birthData.is_twin,
-        twin_order: birthData.is_twin ? birthData.twin_order : null,
+      const dateObj = new Date(birthData.birth_date);
+      const year = dateObj.getFullYear();
+      const month = dateObj.getMonth() + 1;
+      const day = dateObj.getDate();
+      const hour = dateObj.getHours();
+      const solarDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      const timeIndex = getChineseTimeIndex(hour);
+
+      const chart = generateNatalChart(
+        solarDate,
+        timeIndex,
+        birthData.gender as Gender
+      );
+
+      setChartData({
+        natalChart: chart,
+        queryType: 'natal',
       });
+      setStep('chart');
 
-      if (saveRes.ok) {
-        const savedData = await saveRes.json();
-        setSelectedBirthDataId(savedData.id);
-        await loadSavedBirthData();
-      }
-
-      // Calculate chart
-      const calcRes = await apiPost('/api/ziwei/calculate', {
-        name: birthData.name,
-        gender: birthData.gender,
-        birth_date: new Date(birthData.birth_date).toISOString(),
-        birth_location: birthData.birth_location,
-        is_twin: birthData.is_twin,
-        twin_order: birthData.is_twin ? birthData.twin_order : null,
-      });
-
-      if (calcRes.ok) {
-        const result = await calcRes.json();
-        setChartData({
-          natal_chart: result.natal_chart,
-          query_type: 'natal',
-        });
-        setStep('chart');
-      } else {
-        const errData = await calcRes.json();
-        setError(errData.detail || '排盤失敗');
-      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(`排盤錯誤: ${err.message}`);
@@ -245,7 +201,39 @@ export default function ZiweiPage() {
     }
   };
 
-  // Submit question to AI
+  const handleSaveBirthData = async () => {
+    if (!birthData.name.trim()) {
+      setError('請輸入姓名');
+      return;
+    }
+    setError('');
+    setIsProcessing(true);
+
+    try {
+      const saveRes = await apiPost('/api/birth-data', {
+        name: birthData.name,
+        gender: birthData.gender,
+        birth_date: new Date(birthData.birth_date).toISOString(),
+        birth_location: birthData.birth_location,
+        is_twin: birthData.is_twin,
+        twin_order: birthData.is_twin ? birthData.twin_order : null,
+      });
+
+      if (saveRes.ok) {
+        const savedData = await saveRes.json();
+        await loadSavedBirthData();
+        setSelectedBirthDataId(savedData.id);
+        alert('儲存成功！');
+      } else {
+        alert('儲存失敗');
+      }
+    } catch {
+      alert('儲存失敗');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleSubmitQuery = async () => {
     if (!question.trim()) {
       setError('請輸入問題');
@@ -265,8 +253,24 @@ export default function ZiweiPage() {
     const startTime = Date.now();
 
     try {
+      // Serialize chart to text for backend
+      // Using a basic stringify for now, can be improved
+      // Ideally we should extract key info: Palaces, Stars, Decadal, etc.
+      // Since iztro structures are complex (circular refs?), simple JSON.stringify might fail if circular.
+      // But FunctionalAstrolabe should be a clean object tree.
+      // We'll traverse and create a simplified context string in formatting. 
+      // Actually backend expects a string or JSON. If we change backend to accept 'chart_context', we send string.
+      // Let's send a simplified object or just let JSON.stringify handle it if safe.
+      // iztro objects are usually safe.
+
+      const chartContext = JSON.stringify(chartData?.natalChart, (key, value) => {
+        if (key === 'astrolabe') return undefined; // avoid circular ref if any
+        return value;
+      });
+
       const res = await apiPost('/api/ziwei', {
         birth_data_id: selectedBirthDataId,
+        // Include birth data details in case ID is strictly required or as fallback
         name: birthData.name,
         gender: birthData.gender,
         birth_date: new Date(birthData.birth_date).toISOString(),
@@ -276,6 +280,8 @@ export default function ZiweiPage() {
         query_type: queryType,
         query_date: queryType !== 'natal' ? new Date(queryDate).toISOString() : null,
         question,
+        chart_data: chartData?.natalChart, // Send object for storage
+        prompt_context: chartContext,      // Send text for AI (currently JSON string, acceptable for now)
       });
 
       if (res.ok) {
@@ -391,17 +397,16 @@ export default function ZiweiPage() {
 
   // Format lunar date info for display
   const birthInfo = useMemo(() => {
-    if (!chartData?.natal_chart?.birth_info) return null;
-    const info = chartData.natal_chart.birth_info;
+    if (!chartData?.natalChart) return null;
     return {
-      name: info.name,
-      gender: info.gender,
-      birthDate: new Date(info.original_time).toLocaleString('zh-TW'),
-      location: info.location,
-      isTwin: info.is_twin,
-      twinOrder: info.twin_order,
+      name: birthData.name,
+      gender: birthData.gender,
+      birthDate: birthData.birth_date.replace('T', ' '),
+      location: birthData.birth_location,
+      isTwin: birthData.is_twin,
+      twinOrder: birthData.twin_order,
     };
-  }, [chartData]);
+  }, [chartData, birthData]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -443,7 +448,6 @@ export default function ZiweiPage() {
               輸入生辰八字
             </h2>
 
-            {/* Saved Data Selector */}
             {savedBirthDataList.length > 0 && (
               <div className="mb-6">
                 <label className="block text-sm text-foreground-secondary mb-2">選擇已儲存的生辰八字</label>
@@ -476,7 +480,6 @@ export default function ZiweiPage() {
             )}
 
             <div className="space-y-4">
-              {/* Name */}
               <Input
                 label="姓名"
                 value={birthData.name}
@@ -485,7 +488,6 @@ export default function ZiweiPage() {
                 required
               />
 
-              {/* Gender */}
               <div>
                 <label className="block text-sm text-foreground-secondary mb-2">性別</label>
                 <div className="flex gap-4">
@@ -508,7 +510,6 @@ export default function ZiweiPage() {
                 </div>
               </div>
 
-              {/* Birth Date */}
               <Input
                 label="出生日期時間（國曆）"
                 type="datetime-local"
@@ -517,7 +518,6 @@ export default function ZiweiPage() {
                 required
               />
 
-              {/* Location */}
               <div>
                 <label className="block text-sm text-foreground-secondary mb-2">
                   <MapPin size={14} className="inline mr-1" />
@@ -530,7 +530,6 @@ export default function ZiweiPage() {
                 />
               </div>
 
-              {/* Twin */}
               <div className="p-4 border border-border rounded-lg bg-background-card/30">
                 <label className="flex items-center gap-2 text-foreground-primary cursor-pointer">
                   <input
@@ -568,28 +567,39 @@ export default function ZiweiPage() {
               </div>
             )}
 
-            <div className="flex gap-4 mt-6">
-              <Button variant="outline" onClick={() => setStep('intro')}>
+            <div className="flex flex-col sm:flex-row gap-4 mt-6">
+              <Button variant="outline" onClick={() => setStep('intro')} className="w-full sm:w-auto">
                 ← 返回
               </Button>
-              <Button
-                variant="gold"
-                fullWidth
-                onClick={handleCalculateChart}
-                disabled={isProcessing || !birthData.name.trim()}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="animate-spin mr-2" size={20} />
-                    排盤中...
-                  </>
-                ) : (
-                  <>
-                    <Calendar size={20} className="mr-2" />
-                    排盤（自動儲存）
-                  </>
-                )}
-              </Button>
+              <div className="flex-1 flex gap-4">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                  onClick={handleSaveBirthData}
+                  disabled={isProcessing}
+                >
+                  <Save size={20} className="mr-2" />
+                  儲存目前設定
+                </Button>
+                <Button
+                  variant="gold"
+                  className="flex-[2]"
+                  onClick={handleCalculateChart}
+                  disabled={isProcessing || !birthData.name.trim()}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2" size={20} />
+                      排盤中...
+                    </>
+                  ) : (
+                    <>
+                      <Calendar size={20} className="mr-2" />
+                      立即排盤
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </Card>
         </main>
@@ -598,7 +608,6 @@ export default function ZiweiPage() {
       {/* ===== Chart Phase ===== */}
       {step === 'chart' && chartData && (
         <main className="w-full max-w-6xl mx-auto px-4 py-6 space-y-6">
-          {/* User Info Card */}
           {birthInfo && (
             <Card variant="glass" className="p-4">
               <div className="flex flex-wrap gap-4 text-sm">
@@ -616,20 +625,26 @@ export default function ZiweiPage() {
             </Card>
           )}
 
-          {/* Chart Display */}
           <ZiweiChart
-            palaces={chartData.natal_chart.palaces}
-            soulPalaceBranch={chartData.natal_chart.earthly_branch_of_soul_palace}
-            bodyPalaceBranch={chartData.natal_chart.earthly_branch_of_body_palace}
+            palaces={chartData.natalChart.palaces}
+            soulPalaceBranch={chartData.natalChart.palaces.find((p: any) => p.isSoulPalace)?.earthlyBranch || ''}
+            bodyPalaceBranch={chartData.natalChart.palaces.find((p: any) => p.isBodyPalace)?.earthlyBranch || ''}
             centerInfo={{
-              name: birthInfo?.name || '',
-              gender: birthInfo?.gender || 'male',
-              fiveElements: chartData.natal_chart.five_elements_class,
-              birthDate: birthInfo?.birthDate || '',
+              name: birthData.name,
+              gender: birthData.gender,
+              fiveElements: chartData.natalChart.fiveElementsClass,
+              birthDate: birthData.birth_date.replace('T', ' '),
+              solarDate: chartData.natalChart.solarDate,
+              lunarDate: chartData.natalChart.lunarDate.toString(),
+              lunarInfo: {
+                heavenly_stem_earthly_branch_year: chartData.natalChart.lunarDate.heavenlyStemEarthlyBranchYear,
+                heavenly_stem_earthly_branch_month: chartData.natalChart.lunarDate.heavenlyStemEarthlyBranchMonth,
+                heavenly_stem_earthly_branch_day: chartData.natalChart.lunarDate.heavenlyStemEarthlyBranchDay,
+                description: chartData.natalChart.lunarDate.toString(),
+              },
             }}
           />
 
-          {/* AI Query Section */}
           <Card variant="glass" className="p-6">
             <h3 className="text-xl font-bold text-accent mb-4">AI 解盤</h3>
 
@@ -640,7 +655,6 @@ export default function ZiweiPage() {
             />
 
             <div className="space-y-4 mt-6">
-              {/* Query Type */}
               <Select
                 label="問卦類型"
                 value={queryType}
@@ -653,7 +667,6 @@ export default function ZiweiPage() {
                 ]}
               />
 
-              {/* Date Selector for Flow Types */}
               {queryType === 'yearly' && (
                 <div>
                   <label className="block text-sm text-foreground-secondary mb-2">選擇年份</label>
@@ -692,7 +705,6 @@ export default function ZiweiPage() {
                 </div>
               )}
 
-              {/* Question Input */}
               <div>
                 <label className="block text-sm text-foreground-secondary mb-2">請輸入您的問題</label>
                 <textarea
@@ -716,15 +728,13 @@ export default function ZiweiPage() {
                   ← 修改資料
                 </Button>
                 <Button
-                  variant="gold"
-                  fullWidth
                   onClick={handleSubmitQuery}
                   disabled={isProcessing || !question.trim() || !activeAI}
                 >
                   {isProcessing ? (
                     <>
                       <Loader2 className="animate-spin mr-2" size={20} />
-                      解盤中...
+                      請 AI 解盤
                     </>
                   ) : (
                     <>
@@ -798,12 +808,9 @@ export default function ZiweiPage() {
               <p className="text-red-400">{error || '等待結果...'}</p>
             )}
 
-            <div className="flex gap-4 mt-6">
+            <div className="mt-8 flex justify-center">
               <Button variant="outline" onClick={() => setStep('chart')}>
                 ← 返回命盤
-              </Button>
-              <Button variant="gold" fullWidth onClick={() => router.push('/history')}>
-                查看歷史紀錄
               </Button>
             </div>
           </Card>
