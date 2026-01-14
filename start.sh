@@ -470,6 +470,29 @@ init_database() {
 }
 
 # ============================================
+# 執行資料庫遷移
+# ============================================
+run_migrations() {
+    echo -e "\n${YELLOW}[4.5/8] 檢查並執行資料庫遷移...${NC}"
+    
+    cd "$BACKEND_DIR"
+    MIGRATIONS_DIR="$BACKEND_DIR/migrations"
+    
+    if [ -d "$MIGRATIONS_DIR" ]; then
+        for script in "$MIGRATIONS_DIR"/*.py; do
+            if [ -f "$script" ] && [ "$(basename "$script")" != "__init__.py" ]; then
+                filename=$(basename "$script")
+                echo -e "檢查遷移: $filename"
+                "$VENV_DIR/bin/python" "$script"
+            fi
+        done
+        echo -e "${GREEN}✓ 資料庫遷移檢查完成${NC}"
+    else
+        echo -e "${CYAN}ℹ 無遷移腳本目錄${NC}"
+    fi
+}
+
+# ============================================
 # 配置安全機制（簡化版 - 不再使用簽名密鑰）
 # ============================================
 configure_security() {
@@ -741,6 +764,9 @@ main() {
     
     # 4. 初始化資料庫
     init_database
+
+    # 4.5. 執行資料庫遷移
+    run_migrations
     
     # 5. 配置安全機制
     configure_security
