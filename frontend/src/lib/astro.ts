@@ -1,69 +1,113 @@
 import { astro } from 'iztro';
+import { CITY_COORDINATES, TaiwanCity } from './taiwan-cities';
+import { getMutagensByHeavenlyStem as getMutagens } from 'iztro/lib/utils';
 
-/**
- * Ziwei Chart Generation Utility using iztro.js
- * 
- * Documentation: https://github.com/SylarLong/iztro
- */
+export type Gender = 'male' | 'female';
 
-export type Gender = 'male' | 'female'; // iztro uses '男' | '女' but we work with english keys internally
+export const CHINESE_HOURS = [
+  '子', '丑', '寅', '卯', '辰', '巳',
+  '午', '未', '申', '酉', '戌', '亥'
+];
 
-/**
- * Generate a Natal Chart (本命盤)
- */
-export const generateNatalChart = (
-    solarDateStr: string, // "YYYY-MM-DD"
-    timeIndex: number,    // 0-12 (0=Early Rat... 12=Late Rat)
-    gender: Gender,
-    fixLeap: boolean = true
-) => {
-    const genderCn = gender === 'male' ? '男' : '女';
+export function getChineseHourName(index: number): string {
+  return CHINESE_HOURS[index % 12];
+}
 
-    // iztro.astro.bySolar(solarDateStr, timeIndex, gender, fixLeap, language)
-    // solarDateStr format: YYYY-M-D or YYYY-MM-DD
-    const chart = astro.bySolar(solarDateStr, timeIndex, genderCn, true, 'zh-TW');
-    return chart;
-};
+export function getChineseTimeIndex(hour: number): number {
+  if (hour >= 23 || hour < 1) return 0;
+  return Math.floor((hour + 1) / 2);
+}
 
-/**
- * Helper to convert Hour (0-23) to Chinese Time Index (0-12)
- * 23-1: 0 (Early Rat) - but iztro might handle 23 as 0? 
- * Actually iztro typical mapping:
- * 0: 子 (23:00-01:00)
- * 1: 丑 (01:00-03:00)
- * ...
- * 12: invalid/special? 
- * 
- * Let's standardize input:
- * Z (0): 23-1
- * C (1): 1-3
- * Y (2): 3-5
- * M (3): 5-7
- * C (4): 7-9
- * S (5): 9-11
- * W (6): 11-13
- * W (7): 13-15
- * S (8): 15-17
- * Y (9): 17-19
- * X (10): 19-21
- * H (11): 21-23
- * 
- * Note: iztro expects 0 for Early Rat (00:00-01:00) and maybe handled 23 separately?
- * Checking iztro docs (or assumption): usually 0=Zi, 1=Chou... 
- * 
- */
-export const getChineseTimeIndex = (hour: number): number => {
-    if (hour >= 23 || hour < 1) return 0; // Zi
-    if (hour >= 1 && hour < 3) return 1; // Chou
-    if (hour >= 3 && hour < 5) return 2; // Yin
-    if (hour >= 5 && hour < 7) return 3; // Mao
-    if (hour >= 7 && hour < 9) return 4; // Chen
-    if (hour >= 9 && hour < 11) return 5; // Si
-    if (hour >= 11 && hour < 13) return 6; // Wu
-    if (hour >= 13 && hour < 15) return 7; // Wei
-    if (hour >= 15 && hour < 17) return 8; // Shen
-    if (hour >= 17 && hour < 19) return 9; // You
-    if (hour >= 19 && hour < 21) return 10; // Xu
-    if (hour >= 21 && hour < 23) return 11; // Hai
-    return 0;
-};
+function calculateEOT(d: number): number {
+  const b = (2 * Math.PI * (d - 81)) / 365;
+  return 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
+}
+
+function getDayOfYear(date: Date): number {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date.getTime() - start.getTime();
+  const oneDay = 1000 * 60 * 60 * 24;
+  return Math.floor(diff / oneDay);
+}
+
+export function calculateTrueSolarTime(date: Date, location: TaiwanCity) {
+  const coords = CITY_COORDINATES[location];
+  if (!coords) {
+    return {
+      solarTime: date,
+      offsetMinutes: 0,
+      lonOffset: 0,
+      eot: 0
+    };
+  }
+
+  const lonOffset = (coords.lon - 120) * 4;
+  const dayOfYear = getDayOfYear(date);
+  const eot = calculateEOT(dayOfYear);
+  const totalOffsetMinutes = lonOffset + eot;
+  const solarTime = new Date(date.getTime() + totalOffsetMinutes * 60 * 1000);
+
+  return {
+    solarTime,
+    offsetMinutes: totalOffsetMinutes,
+    lonOffset,
+    eot
+  };
+}
+
+export function generateNatalChart(
+  dateStr: string,
+  timeIndex: number,
+  gender: Gender
+) {
+  const genderText = gender === 'male' ? '男' : '女';
+  return astro.bySolar(dateStr, timeIndex, genderText, true, 'zh-TW');
+}
+
+export function generateHoroscope(
+  natalChart: any,
+  dateStr: string,
+  timeIndex: number
+) {
+  if (natalChart && typeof natalChart.horoscope === 'function') {
+    return natalChart.horoscope(dateStr, timeIndex);
+  }
+  return natalChart;
+}
+
+export function getFlowMutagens(heavenlyStem: string) {
+    const stemMap: Record<string, string> = {
+        '甲': 'jiaHeavenly',
+        '乙': 'yiHeavenly',
+        '丙': 'bingHeavenly',
+        '丁': 'dingHeavenly',
+        '戊': 'wuHeavenly',
+        '己': 'jiHeavenly',
+        '庚': 'gengHeavenly',
+        '辛': 'xinHeavenly',
+        '壬': 'renHeavenly',
+        '癸': 'guiHeavenly'
+    };
+
+    const key = stemMap[heavenlyStem];
+    if (!key) return [];
+    
+    // getMutagens returns [Lu, Quan, Ke, Ji] StarNames
+    return getMutagens(key as any);
+}
+
+// Add types for richer data extraction
+export interface LimitInfo {
+    index: number;
+    heavenlyStem: string;
+    earthlyBranch: string;
+    name?: string; // e.g. "大限"
+}
+
+export interface DetailedHoroscopeData {
+    decadal?: LimitInfo;
+    yearly?: LimitInfo;
+    monthly?: LimitInfo;
+    daily?: LimitInfo;
+    age?: LimitInfo;
+}

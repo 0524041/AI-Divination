@@ -12,8 +12,16 @@ import { AISelector, AIConfig } from '@/components/features/AISelector';
 import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
 import { apiGet, apiPost, apiDelete } from '@/lib/api-client';
-import { TAIWAN_CITIES } from '@/lib/taiwan-cities';
-import { generateNatalChart, getChineseTimeIndex, Gender } from '@/lib/astro';
+import { TAIWAN_CITIES, TaiwanCity } from '@/lib/taiwan-cities';
+import { Lunar, Solar } from 'lunar-javascript';
+import {
+  generateNatalChart,
+  generateHoroscope,
+  getChineseTimeIndex,
+  calculateTrueSolarTime,
+  getChineseHourName,
+  Gender
+} from '@/lib/astro';
 import {
   Compass,
   Send,
@@ -31,6 +39,7 @@ import {
 
 type Step = 'intro' | 'input' | 'chart' | 'result';
 type QueryType = 'natal' | 'yearly' | 'monthly' | 'daily';
+type DateType = 'solar' | 'lunar';
 
 interface BirthData {
   id?: number;
@@ -43,9 +52,8 @@ interface BirthData {
 }
 
 interface ChartData {
-  natalChart: any; // FunctionalAstrolabe
-  queryType: string;
-  queryDate?: string;
+  natalChart: any;
+  solarTimeIndex: number;
 }
 
 interface DivinationResult {
@@ -58,6 +66,13 @@ interface DivinationResult {
 const MAX_WAIT_GEMINI = 60 * 1000;
 const MAX_WAIT_LOCAL = 180 * 1000;
 const AI_TIMEOUT = 5 * 60 * 1000;
+
+const formatBazi = (baziStr?: string) => {
+    if (!baziStr) return '';
+    const parts = baziStr.split(' ');
+    if (parts.length !== 4) return baziStr;
+    return `干支︰${parts[0]}年 ${parts[1]}月 ${parts[2]}日 ${parts[3]}時`;
+};
 
 export default function ZiweiPage() {
   const router = useRouter();
@@ -76,8 +91,9 @@ export default function ZiweiPage() {
 
   // Chart & Query
   const [chartData, setChartData] = useState<ChartData | null>(null);
-  const [queryType, setQueryType] = useState<QueryType>('natal');
-  const [queryDate, setQueryDate] = useState(new Date().toISOString().slice(0, 10));
+  const [viewMode, setViewMode] = useState<QueryType>('natal');
+  const [dateType, setDateType] = useState<DateType>('solar');
+  const [queryDate, setQueryDate] = useState(new Date().toISOString().slice(0, 10)); // Always Solar Date string YYYY-MM-DD
   const [question, setQuestion] = useState('');
 
   // Result
@@ -94,6 +110,42 @@ export default function ZiweiPage() {
 
   // Share
   const [sharingState, setSharingState] = useState<'idle' | 'loading' | 'success'>('idle');
+
+  // Display Chart Calculation
+  const displayChart = useMemo(() => {
+    if (!chartData?.natalChart) return null;
+    if (viewMode === 'natal') return chartData.natalChart;
+    
+    try {
+      return generateHoroscope(chartData.natalChart, queryDate, chartData.solarTimeIndex);
+    } catch (e) {
+      console.error('Error generating horoscope:', e);
+      return chartData.natalChart;
+    }
+  }, [chartData, viewMode, queryDate]);
+
+  // Lunar Date State (Derived from queryDate when in Lunar mode)
+  const currentLunarDate = useMemo(() => {
+    const d = new Date(queryDate);
+    return Lunar.fromDate(d);
+  }, [queryDate]);
+
+  // Handle Lunar Date Inputs
+  const handleLunarChange = (type: 'year' | 'month' | 'day', value: number) => {
+    const y = type === 'year' ? value : currentLunarDate.getYear();
+    const m = type === 'month' ? value : currentLunarDate.getMonth();
+    const d = type === 'day' ? value : currentLunarDate.getDay();
+    
+    // Create new lunar date and convert to solar
+    // Note: handling leap months is complex, here we default to non-leap or first month
+    try {
+        const lunar = Lunar.fromYmd(y, m, d);
+        const solar = lunar.getSolar();
+        setQueryDate(solar.toString());
+    } catch (e) {
+        console.error('Invalid Lunar Date', e);
+    }
+  };
 
   // Check login
   useEffect(() => {
@@ -171,23 +223,55 @@ export default function ZiweiPage() {
 
     try {
       const dateObj = new Date(birthData.birth_date);
-      const year = dateObj.getFullYear();
-      const month = dateObj.getMonth() + 1;
-      const day = dateObj.getDate();
-      const hour = dateObj.getHours();
-      const solarDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-      const timeIndex = getChineseTimeIndex(hour);
+
+      // Calculate True Solar Time
+      const city = (birthData.birth_location || '台北市') as TaiwanCity;
+      const {
+        solarTime,
+        offsetMinutes,
+      } = calculateTrueSolarTime(dateObj, city);
+
+      // Determine indices
+      const originalHour = dateObj.getHours();
+      const originalTimeIndex = getChineseTimeIndex(originalHour);
+
+      const solarHour = solarTime.getHours();
+      const solarTimeIndex = getChineseTimeIndex(solarHour);
+
+      const solarHourChar = getChineseHourName(solarTimeIndex);
+      const originalHourChar = getChineseHourName(originalTimeIndex);
+
+      // Generate Correction Note
+      let correctionNote = '';
+      if (originalTimeIndex !== solarTimeIndex) {
+        const offsetInt = Math.round(offsetMinutes);
+        const sign = offsetInt >= 0 ? '+' : '';
+        correctionNote = `經真太陽時校正：時辰由【${originalHourChar}】變更為【${solarHourChar}】（調整 ${sign}${offsetInt} 分）`;
+      }
+
+      // Generate Chart using Solar Date/Time
+      const year = solarTime.getFullYear();
+      const month = solarTime.getMonth() + 1;
+      const day = solarTime.getDate();
+      const solarDateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
       const chart = generateNatalChart(
-        solarDate,
-        timeIndex,
+        solarDateStr,
+        solarTimeIndex,
         birthData.gender as Gender
       );
 
+      // Inject metadata for UI
+      (chart as any).correctionNote = correctionNote;
+      (chart as any).timeChar = solarHourChar;
+      (chart as any).trueSolarTimeObj = solarTime; // Save for display
+
       setChartData({
         natalChart: chart,
-        queryType: 'natal',
+        solarTimeIndex: solarTimeIndex,
       });
+      // Reset view to natal on new calculation
+      setViewMode('natal');
       setStep('chart');
 
     } catch (err: unknown) {
@@ -253,35 +337,25 @@ export default function ZiweiPage() {
     const startTime = Date.now();
 
     try {
-      // Serialize chart to text for backend
-      // Using a basic stringify for now, can be improved
-      // Ideally we should extract key info: Palaces, Stars, Decadal, etc.
-      // Since iztro structures are complex (circular refs?), simple JSON.stringify might fail if circular.
-      // But FunctionalAstrolabe should be a clean object tree.
-      // We'll traverse and create a simplified context string in formatting. 
-      // Actually backend expects a string or JSON. If we change backend to accept 'chart_context', we send string.
-      // Let's send a simplified object or just let JSON.stringify handle it if safe.
-      // iztro objects are usually safe.
-
-      const chartContext = JSON.stringify(chartData?.natalChart, (key, value) => {
-        if (key === 'astrolabe') return undefined; // avoid circular ref if any
+      // We send the *currently displayed chart* (which could be yearly/monthly) as context
+      const chartContext = JSON.stringify(displayChart, (key, value) => {
+        if (key === 'astrolabe') return undefined; // avoid circular ref
         return value;
       });
 
       const res = await apiPost('/api/ziwei', {
         birth_data_id: selectedBirthDataId,
-        // Include birth data details in case ID is strictly required or as fallback
         name: birthData.name,
         gender: birthData.gender,
         birth_date: new Date(birthData.birth_date).toISOString(),
         birth_location: birthData.birth_location,
         is_twin: birthData.is_twin,
         twin_order: birthData.is_twin ? birthData.twin_order : null,
-        query_type: queryType,
-        query_date: queryType !== 'natal' ? new Date(queryDate).toISOString() : null,
+        query_type: viewMode, // Use current view mode
+        query_date: viewMode !== 'natal' ? new Date(queryDate).toISOString() : null,
         question,
-        chart_data: chartData?.natalChart, // Send object for storage
-        prompt_context: chartContext,      // Send text for AI (currently JSON string, acceptable for now)
+        chart_data: chartData?.natalChart, // Store Natal chart
+        prompt_context: chartContext,      // AI uses the flow chart
       });
 
       if (res.ok) {
@@ -408,6 +482,51 @@ export default function ZiweiPage() {
     };
   }, [chartData, birthData]);
 
+  // Context Label for AI Question
+  const contextLabel = useMemo(() => {
+    if (viewMode === 'natal') return '本命（一生運勢）';
+    const d = new Date(queryDate);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    if (viewMode === 'yearly') return `流年運勢（${y}年）`;
+    if (viewMode === 'monthly') return `流月運勢（${y}年${m}月）`;
+    if (viewMode === 'daily') return `流日運勢（${y}年${m}月${day}日）`;
+    return '本命';
+  }, [viewMode, queryDate]);
+
+  // Generate True Solar Time formatted string
+  const trueSolarTimeString = useMemo(() => {
+      if (!chartData?.natalChart) return '';
+      const tst = (chartData.natalChart as any).trueSolarTimeObj as Date;
+      if (!tst) return '';
+      
+      try {
+          const lunar = Lunar.fromDate(tst);
+          // Format: 農曆:XXXX/XX/XX XX:XX分 X時(時辰)
+          // lunar.getYearInChinese() returns e.g. "二零二五"
+          // We want simple format maybe? Or traditional. User example: "農曆:XXXX/XX/XX XX:XX分 X時(時辰)"
+          // Let's use numeric year for clarity or Chinese if requested.
+          // User Example: "農曆:XXXX/XX/XX XX:XX分 X時(時辰)"
+          
+          const y = lunar.getYear();
+          const m = lunar.getMonth();
+          const d = lunar.getDay();
+          
+          // Get Time
+          const h = tst.getHours();
+          const min = tst.getMinutes();
+          
+          const timeIndex = getChineseTimeIndex(h);
+          const timeChar = getChineseHourName(timeIndex);
+          
+          return `農曆:${y}/${m.toString().padStart(2,'0')}/${d.toString().padStart(2,'0')} ${h.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}分 ${timeChar}時(${timeChar})`;
+      } catch (e) {
+          return '';
+      }
+  }, [chartData]);
+
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar pageTitle="紫微斗數" showBackButton backHref="/" />
@@ -450,8 +569,9 @@ export default function ZiweiPage() {
 
             {savedBirthDataList.length > 0 && (
               <div className="mb-6">
-                <label className="block text-sm text-foreground-secondary mb-2">選擇已儲存的生辰八字</label>
+                <label htmlFor="saved-birth-data" className="block text-sm text-foreground-secondary mb-2">選擇已儲存的生辰八字</label>
                 <Select
+                  id="saved-birth-data"
                   value={selectedBirthDataId?.toString() || ''}
                   onChange={(e) => {
                     const id = parseInt(e.target.value);
@@ -489,7 +609,7 @@ export default function ZiweiPage() {
               />
 
               <div>
-                <label className="block text-sm text-foreground-secondary mb-2">性別</label>
+                <span className="block text-sm text-foreground-secondary mb-2">性別</span>
                 <div className="flex gap-4">
                   <Button
                     type="button"
@@ -519,11 +639,12 @@ export default function ZiweiPage() {
               />
 
               <div>
-                <label className="block text-sm text-foreground-secondary mb-2">
+                <label htmlFor="birth-location" className="block text-sm text-foreground-secondary mb-2">
                   <MapPin size={14} className="inline mr-1" />
                   出生地（用於真太陽時校正）
                 </label>
                 <Select
+                  id="birth-location"
                   value={birthData.birth_location}
                   onChange={(e) => setBirthData({ ...birthData, birth_location: e.target.value })}
                   options={TAIWAN_CITIES.map(city => ({ value: city, label: city }))}
@@ -606,42 +727,169 @@ export default function ZiweiPage() {
       )}
 
       {/* ===== Chart Phase ===== */}
-      {step === 'chart' && chartData && (
+      {step === 'chart' && chartData && displayChart && (
         <main className="w-full max-w-6xl mx-auto px-4 py-6 space-y-6">
-          {birthInfo && (
-            <Card variant="glass" className="p-4">
-              <div className="flex flex-wrap gap-4 text-sm">
-                <div><span className="text-foreground-secondary">姓名：</span><span className="text-accent font-bold">{birthInfo.name}</span></div>
-                <div><span className="text-foreground-secondary">性別：</span><span>{birthInfo.gender === 'male' ? '男' : '女'}</span></div>
-                <div><span className="text-foreground-secondary">出生時間：</span><span>{birthInfo.birthDate}</span></div>
-                <div><span className="text-foreground-secondary">出生地：</span><span>{birthInfo.location}</span></div>
-                {birthInfo.isTwin && (
-                  <div className="text-amber-400">
-                    <span>雙胞胎 ({birthInfo.twinOrder === 'elder' ? '老大' : '老二'})</span>
-                    {birthInfo.twinOrder === 'younger' && <span className="ml-2 text-xs">已套用對宮法</span>}
+          {/* Top Control Bar for View Mode */}
+          <Card variant="glass" className="p-4 flex flex-col md:flex-row gap-4 items-center justify-between sticky top-[60px] z-30 shadow-md">
+             <div className="flex gap-4 items-center flex-wrap justify-center w-full md:justify-start">
+               {/* View Mode Tabs */}
+               <div className="flex bg-background-card rounded-lg p-1">
+                 {(['natal', 'yearly', 'monthly', 'daily'] as QueryType[]).map((mode) => (
+                   <button
+                     key={mode}
+                     type="button"
+                     onClick={() => setViewMode(mode)}
+                     className={`
+                       px-4 py-2 rounded-md text-sm font-bold transition-all
+                       ${viewMode === mode 
+                         ? 'bg-accent text-white shadow-sm' 
+                         : 'text-foreground-secondary hover:text-foreground-primary hover:bg-white/10'}
+                     `}
+                   >
+                     {mode === 'natal' && '本命'}
+                     {mode === 'yearly' && '流年'}
+                     {mode === 'monthly' && '流月'}
+                     {mode === 'daily' && '流日'}
+                   </button>
+                 ))}
+               </div>
+
+               {/* Date Type Selector */}
+               {viewMode !== 'natal' && (
+                  <div className="flex bg-background-card rounded-lg p-1 text-xs">
+                      <button
+                        onClick={() => setDateType('solar')}
+                        className={`px-2 py-1.5 rounded ${dateType === 'solar' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                      >
+                        陽曆
+                      </button>
+                      <button
+                        onClick={() => setDateType('lunar')}
+                        className={`px-2 py-1.5 rounded ${dateType === 'lunar' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                      >
+                        農曆
+                      </button>
                   </div>
-                )}
-              </div>
-            </Card>
-          )}
+               )}
+
+               {/* Date Picker */}
+               <div className="flex gap-2 items-center">
+                  {viewMode === 'yearly' && (
+                    dateType === 'solar' ? (
+                        <Select
+                        value={queryDate.slice(0, 4)}
+                        onChange={(e) => setQueryDate(`${e.target.value}-01-01`)}
+                        options={Array.from({ length: 100 }, (_, i) => {
+                            const year = new Date().getFullYear() - 50 + i;
+                            return { value: year.toString(), label: `${year} 年` };
+                        })}
+                        className="w-32 py-1.5 text-sm"
+                        />
+                    ) : (
+                        <Select
+                            value={currentLunarDate.getYear().toString()}
+                            onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
+                            options={Array.from({ length: 100 }, (_, i) => {
+                                const year = new Date().getFullYear() - 50 + i;
+                                return { value: year.toString(), label: `農曆 ${year} 年` };
+                            })}
+                            className="w-32 py-1.5 text-sm"
+                        />
+                    )
+                  )}
+                  {viewMode === 'monthly' && (
+                     dateType === 'solar' ? (
+                        <input
+                        type="month"
+                        value={queryDate.slice(0, 7)}
+                        onChange={(e) => setQueryDate(e.target.value + '-01')}
+                        className="px-3 py-1.5 rounded-lg bg-background-card border border-border text-foreground-primary text-sm"
+                        />
+                     ) : (
+                         <div className="flex gap-1">
+                             <Select
+                                value={currentLunarDate.getYear().toString()}
+                                onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
+                                options={Array.from({ length: 50 }, (_, i) => {
+                                    const year = new Date().getFullYear() - 25 + i;
+                                    return { value: year.toString(), label: `${year}年` };
+                                })}
+                                className="w-24 py-1.5 text-sm"
+                             />
+                             <Select
+                                value={currentLunarDate.getMonth().toString()}
+                                onChange={(e) => handleLunarChange('month', parseInt(e.target.value))}
+                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
+                                className="w-20 py-1.5 text-sm"
+                             />
+                         </div>
+                     )
+                  )}
+                  {viewMode === 'daily' && (
+                     dateType === 'solar' ? (
+                        <input
+                        type="date"
+                        value={queryDate.slice(0, 10)}
+                        onChange={(e) => setQueryDate(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg bg-background-card border border-border text-foreground-primary text-sm"
+                        />
+                     ) : (
+                        <div className="flex gap-1">
+                             <Select
+                                value={currentLunarDate.getYear().toString()}
+                                onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
+                                options={Array.from({ length: 50 }, (_, i) => {
+                                    const year = new Date().getFullYear() - 25 + i;
+                                    return { value: year.toString(), label: `${year}年` };
+                                })}
+                                className="w-24 py-1.5 text-sm"
+                             />
+                             <Select
+                                value={currentLunarDate.getMonth().toString()}
+                                onChange={(e) => handleLunarChange('month', parseInt(e.target.value))}
+                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
+                                className="w-20 py-1.5 text-sm"
+                             />
+                             <Select
+                                value={currentLunarDate.getDay().toString()}
+                                onChange={(e) => handleLunarChange('day', parseInt(e.target.value))}
+                                options={Array.from({ length: 30 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}日` }))}
+                                className="w-20 py-1.5 text-sm"
+                             />
+                        </div>
+                     )
+                  )}
+               </div>
+
+               {/* Lunar/Solar Info Display */}
+               <div className="text-xs text-foreground-muted flex flex-col md:flex-row gap-2 md:gap-4 md:ml-auto items-center">
+                  {displayChart && (
+                    <>
+                      <span>
+                        <span className="opacity-70">真太陽時：</span>
+                        {trueSolarTimeString}
+                      </span>
+                    </>
+                  )}
+               </div>
+             </div>
+          </Card>
 
           <ZiweiChart
-            palaces={chartData.natalChart.palaces}
-            soulPalaceBranch={chartData.natalChart.palaces.find((p: any) => p.isSoulPalace)?.earthlyBranch || ''}
-            bodyPalaceBranch={chartData.natalChart.palaces.find((p: any) => p.isBodyPalace)?.earthlyBranch || ''}
+            chart={displayChart}
+            viewMode={viewMode}
             centerInfo={{
               name: birthData.name,
               gender: birthData.gender,
-              fiveElements: chartData.natalChart.fiveElementsClass,
+              fiveElements: displayChart.fiveElementsClass,
               birthDate: birthData.birth_date.replace('T', ' '),
-              solarDate: chartData.natalChart.solarDate,
-              lunarDate: chartData.natalChart.lunarDate.toString(),
+              solarDate: displayChart.solarDate,
+              lunarDate: displayChart.lunarDate.toString(),
+              bazi: formatBazi(displayChart.chineseDate),
               lunarInfo: {
-                heavenly_stem_earthly_branch_year: chartData.natalChart.lunarDate.heavenlyStemEarthlyBranchYear,
-                heavenly_stem_earthly_branch_month: chartData.natalChart.lunarDate.heavenlyStemEarthlyBranchMonth,
-                heavenly_stem_earthly_branch_day: chartData.natalChart.lunarDate.heavenlyStemEarthlyBranchDay,
-                description: chartData.natalChart.lunarDate.toString(),
+                description: `${displayChart.lunarDate.toString()} ${displayChart.timeChar || (chartData.natalChart as any).timeChar || ''}時`,
               },
+              correctionNote: (chartData.natalChart as any).correctionNote,
             }}
           />
 
@@ -655,66 +903,21 @@ export default function ZiweiPage() {
             />
 
             <div className="space-y-4 mt-6">
-              <Select
-                label="問卦類型"
-                value={queryType}
-                onChange={(e) => setQueryType(e.target.value as QueryType)}
-                options={[
-                  { value: 'natal', label: '本命（一生格局）' },
-                  { value: 'yearly', label: '流年（指定年份運勢）' },
-                  { value: 'monthly', label: '流月（指定月份運勢）' },
-                  { value: 'daily', label: '流日（指定日期運勢）' },
-                ]}
-              />
-
-              {queryType === 'yearly' && (
-                <div>
-                  <label className="block text-sm text-foreground-secondary mb-2">選擇年份</label>
-                  <Select
-                    value={queryDate}
-                    onChange={(e) => setQueryDate(e.target.value)}
-                    options={Array.from({ length: 100 }, (_, i) => {
-                      const year = new Date().getFullYear() - 50 + i;
-                      return { value: `${year}-01-01`, label: `${year} 年` };
-                    })}
-                  />
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                    <label htmlFor="question-input" className="block text-sm text-foreground-secondary mb-2">請輸入您的問題</label>
+                    <textarea
+                      id="question-input"
+                      value={question}
+                      onChange={(e) => setQuestion(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent h-24 resize-none"
+                      placeholder={`請針對「${contextLabel}」提問...`}
+                      maxLength={500}
+                    />
+                    <div className="absolute top-9 right-3 text-xs bg-accent/20 text-accent px-2 py-1 rounded">
+                      {contextLabel}
+                    </div>
                 </div>
-              )}
-
-              {queryType === 'monthly' && (
-                <div>
-                  <label className="block text-sm text-foreground-secondary mb-2">選擇月份</label>
-                  <input
-                    type="month"
-                    value={queryDate.slice(0, 7)}
-                    onChange={(e) => setQueryDate(e.target.value + '-01')}
-                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  />
-                </div>
-              )}
-
-              {queryType === 'daily' && (
-                <div>
-                  <label className="block text-sm text-foreground-secondary mb-2">選擇日期</label>
-                  <input
-                    type="date"
-                    value={queryDate.slice(0, 10)}
-                    onChange={(e) => setQueryDate(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm text-foreground-secondary mb-2">請輸入您的問題</label>
-                <textarea
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent h-24 resize-none"
-                  placeholder="例如：我的事業運勢如何？財運如何？"
-                  maxLength={500}
-                />
-                <p className="text-right text-xs text-foreground-muted mt-1">{question.length}/500</p>
               </div>
 
               {error && (
@@ -730,6 +933,7 @@ export default function ZiweiPage() {
                 <Button
                   onClick={handleSubmitQuery}
                   disabled={isProcessing || !question.trim() || !activeAI}
+                  className="flex-1"
                 >
                   {isProcessing ? (
                     <>
