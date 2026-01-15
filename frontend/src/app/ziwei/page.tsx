@@ -355,7 +355,10 @@ export default function ZiweiPage() {
         is_twin: birthData.is_twin,
         twin_order: birthData.is_twin ? birthData.twin_order : null,
         query_type: viewMode, // Use current view mode
-        query_date: viewMode !== 'natal' ? new Date(queryDate).toISOString() : null,
+        // Fix: Use Noon time to avoid date shifting due to timezone conversion
+        // Appending 'T12:00:00' makes it Local Noon. toISOString() converts to UTC.
+        // Noon is safe for all timezones (UTC-12 to UTC+12) to stay on the same day.
+        query_date: viewMode !== 'natal' ? new Date(`${queryDate}T12:00:00`).toISOString() : null,
         question,
         chart_data: chartData?.natalChart, // Store Natal chart
         prompt_context: chartContext,      // AI uses the flow chart
@@ -1083,6 +1086,39 @@ export default function ZiweiPage() {
               </div>
             ) : interpretation ? (
               <div className="space-y-4">
+                {/* 顯示完整命盤（可折疊） */}
+                {chartData && displayChart && (
+                  <details className="bg-foreground-muted/5 rounded-lg border border-border">
+                    <summary className="px-4 py-3 cursor-pointer text-foreground-muted hover:text-accent flex items-center gap-2">
+                      <span className="text-lg">☯</span>
+                      <span>完整卦象盤面（點擊展開）</span>
+                    </summary>
+                    <div className="px-4 pb-4 border-t border-border pt-3">
+                      <div className="overflow-x-auto">
+                        <div className="min-w-[350px] transform scale-[0.8] origin-top-left md:scale-100 md:origin-top">
+                          <ZiweiChart
+                            chart={displayChart}
+                            viewMode={viewMode}
+                            centerInfo={{
+                              name: birthData.name,
+                              gender: birthData.gender,
+                              fiveElements: displayChart.fiveElementsClass,
+                              birthDate: birthData.birth_date.replace('T', ' '),
+                              solarDate: displayChart.solarDate,
+                              lunarDate: displayChart.lunarDate.toString(),
+                              bazi: formatBazi(chartData.natalChart.chineseDate),
+                              lunarInfo: {
+                                description: `${displayChart.lunarDate.toString()} ${displayChart.timeChar || (chartData.natalChart as any).timeChar || ''}時`,
+                              },
+                              correctionNote: (chartData.natalChart as any).correctionNote,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+                )}
+
                 <MarkdownRenderer content={interpretation} />
               </div>
             ) : (

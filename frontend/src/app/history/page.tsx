@@ -27,6 +27,7 @@ import {
   Check,
   Search,
 } from 'lucide-react';
+import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
 
 interface HistoryItem {
   id: number;
@@ -40,6 +41,18 @@ interface HistoryItem {
     formatted?: string;
     spread?: string;
     spread_name?: string;
+    // Ziwei fields
+    palaces?: any[];
+    astrolabe?: any; // sometimes iztro might wrap it?
+    solarDate?: string;
+    lunarDate?: string;
+    chineseDate?: string;
+    time?: string;
+    fiveElementsClass?: string;
+    zodiac?: string;
+    timeChar?: string;
+    correctionNote?: string;
+    
     cards?: Array<{
       id: number;
       name: string;
@@ -784,13 +797,33 @@ export default function HistoryPage() {
                         {item.question}
                       </p>
 
-                      {expandedId === item.id && (item.target || item.gender || (item.divination_type === 'tarot' && item.chart_data.spread_name)) && (
+                      {expandedId === item.id && (item.target || item.gender || (item.divination_type === 'tarot' && item.chart_data.spread_name) || item.divination_type === 'ziwei') && (
                         <div className="flex flex-wrap gap-3 mt-2 text-sm text-foreground-muted">
                           {/* 塔羅牌顯示牌陣類型 */}
                           {item.divination_type === 'tarot' && item.chart_data.spread_name && (
                             <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
                               牌陣：<span className="text-foreground-secondary">{item.chart_data.spread_name}</span>
                             </span>
+                          )}
+                          {/* 紫微斗數顯示測算類型與日期 */}
+                          {item.divination_type === 'ziwei' && (
+                            <>
+                              <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
+                                類型：<span className="text-foreground-secondary">
+                                  {item.chart_data.query_type === 'natal' ? '本命' :
+                                   item.chart_data.query_type === 'yearly' ? '流年' :
+                                   item.chart_data.query_type === 'monthly' ? '流月' :
+                                   item.chart_data.query_type === 'daily' ? '流日' : '本命'}
+                                </span>
+                              </span>
+                              {item.chart_data.query_type && item.chart_data.query_type !== 'natal' && item.chart_data.query_date && (
+                                <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
+                                  日期：<span className="text-foreground-secondary">
+                                    {new Date(item.chart_data.query_date as string).toLocaleDateString('zh-TW')}
+                                  </span>
+                                </span>
+                              )}
+                            </>
                           )}
                           {/* 六爻等其他占卜顯示對象和性別 */}
                           {item.target && (
@@ -800,7 +833,7 @@ export default function HistoryPage() {
                           )}
                           {item.gender && (
                             <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
-                              性別：<span className="text-foreground-secondary">{item.gender}</span>
+                              性別：<span className="text-foreground-secondary">{item.gender === 'male' || item.gender === '男' ? '男' : '女'}</span>
                             </span>
                           )}
                         </div>
@@ -928,10 +961,41 @@ export default function HistoryPage() {
                                   } else if (item.divination_type === 'liuyao') {
                                     // 六爻：顯示 formatted
                                     return <div className="whitespace-pre-wrap">{data.formatted || JSON.stringify(data, null, 2)}</div>;
+                                  } else if (item.divination_type === 'ziwei') {
+                                    // 紫微斗數：顯示命盤
+                                    // 建構 centerInfo
+                                    const centerInfo = {
+                                      name: data.name || item.username || '用戶', // 優先使用 chart_data 中的測算者姓名
+                                      gender: item.gender === '男' ? 'male' : 'female',
+                                      fiveElements: data.fiveElementsClass || '',
+                                      birthDate: data.solarDate || '',
+                                      solarDate: data.solarDate || '',
+                                      lunarDate: data.lunarDate || '',
+                                      bazi: data.chineseDate || '',
+                                      lunarInfo: {
+                                        description: data.lunarDate || ''
+                                      },
+                                      correctionNote: data.correctionNote
+                                    };
+                                    
+                                    // 判斷 viewMode
+                                    const viewMode = (data.query_type as 'natal' | 'yearly' | 'monthly' | 'daily') || 'natal';
+                                    
+                                    return (
+                                      <div className="overflow-x-auto">
+                                        <div className="min-w-[350px] transform scale-[0.8] origin-top-left md:scale-100 md:origin-top">
+                                          <ZiweiChart 
+                                            chart={data} 
+                                            centerInfo={centerInfo as any} 
+                                            viewMode={viewMode} 
+                                          />
+                                        </div>
+                                      </div>
+                                    );
                                   }
                                   return <div className="whitespace-pre-wrap">{JSON.stringify(data, null, 2)}</div>;
                                 } catch (e) {
-                                  return <div className="text-red-400">解析失敗</div>;
+                                  return <div className="text-red-400">解析失敗: {(e as Error).message}</div>;
                                 }
                               })()}
                             </div>
