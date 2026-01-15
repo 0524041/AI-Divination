@@ -17,17 +17,22 @@ export function useOnlineCount() {
       // 否則嘗試連接 /ws/online (假設有 Nginx 轉發或同源)
       
       let wsUrl = '';
+      // 使用 /api/ws/online 路徑，以便 Next.js rewrite 可以嘗試代理
+      // 或者如果 Cloudflare Ingress 設定了 /api/* -> localhost:8000 也能生效
+      
       if (window.location.port === '3000') {
-        wsUrl = `${protocol}//${host}:8000/ws/online`;
+        // 開發環境：直接連後端 (因為 Next.js rewrite 對 WS 支援不穩定，開發時分開連較穩)
+        wsUrl = `${protocol}//${host}:8000/api/ws/online`;
       } else {
-        // 生產環境嘗試連線到相對路徑 (依賴 Nginx /ws 轉發) 
-        // 或是如果沒有 Nginx，這裡可能需要配置環境變數
-        // 暫時假設生產環境同源或透過 Nginx 轉發 /ws
-        wsUrl = `${protocol}//${window.location.host}/ws/online`;
+        // 生產環境 (Cloudflare Tunnel)：
+        // 嘗試透過同源路徑 /api/ws/online 連接
+        // 這樣請求會發送到 Next.js (3000) -> Rewrite 規則 -> Backend (8000)
+        // 或是 Cloudflare Ingress 直接將 /api/* 導向 Backend
+        wsUrl = `${protocol}//${window.location.host}/api/ws/online`;
         
-        // 如果是直接用 port 8000 訪問後端 API 測試
+        // 特殊情況：如果是在 localhost:8000 直接開
         if (window.location.port === '8000') {
-             wsUrl = `${protocol}//${host}:8000/ws/online`;
+             wsUrl = `${protocol}//${host}:8000/api/ws/online`;
         }
       }
 

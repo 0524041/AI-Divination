@@ -4,7 +4,7 @@ from app.services.websocket import manager
 router = APIRouter(tags=["WebSocket"])
 
 
-@router.websocket("/ws/online")
+@router.websocket("/api/ws/online")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
