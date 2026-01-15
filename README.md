@@ -238,8 +238,7 @@ AI-Divination/
 
 ## 🚀 規劃中功能
 - [ ] 更多塔羅牌陣類型
-- [ ] 八字命盤 (Coming Soon)
-- [ ] 流年運勢整合報表
+- [ ] 姓名學分析 (Coming Soon)
 - [ ] Docker 部署支援
 
 ## 🔗 相關文檔
