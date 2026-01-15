@@ -16,6 +16,7 @@ from app.api import (
     share_router,
 )
 from app.api.ziwei import router as ziwei_router
+from app.api.websocket import router as websocket_router
 from app.api.birth_data import router as birth_data_router
 from app.api.debug import router as debug_router
 from app.middleware.performance import PerformanceMiddleware
@@ -87,6 +88,7 @@ app.include_router(auth_router)
 app.include_router(settings_router)
 app.include_router(liuyao_router)
 app.include_router(ziwei_router)
+app.include_router(websocket_router)
 app.include_router(birth_data_router)
 app.include_router(history_router)
 app.include_router(admin_router)
