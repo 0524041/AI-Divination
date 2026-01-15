@@ -562,9 +562,8 @@ install_frontend_deps() {
     cd "$FRONTEND_DIR"
     
     if [ -f "package.json" ]; then
-        if [ ! -d "node_modules" ]; then
-            npm install --silent
-        fi
+        echo "檢查並更新前端依賴..."
+        npm install --silent
         echo -e "${GREEN}✓ 前端依賴已安裝${NC}"
     else
         echo -e "${RED}✗ package.json 不存在${NC}"
