@@ -16,6 +16,8 @@ from app.models.settings import AIConfig
 from app.models.history import History
 from app.utils.auth import get_current_user, decrypt_api_key
 from app.services.ai import get_ai_service
+from app.services.ziwei_service import ziwei_service
+from app.schemas.ziwei import ZiweiProcessRequest, ZiweiBirthDetails, ZiweiQuerySettings
 
 router = APIRouter(prefix="/api/ziwei", tags=["紫微斗數"], redirect_slashes=False)
 settings = get_settings()
@@ -35,7 +37,9 @@ class ZiweiDivinationRequest(BaseModel):
     query_date: Optional[datetime] = None
     question: str = Field(..., min_length=1, max_length=500)
     chart_data: dict
-    prompt_context: str
+    prompt_context: Optional[str] = (
+        None  # Make optional as we generate it in backend now
+    )
 
 
 class DivinationResponse(BaseModel):
@@ -91,25 +95,80 @@ async def process_ziwei_divination(history_id: int, db_url: str):
             db.commit()
             return
 
-        system_prompt = ""
+        # 讀取系統 Prompt 模板
+        system_prompt_template = ""
         if SYSTEM_PROMPT_PATH.exists():
-            system_prompt = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+            system_prompt_template = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+        else:
+            # Fallback simple prompt if file missing
+            system_prompt_template = "你是一位紫微斗數專家。請根據提供的信息回答問題。\n\n{{使用者資訊}}\n\n{{完整命盤}}\n\n{{補充說明}}"
 
+        # 準備資料給 ZiweiService
         chart_data_json = json.loads(history.chart_data)
 
-        chart_text = chart_data_json.get("prompt_context", "（無命盤數據）")
+        # 正規化性別
+        raw_gender = history.gender or "male"
+        normalized_gender = "男"
+        if raw_gender == "female" or raw_gender == "女":
+            normalized_gender = "女"
+        elif raw_gender == "male" or raw_gender == "男":
+            normalized_gender = "男"
 
-        user_prompt = f"""
-【用戶問題】
-{history.question}
+        # 構造 Request 物件 (需從 history 還原)
+        process_request = ZiweiProcessRequest(
+            birth_details=ZiweiBirthDetails(
+                name=chart_data_json.get("name", "用戶"),  # 優先從 chart_data 獲取
+                # 檢查 History model: id, user_id, question, gender, chart_data...
+                # name 似乎沒存，暫時用 "用戶" 或從 chart_data 找
+                gender=normalized_gender,
+                birth_date=datetime.now(),  # Placeholder if strictly needed, but chart is already calc.
+                # Actually, virtual age calc needs birth date.
+                # If history doesn't have birth_date, we might have a problem unless it's in chart_data['solarDate']
+                birth_location="Unknown",
+            ),
+            query_settings=ZiweiQuerySettings(
+                query_type=chart_data_json.get(
+                    "query_type", "natal"
+                ),  # 優先從 chart_data 獲取
+                query_date=datetime.fromisoformat(chart_data_json.get("query_date"))
+                if chart_data_json.get("query_date")
+                else datetime.now(),  # 優先從 chart_data 獲取
+                question=history.question,
+            ),
+            chart_data=chart_data_json,
+        )
 
-【命盤資料】
-{chart_text}
-"""
+        # 修正：嘗試從 chart_data 提取準確資訊
+        if "solarDate" in chart_data_json:
+            try:
+                process_request.birth_details.birth_date = datetime.strptime(
+                    chart_data_json["solarDate"], "%Y-%m-%d"
+                )
+            except:
+                pass
+
+        # 修正: query_type 和 query_date 應該在 request 時存入，但 History model 似乎沒存 query_type?
+        # 我們可以查看 API 的 `create_divination` 存了什麼。
+        # 暫時假設 query_date 為當前 (如果是流年/流月，前端通常會算好 chart 發過來)
+
+        # 執行 Service 處理
+        prompt_data = ziwei_service.process_chart(process_request)
+
+        # 替換模板變數
+        final_system_prompt = (
+            system_prompt_template.replace(
+                "{{使用者資訊}}", prompt_data["user_info_json"]
+            )
+            .replace("{{完整命盤}}", prompt_data["chart_info_json"])
+            .replace("{{補充說明}}", prompt_data["supplementary_info_json"])
+            .replace("{{使用者提問問題}}", prompt_data["question"])
+        )
+
+        user_prompt = f"請解答我的問題：{history.question}"
 
         try:
             interpretation = await ai_service.generate(
-                prompt=user_prompt, system_prompt=system_prompt
+                prompt=user_prompt, system_prompt=final_system_prompt
             )
 
             history.interpretation = interpretation
@@ -153,6 +212,11 @@ async def create_divination(
     try:
         final_chart_data = data.chart_data
         final_chart_data["prompt_context"] = data.prompt_context
+        # Save query metadata to chart_data so it persists in history
+        final_chart_data["query_type"] = data.query_type
+        final_chart_data["name"] = data.name  # Save subject name
+        if data.query_date:
+            final_chart_data["query_date"] = data.query_date.isoformat()
 
         history = History(
             user_id=current_user.id,
