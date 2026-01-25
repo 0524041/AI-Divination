@@ -43,8 +43,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyTheme(mediaQuery.matches);
       
       const handler = (e: MediaQueryListEvent) => applyTheme(e.matches);
-      mediaQuery.addEventListener('change', handler);
-      return () => mediaQuery.removeEventListener('change', handler);
+      // 兼容 Safari 14 以下版本
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handler);
+      } else {
+        // Safari 13 及以下使用 addListener
+        mediaQuery.addListener(handler);
+      }
+      return () => {
+        if (mediaQuery.removeEventListener) {
+          mediaQuery.removeEventListener('change', handler);
+        } else {
+          mediaQuery.removeListener(handler);
+        }
+      };
     } else {
       applyTheme(theme === 'dark');
       localStorage.setItem('theme', theme);

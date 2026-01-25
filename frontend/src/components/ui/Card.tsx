@@ -23,7 +23,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
                 className={cn(
                     'rounded-xl transition-all duration-300',
                     (effectiveVariant === 'default') && 'bg-background-card border border-border',
-                    (effectiveVariant === 'glass') && 'bg-background-card/80 backdrop-blur-md border border-border-accent',
+                    (effectiveVariant === 'glass') && 'bg-background-card backdrop-blur-md border border-border-accent',
                     (effectiveVariant === 'outline') && 'bg-transparent border border-border',
                     
                     isGolden && 'border-accent/50 shadow-[0_0_20px_rgba(212,175,55,0.1)]',

@@ -88,6 +88,7 @@ body {
 /* Glass Effect */
 .glass-card {
   background: var(--bg-card);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border: 1px solid var(--border-accent);
   border-radius: 1rem;
@@ -97,6 +98,19 @@ body {
 
 .dark .glass-card {
   background: var(--bg-card); /* Uses the rgba value in dark mode */
+}
+
+/* 為不支援 backdrop-filter 的瀏覽器提供 fallback */
+@supports not (backdrop-filter: blur(10px)) {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.95); /* 淺色模式 fallback */
+  }
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  .dark .glass-card {
+    background: rgba(22, 33, 62, 0.95); /* 深色模式 fallback */
+  }
 }
 
 /* Gold Button */
