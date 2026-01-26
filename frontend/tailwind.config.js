@@ -47,12 +47,10 @@ module.exports = {
         },
       },
       fontFamily: {
-        serif: ['Cinzel', 'Playfair Display', 'Noto Serif TC', 'serif'],
-        sans: ['Outfit', 'Inter', 'sans-serif'],
-        heading: ['Cinzel', 'serif'],
-        body: ['Outfit', 'sans-serif'],
-        // Legacy support
-        chinese: ['Noto Serif TC', 'serif'],
+        serif: ['var(--font-serif)', 'Noto Serif TC', 'serif'],
+        sans: ['var(--font-noto-sans)', 'var(--font-inter)', 'sans-serif'],
+        heading: ['var(--font-serif)', 'serif'],
+        body: ['var(--font-noto-sans)', 'sans-serif'],
       },
       animation: {
         'spin-slow': 'spin 3s linear infinite',

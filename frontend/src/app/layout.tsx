@@ -2,16 +2,25 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import BackgroundCanvas from '@/components/ui/BackgroundCanvas';
+import dynamic from 'next/dynamic';
+import { Inter, Noto_Sans_TC, Noto_Serif_TC } from 'next/font/google';
 
-import { Zen_Maru_Gothic, Noto_Serif_TC } from 'next/font/google';
+const BackgroundCanvas = dynamic(() => import('@/components/ui/BackgroundCanvas'), {
+  ssr: false,
+});
 
 // Load fonts
-const zenMaruGothic = Zen_Maru_Gothic({
-  weight: ['300', '400', '500', '700', '900'],
+const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-zen',
+  variable: '--font-inter',
+});
+
+const notoSansTC = Noto_Sans_TC({
+  weight: ['300', '400', '500', '700'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-noto-sans',
 });
 
 const notoSerifTC = Noto_Serif_TC({
@@ -30,7 +39,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW" suppressHydrationWarning>
-      <body className={`${zenMaruGothic.className} antialiased bg-background-primary text-foreground-primary transition-colors duration-300 relative min-h-screen`}>
+      <body className={`${inter.variable} ${notoSansTC.variable} ${notoSerifTC.variable} font-sans antialiased bg-background-primary text-foreground-primary transition-colors duration-300 relative min-h-screen`}>
         <ThemeProvider>
           <AuthProvider>
             <BackgroundCanvas />

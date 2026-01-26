@@ -54,14 +54,14 @@ export function NavbarClient({ items }: NavbarClientProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 group relative',
+                  'flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 group relative text-base md:text-lg',
                   active
                     ? 'text-accent font-bold'
                     : 'text-foreground-secondary hover:text-foreground-primary'
                 )}
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  <Icon size={18} strokeWidth={active ? 2.5 : 2} className={cn("transition-transform group-hover:scale-110", active ? "text-accent" : "text-foreground-muted group-hover:text-accent")} />
+                  <Icon size={20} strokeWidth={active ? 2.5 : 2} className={cn("transition-transform group-hover:scale-110", active ? "text-accent" : "text-foreground-muted group-hover:text-accent")} />
                   {item.label}
                 </span>
                 {active && (
@@ -168,7 +168,7 @@ export function NavbarClient({ items }: NavbarClientProps) {
                           active ? 'text-accent' : 'text-foreground-muted group-hover:text-foreground-primary'
                         )}
                       />
-                      <span className="font-semibold text-base tracking-wide">{item.label}</span>
+                      <span className="font-semibold text-base md:text-lg tracking-wide">{item.label}</span>
                     </Link>
                   );
                 })}

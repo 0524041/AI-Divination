@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { P5CanvasInstance, ReactP5Wrapper } from '@p5-wrapper/react';
+import { type P5CanvasInstance } from '@p5-wrapper/react';
 import { useTheme } from '@/contexts/ThemeContext';
 
 // Dynamically import ReactP5Wrapper to avoid SSR issues

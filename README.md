@@ -1,4 +1,4 @@
-# ☯ 玄覺空間 (Mystic Mind Space) v1.4.0
+# ☯ 玄覺空間 (Mystic Mind Space) v1.4.1
 
 🌐 **網站上線啦！歡迎大家測試：[https://akspace99.dpdns.org](https://akspace99.dpdns.org)**
 
@@ -179,6 +179,13 @@ AI-Divination/
 4. 在設定頁面新增 Local AI 配置，填入 URL 和模型名稱
 
 ## 📚 版本歷史
+
+### v1.4.1 (2026-01-26) ⚡
+- **效能優化**：
+  - 🚀 **Lazy Load**: 背景動畫 (`BackgroundCanvas`) 改為客戶端延遲載入，顯著提升首次渲染速度 (FCP)。
+- **視覺調整**：
+  - **字體更換**：改用 **Inter** (英數) + **Noto Sans TC** (中文)，打造更俐落專業的 Proportional Sans-Serif 風格。
+  - **閱讀體驗**：加大桌面版 Navbar 與 Markdown 內容的基礎字體大小 (16px -> 18px)，提升大螢幕閱讀舒適度。
 
 ### v1.4.0 (2026-01-26) 🍃
 - 🎨 **Digital Zen 前端重構 (數位禪意)**：

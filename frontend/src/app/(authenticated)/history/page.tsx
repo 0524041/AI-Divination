@@ -794,7 +794,7 @@ export default function HistoryPage() {
                           </Badge>
                         )}
                       </div>
-                      <p className={`text-foreground-primary ${expandedId === item.id ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                      <p className={`text-foreground-primary text-base md:text-lg ${expandedId === item.id ? 'whitespace-pre-wrap' : 'truncate'}`}>
                         {item.question}
                       </p>
 
