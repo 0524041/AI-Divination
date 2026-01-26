@@ -7,7 +7,6 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Navbar } from '@/components/layout/Navbar';
 import { AISelector, AIConfig } from '@/components/features/AISelector';
 import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
@@ -541,7 +540,7 @@ export default function ZiweiPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar pageTitle="紫微斗數" showBackButton backHref="/" />
+      
 
       {/* ===== Intro Phase ===== */}
       {step === 'intro' && (

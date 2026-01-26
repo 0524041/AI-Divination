@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
-import { Navbar } from '@/components/layout/Navbar';
 import { AISelector, AIConfig } from '@/components/features/AISelector';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -503,14 +502,6 @@ export default function TarotPage() {
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,_rgba(21,21,40,1)_0%,_rgba(10,10,10,1)_80%)] opacity-0 dark:opacity-100 transition-opacity duration-500"></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[var(--gold)] opacity-[0.03] blur-[100px] rounded-full"></div>
       </div>
-
-      {/* 使用共用 Navbar */}
-      <Navbar
-        pageTitle="塔羅占卜"
-        pageIcon={<Sparkles className="text-[var(--gold)]" size={24} />}
-        showBackButton
-        backHref="/"
-      />
 
       {/* 主要內容區域 */}
       <main className={`relative z-10 pt-8 px-4 transition-all duration-500 ${step === 'select' ? 'w-full max-w-[1800px] mx-auto' : (step === 'reveal' || step === 'interpreting' || step === 'result' ? 'w-full max-w-[1600px] mx-auto' : 'max-w-4xl mx-auto')}`}>

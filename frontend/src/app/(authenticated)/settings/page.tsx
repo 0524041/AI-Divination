@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Navbar } from '@/components/layout/Navbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -513,14 +512,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* 使用共用 Navbar */}
-      <Navbar
-        pageTitle="設定"
-        pageIcon={<SettingsIcon className="text-accent" size={24} />}
-        showBackButton
-        backHref="/"
-      />
+    <>
 
       {/* 主內容 */}
       <main className="w-full max-w-4xl mx-auto px-4 py-6">
@@ -1051,6 +1043,6 @@ export default function SettingsPage() {
           </div>
         )}
       </main>
-    </div>
+      </>
   );
 }

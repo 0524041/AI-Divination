@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
-import { Navbar } from '@/components/layout/Navbar';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -536,15 +535,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* 使用共用 Navbar */}
-      <Navbar
-        pageTitle="歷史紀錄"
-        pageIcon={<HistoryIcon className="text-accent" size={24} />}
-        showBackButton
-        backHref="/"
-      />
-
+    <>
       {/* 主內容 */}
       <main className="w-full max-w-4xl mx-auto px-4 py-6">
         {/* Admin 用戶篩選器 - 移動到內容區 */}
@@ -1086,6 +1077,6 @@ export default function HistoryPage() {
           </Card>
         )}
       </main>
-    </div>
+      </>
   );
 }

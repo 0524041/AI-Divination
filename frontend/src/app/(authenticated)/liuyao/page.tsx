@@ -7,7 +7,6 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import CoinTossing from '@/components/CoinTossing';
-import { Navbar } from '@/components/layout/Navbar';
 import { AISelector, AIConfig } from '@/components/features/AISelector';
 import { apiGet, apiPost } from '@/lib/api-client';
 import {
@@ -420,14 +419,7 @@ export default function LiuYaoPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* 使用共用 Navbar */}
-      <Navbar
-        pageTitle="六爻占卜"
-        showBackButton
-        backHref="/"
-      />
-
-      {/* Intro Phase */}
+            {/* Intro Phase */}
       {step === 'intro' && (
         <div className="flex flex-col items-center text-center space-y-8 fade-in py-12 px-4 min-h-[500px]">
           <div className="w-48 h-48 relative mb-4 flex items-center justify-center">
