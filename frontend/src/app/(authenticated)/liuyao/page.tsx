@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { LiuyaoChart } from '@/components/liuyao/LiuyaoChart';
 import CoinTossing from '@/components/CoinTossing';
 import { AISelector, AIConfig } from '@/components/features/AISelector';
 import { apiGet, apiPost } from '@/lib/api-client';
@@ -786,33 +787,16 @@ export default function LiuYaoPage() {
                             </details>
                           )}
 
-                          {/* Raw Data Content */}
-                          <details className="bg-background-card/50 rounded-lg border border-border">
-                            <summary className="px-4 py-3 cursor-pointer text-foreground-secondary hover:text-accent flex items-center gap-2">
+                          {/* Visual Chart */}
+                          <div className="bg-background-card/50 rounded-xl border border-border overflow-hidden">
+                            <div className="px-4 py-3 bg-accent/5 border-b border-border flex items-center gap-2">
                               <span className="text-lg">☯</span>
-                              <span>完整卦象盤面（點擊展開）</span>
-                            </summary>
-                            <div className="px-4 pb-4 text-foreground-secondary text-sm whitespace-pre-wrap border-t border-border pt-3 leading-relaxed">
-                              {(() => {
-                                // 只顯示到第三條 ---- 線（卦象結構結束）
-                                const formatted = result.chart_data.formatted || '';
-                                const lines = formatted.split('\n');
-                                const resultLines = [];
-                                let dashCount = 0;
-                                for (const line of lines) {
-                                  if (line.trim().startsWith('----')) {
-                                    dashCount++;
-                                    resultLines.push(line);
-                                    if (dashCount >= 3) break;
-                                    continue;
-                                  }
-                                  if (line.startsWith('【本卦：') || line.startsWith('【變卦：')) break;
-                                  resultLines.push(line);
-                                }
-                                return resultLines.join('\n');
-                              })()}
+                              <span className="font-bold text-foreground-secondary">完整卦象盤面</span>
                             </div>
-                          </details>
+                            <div className="p-4">
+                              <LiuyaoChart formattedText={result.chart_data.formatted || ''} />
+                            </div>
+                          </div>
 
                           {/* 主要內容 */}
                           <div className="markdown-content bg-background-card/30 rounded-xl p-6" dangerouslySetInnerHTML={{ __html: parsedContent.mainHtml }} />

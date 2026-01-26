@@ -27,6 +27,7 @@ import {
   Search,
 } from 'lucide-react';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
+import { LiuyaoChart } from '@/components/liuyao/LiuyaoChart';
 
 interface HistoryItem {
   id: number;
@@ -960,8 +961,14 @@ export default function HistoryPage() {
                                       </div>
                                     );
                                   } else if (item.divination_type === 'liuyao') {
-                                    // 六爻：顯示 formatted
-                                    return <div className="whitespace-pre-wrap">{data.formatted || JSON.stringify(data, null, 2)}</div>;
+                                    // 六爻：顯示 LiuyaoChart
+                                    return (
+                                      <div className="bg-background-card/50 rounded-xl border border-border overflow-hidden mt-2">
+                                        <div className="p-1">
+                                          <LiuyaoChart formattedText={data.formatted || ''} />
+                                        </div>
+                                      </div>
+                                    );
                                   } else if (item.divination_type === 'ziwei') {
                                     // 紫微斗數：顯示命盤
                                     // 建構 centerInfo
