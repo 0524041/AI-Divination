@@ -155,6 +155,55 @@ export default function HistoryPage() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showUserFilter]);
 
+  // 輪詢機制：當有 pending 或 processing 狀態的紀錄時自動刷新
+  useEffect(() => {
+    const hasPendingItems = history.some(
+      item => item.status === 'pending' || item.status === 'processing'
+    );
+
+    if (!hasPendingItems || loading) return;
+
+    const pollInterval = setInterval(async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      // 靜默刷新，不設置 loading 狀態
+      let endpoint = `/api/history?page=${currentPage}&page_size=${pageSize}`;
+      if (historySearchTerm) {
+        endpoint += `&search=${encodeURIComponent(historySearchTerm)}`;
+      }
+      if (user?.role === 'admin') {
+        if (selectedUserId === 0) {
+          endpoint = `/api/history/admin/all?page=${currentPage}&page_size=${pageSize}`;
+          if (historySearchTerm) {
+            endpoint += `&search=${encodeURIComponent(historySearchTerm)}`;
+          }
+        } else if (selectedUserId !== null) {
+          endpoint = `/api/history/admin/all?user_id=${selectedUserId}&page=${currentPage}&page_size=${pageSize}`;
+          if (historySearchTerm) {
+            endpoint += `&search=${encodeURIComponent(historySearchTerm)}`;
+          }
+        }
+      }
+
+      try {
+        const res = await fetch(endpoint, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setHistory(data.items || []);
+          setTotalCount(data.total || 0);
+          setTotalPages(Math.ceil((data.total || 0) / pageSize));
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 3000); // 每 3 秒輪詢一次
+
+    return () => clearInterval(pollInterval);
+  }, [history, loading, currentPage, pageSize, historySearchTerm, user, selectedUserId]);
+
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
