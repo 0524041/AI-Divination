@@ -21,14 +21,14 @@
   --text-secondary: #475569;
   --text-muted: #64748B;
   
-  --accent: #B8962E;
-  --accent-hover: #9A7D26;
-  --accent-light: rgba(184, 150, 46, 0.1);
+  --accent: #D9B045; /* Brighter Gold */
+  --accent-hover: #B89028;
+  --accent-light: rgba(217, 176, 69, 0.15);
   
   --accent-secondary: #7C3AED;
   
   --border: #E2E8F0;
-  --border-accent: rgba(184, 150, 46, 0.3);
+  --border-accent: rgba(217, 176, 69, 0.3);
   
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
@@ -49,9 +49,9 @@
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
   
-  --accent: #D4AF37;
-  --accent-hover: #E5C44A;
-  --accent-light: rgba(212, 175, 55, 0.1);
+  --accent: #EBC556; /* Even brighter/lighter for Dark Mode contrast */
+  --accent-hover: #F0D070;
+  --accent-light: rgba(235, 197, 86, 0.15);
   
   --accent-secondary: #8B5CF6;
   
