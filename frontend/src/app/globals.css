@@ -3,74 +3,78 @@
 @tailwind utilities;
 
 /* Google Fonts - Client side load (fallback to system fonts) */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
-
-/* Font Stack */
-.font-chinese {
-  font-family: 'Noto Serif TC', 'Songti SC', 'STSong', 'SimSun', 'Microsoft YaHei', serif;
-}
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root {
-  /* Light Theme (default) */
-  --bg-primary: #F8F6F3;
+  /* Digital Zen - Light Theme (High Contrast) */
+  --bg-primary: #F2F0E9;
+  /* Warm off-white */
   --bg-secondary: #FFFFFF;
-  --bg-card: #FFFFFF;
-  --bg-card-hover: #F1EDE8;
-  
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
-  
-  --accent: #D9B045; /* Brighter Gold */
-  --accent-hover: #B89028;
-  --accent-light: rgba(217, 176, 69, 0.15);
-  
-  --accent-secondary: #7C3AED;
-  
-  --border: #E2E8F0;
-  --border-accent: rgba(217, 176, 69, 0.3);
-  
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --bg-card: rgba(255, 255, 255, 0.85);
+  /* Increased opacity for clarity */
+  --bg-card-hover: rgba(255, 255, 255, 0.95);
+
+  --text-primary: #1A1A1A;
+  /* Darker charcoal */
+  --text-secondary: #404040;
+  /* Darker grey */
+  --text-muted: #666666;
+  --text-accent: #5F7A64;
+  /* Deeper sage */
+
+  --accent: #7D9480;
+  /* Slightly stronger sage */
+  --accent-hover: #5F7A64;
+  --accent-light: rgba(125, 148, 128, 0.25);
+
+  --accent-secondary: #B8962E;
+  /* Darker Gold */
+
+  --border: rgba(0, 0, 0, 0.12);
+  /* Stronger border */
+  --border-accent: rgba(125, 148, 128, 0.4);
+
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  /* Stronger shadow */
+  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.12);
 
   /* Legacy compatibility */
-  --gold: var(--accent);
-  --gold-dark: var(--accent-hover);
+  --gold: var(--accent-secondary);
+  --gold-dark: #9A7D26;
 }
 
 .dark {
-  /* Dark Theme */
-  --bg-primary: #0A0E27;
-  --bg-secondary: #0F0F23;
-  --bg-card: rgba(22, 33, 62, 0.8);
-  --bg-card-hover: rgba(30, 45, 80, 0.9);
-  
-  --text-primary: #EAEAEA;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-  
-  --accent: #EBC556; /* Even brighter/lighter for Dark Mode contrast */
-  --accent-hover: #F0D070;
-  --accent-light: rgba(235, 197, 86, 0.15);
-  
-  --accent-secondary: #8B5CF6;
-  
-  --border: rgba(212, 175, 55, 0.2);
-  --border-accent: rgba(212, 175, 55, 0.4);
-  
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  /* Digital Zen - Dark Theme */
+  --bg-primary: #0D1117;
+  --bg-secondary: #161B22;
+  --bg-card: rgba(22, 27, 34, 0.7);
+  --bg-card-hover: rgba(30, 36, 46, 0.9);
 
-  /* Legacy compatibility */
+  --text-primary: #F0F6FC;
+  /* Brighter white */
+  --text-secondary: #C9D1D9;
+  /* Lighter grey */
+  --text-muted: #8B949E;
+  --text-accent: #D2A8FF;
+
+  --accent: #D4AF37;
+  --accent-hover: #EBC556;
+  --accent-light: rgba(212, 175, 55, 0.15);
+
+  --accent-secondary: #7C3AED;
+
+  --border: rgba(240, 246, 252, 0.15);
+  --border-accent: rgba(212, 175, 55, 0.4);
+
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.6);
+
   --gold: #d4af37;
   --gold-dark: #b8962e;
 }
 
-/* Prevent white flash during overscroll */
 html {
   background-color: var(--bg-primary);
-  /* Optional: disable overscroll behavior */
-  /* overscroll-behavior: none; */
 }
 
 body {
@@ -78,11 +82,114 @@ body {
   color: var(--text-primary);
   min-height: 100vh;
   min-height: 100dvh;
-  /* Dynamic viewport height for mobile */
-  /* Prevent CLS from font loading by setting consistent line-height and font-size-adjust */
-  line-height: 1.5;
+  line-height: 1.6;
+  /* Increased line-height for readability */
   font-size-adjust: 0.5;
   transition: background-color 0.3s ease, color 0.3s ease;
+  font-weight: 500;
+  /* Bolder base font weight */
+}
+
+/* Enhancing Readability Utility */
+.font-medium {
+  font-weight: 700 !important;
+  /* Bump medium to bold for this rounded font */
+}
+
+.font-semibold {
+  font-weight: 900 !important;
+  /* Bump semibold to extra bold */
+}
+
+/* Animations */
+@keyframes flow-shine {
+  0% {
+    transform: translateX(-100%) skewX(-15deg);
+  }
+
+  100% {
+    transform: translateX(200%) skewX(-15deg);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes backdrop-fade {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes backdrop-fade-out {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-out-right {
+  animation: slide-out-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-backdrop-fade {
+  animation: backdrop-fade 0.3s ease-out forwards;
+}
+
+.animate-backdrop-fade-out {
+  animation: backdrop-fade-out 0.3s ease-out forwards;
 }
 
 /* Glass Effect */
@@ -97,26 +204,30 @@ body {
 }
 
 .dark .glass-card {
-  background: var(--bg-card); /* Uses the rgba value in dark mode */
+  background: var(--bg-card);
+  /* Uses the rgba value in dark mode */
 }
 
 /* 為不支援 backdrop-filter 的瀏覽器提供 fallback */
 @supports not (backdrop-filter: blur(10px)) {
   .glass-card {
-    background: rgba(255, 255, 255, 0.95); /* 淺色模式 fallback */
+    background: rgba(255, 255, 255, 0.95);
+    /* 淺色模式 fallback */
   }
 }
 
 @supports not (backdrop-filter: blur(10px)) {
   .dark .glass-card {
-    background: rgba(22, 33, 62, 0.95); /* 深色模式 fallback */
+    background: rgba(22, 33, 62, 0.95);
+    /* 深色模式 fallback */
   }
 }
 
 /* Gold Button */
 .btn-gold {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-  color: var(--bg-primary); /* Use bg color for text on gold button for contrast */
+  color: var(--bg-primary);
+  /* Use bg color for text on gold button for contrast */
   font-weight: 600;
   padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;
@@ -124,9 +235,10 @@ body {
 }
 
 .dark .btn-gold {
-  color: #1a1a2e; /* Original dark text for gold button in dark mode if needed, but lets stick to variables */
+  color: #1a1a2e;
+  /* Original dark text for gold button in dark mode if needed, but lets stick to variables */
   /* Actually for accessibility, black text on gold is better. Let's use a dark color. */
-  color: #0A0E27; 
+  color: #0A0E27;
 }
 
 .btn-gold:hover {
@@ -577,6 +689,7 @@ select.input-dark {
 
 /* ===== Accessibility: Reduced Motion ===== */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

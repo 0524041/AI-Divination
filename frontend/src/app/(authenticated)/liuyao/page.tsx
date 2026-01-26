@@ -419,32 +419,34 @@ export default function LiuYaoPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-            {/* Intro Phase */}
+      {/* Intro Phase */}
       {step === 'intro' && (
-        <div className="flex flex-col items-center text-center space-y-8 fade-in py-12 px-4 min-h-[500px]">
-          <div className="w-48 h-48 relative mb-4 flex items-center justify-center">
-            <div className="absolute inset-0 bg-background-card/50 rounded-full border-2 border-accent animate-pulse-slow"></div>
-            <div className="text-8xl">☯</div>
+        <div className="flex flex-col items-center text-center space-y-8 animate-in fade-in zoom-in-95 duration-700 py-12 px-4 min-h-[60vh] justify-center">
+          <div className="w-48 h-48 relative mb-6 flex items-center justify-center group cursor-pointer" onClick={() => setStep('divine')}>
+            <div className="absolute inset-0 bg-accent/5 rounded-full border border-accent/20 animate-spin-slow group-hover:bg-accent/10 transition-colors"></div>
+            <div className="absolute inset-4 bg-background-card/80 backdrop-blur-sm rounded-full border border-white/10 dark:border-white/5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-500">
+              <span className="text-8xl select-none group-hover:scale-110 transition-transform duration-300 transform origin-center">☯</span>
+            </div>
           </div>
 
-          <div className="space-y-4 max-w-2xl">
-            <h2 className="text-3xl font-bold text-accent">探尋易經的智慧</h2>
-            <p className="text-foreground-secondary leading-relaxed">
-              六爻占卜源於《易經》，透過三次擲幣的變化，
+          <div className="space-y-6 max-w-2xl">
+            <h2 className="text-4xl font-heading font-medium text-foreground-primary tracking-tight">探尋易經的智慧</h2>
+            <p className="text-foreground-secondary text-lg leading-relaxed font-light">
+              六爻占卜源於《易經》，透過三次擲幣的變化，<br className="hidden sm:block" />
               洞察事物發展的規律與吉凶。
-              結合現代 AI 技術，為您提供深入淺出的解讀。
             </p>
-            <p className="text-foreground-muted text-sm">
-              心誠則靈，請保持內心平靜，專注於您想詢問的問題。
+            <p className="text-accent text-sm font-medium tracking-widest uppercase opacity-80">
+              心誠則靈 • 靜心專注
             </p>
           </div>
 
-          <Button 
-            onClick={() => setStep('divine')} 
+          <Button
+            onClick={() => setStep('divine')}
             variant="gold"
-            className="px-12 py-6 text-lg"
+            size="lg"
+            className="px-12 py-8 text-xl rounded-full shadow-xl shadow-gold/20 hover:shadow-gold/40 hover:scale-105 transition-all duration-300"
           >
-            <Compass size={20} className="mr-2" />
+            <Compass size={24} className="mr-3" />
             開始占卜
           </Button>
         </div>
@@ -562,10 +564,10 @@ export default function LiuYaoPage() {
                     )}
 
                     {/* 提交按鈕 */}
-                    <Button 
-                      type="submit" 
-                      variant="gold" 
-                      fullWidth 
+                    <Button
+                      type="submit"
+                      variant="gold"
+                      fullWidth
                       disabled={loading || !question.trim() || !activeAI}
                       className="flex items-center justify-center gap-2"
                     >
@@ -756,8 +758,8 @@ export default function LiuYaoPage() {
                                 <><Share2 size={16} />分享</>
                               )}
                             </Button>
-                            <Button 
-                              onClick={handleCopy} 
+                            <Button
+                              onClick={handleCopy}
                               variant="ghost"
                               size="sm"
                               className="text-foreground-secondary hover:text-accent hover:bg-background-card gap-2"

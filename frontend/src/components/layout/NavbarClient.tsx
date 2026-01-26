@@ -31,96 +31,119 @@ export function NavbarClient({ items }: NavbarClientProps) {
     logout();
   };
 
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setMenuOpen(false);
+      setIsClosing(false);
+    }, 300); // 300ms matches animation duration
+  };
+
+  const [isClosing, setIsClosing] = useState(false);
+
   return (
     <>
-      <div className="hidden md:flex items-center gap-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
+      <div className="flex items-center gap-4">
+        {/* Desktop Menu */}
+        <div className="hidden md:flex items-center space-x-8">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-300 group relative',
+                  active
+                    ? 'text-accent font-bold'
+                    : 'text-foreground-secondary hover:text-foreground-primary'
+                )}
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  <Icon size={18} strokeWidth={active ? 2.5 : 2} className={cn("transition-transform group-hover:scale-110", active ? "text-accent" : "text-foreground-muted group-hover:text-accent")} />
+                  {item.label}
+                </span>
+                {active && (
+                  <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-accent rounded-full animate-in fade-in zoom-in duration-300" />
+                )}
+              </Link>
+            );
+          })}
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200',
-                active
-                  ? 'text-accent bg-accent-light/50'
-                  : 'text-foreground-secondary hover:text-foreground-primary hover:bg-background-card-hover'
-              )}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-foreground-secondary hover:text-red-500 hover:bg-red-500/10 transition-all duration-300"
+            title="登出"
+          >
+            <LogOut size={18} strokeWidth={2} />
+          </button>
+        </div>
 
-        <div className="w-px h-5 bg-border mx-2" />
-
+        {/* Theme Toggle */}
         <ThemeToggle />
 
+        {/* Mobile Menu Button */}
         <button
-          type="button"
-          onClick={logout}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-foreground-secondary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all duration-200"
+          onClick={() => setMenuOpen(true)}
+          className="md:hidden p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
-          <LogOut size={18} />
-          <span>登出</span>
-        </button>
-      </div>
-
-      <div className="flex items-center gap-2 md:hidden">
-        <ThemeToggle />
-        <button
-          type="button"
-          className="p-2 rounded-lg text-foreground-secondary hover:text-foreground-primary hover:bg-background-card-hover transition-colors"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label={menuOpen ? '關閉選單' : '開啟選單'}
-        >
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          {menuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
       {/* Mobile Menu Overlay and Panel */}
-      {/* Mobile Menu Portal */}
-      {menuOpen && (
+      {(menuOpen || isClosing) && (
         <Portal>
           <div className="fixed inset-0 z-[100] flex justify-end">
             {/* Backdrop */}
             <div
-              className="absolute inset-0 bg-black/30 backdrop-blur-[2px] animate-in fade-in duration-300"
-              onClick={() => setMenuOpen(false)}
+              className={cn(
+                "absolute inset-0 bg-black/40 backdrop-blur-[2px]",
+                isClosing ? "animate-backdrop-fade-out" : "animate-backdrop-fade"
+              )}
+              onClick={handleClose}
               aria-hidden="true"
             />
 
             {/* Sidebar Panel */}
-            <div className="relative w-full max-w-xs h-[100dvh] bg-background-primary dark:bg-[#020617] shadow-xl animate-in slide-in-from-right duration-300 flex flex-col border-l border-border/50">
+            <div
+              className={cn(
+                "relative w-full max-w-xs h-[100dvh] bg-background-primary shadow-2xl flex flex-col border-l border-white/10 overflow-hidden",
+                isClosing ? "animate-slide-out-right" : "animate-slide-in-right"
+              )}
+            >
+
+              {/* Decorative Flow Background for Sidebar */}
+              <div className="absolute inset-0 pointer-events-none opacity-5">
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-accent/20 to-transparent animate-pulse" />
+              </div>
 
               {/* Header */}
-              <div className="flex items-center justify-between px-6 h-20 shrink-0">
+              <div className="flex items-center justify-between px-6 h-20 shrink-0 border-b border-border/50 relative z-10">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/10 text-accent">
                     <span className="text-xl">☯</span>
                   </div>
-                  <span className="font-medium text-lg tracking-wide text-foreground-primary">
+                  <span className="font-heading font-semibold text-lg tracking-wide text-foreground-primary">
                     玄覺空間
                   </span>
                 </div>
                 <button
-                  onClick={() => setMenuOpen(false)}
-                  className="p-2 -mr-2 text-foreground-secondary hover:text-foreground-primary transition-colors"
+                  onClick={handleClose}
+                  className="p-2 -mr-2 text-foreground-secondary hover:text-foreground-primary transition-colors rounded-full hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                 >
-                  <X size={24} strokeWidth={1.5} />
+                  <X size={24} strokeWidth={2} />
                 </button>
               </div>
 
               {/* Navigation */}
-              <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-                <div className="px-2 mb-4 text-xs font-medium text-foreground-muted uppercase tracking-wider opacity-60">
+              <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto relative z-10">
+                <div className="px-2 mb-4 text-xs font-bold text-foreground-muted uppercase tracking-widest opacity-80">
                   Menu
                 </div>
 
-                {items.map((item) => {
+                {items.map((item, index) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
 
@@ -128,42 +151,39 @@ export function NavbarClient({ items }: NavbarClientProps) {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={handleClose}
                       className={cn(
-                        'group flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200',
+                        'group flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300',
                         active
-                          ? 'bg-neutral-100 dark:bg-white/10 text-accent font-semibold shadow-sm'
-                          : 'text-foreground-secondary hover:bg-background-card-hover hover:text-foreground-primary'
+                          ? 'bg-accent/10 text-accent font-bold shadow-sm ring-1 ring-accent/20 translate-x-1'
+                          : 'text-foreground-secondary hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground-primary hover:translate-x-1'
                       )}
+                      style={{ animationDelay: isClosing ? '0ms' : `${index * 50}ms` }}
                     >
                       <Icon
-                        size={20}
-                        strokeWidth={active ? 2 : 1.5}
+                        size={22}
+                        strokeWidth={active ? 2.5 : 2}
                         className={cn(
                           'transition-colors',
                           active ? 'text-accent' : 'text-foreground-muted group-hover:text-foreground-primary'
                         )}
                       />
-                      <span className="font-medium text-sm tracking-wide">{item.label}</span>
+                      <span className="font-semibold text-base tracking-wide">{item.label}</span>
                     </Link>
                   );
                 })}
               </nav>
 
               {/* Footer Actions */}
-              <div className="p-6 mt-auto border-t border-border/30 bg-background-secondary/50 dark:bg-black/10">
+              <div className="p-6 mt-auto border-t border-border/50 bg-background-secondary/30 relative z-10">
                 <div className="space-y-3">
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/10 rounded-xl transition-colors group"
+                    className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-colors group font-semibold"
                   >
-                    <LogOut size={20} strokeWidth={1.5} className="group-hover:scale-105 transition-transform" />
-                    <span className="font-medium text-sm text-red-600 dark:text-red-400">登出帳號</span>
+                    <LogOut size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
+                    <span className="font-medium text-sm">登出帳號</span>
                   </button>
-                </div>
-
-                <div className="mt-6 text-center text-[10px] text-foreground-muted/40 font-mono">
-                  v1.3.0 • AI Divination
                 </div>
               </div>
             </div>

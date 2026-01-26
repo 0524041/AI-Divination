@@ -67,10 +67,10 @@ const MAX_WAIT_LOCAL = 180 * 1000;
 const AI_TIMEOUT = 5 * 60 * 1000;
 
 const formatBazi = (baziStr?: string) => {
-    if (!baziStr) return '';
-    const parts = baziStr.split(' ');
-    if (parts.length !== 4) return baziStr;
-    return `干支︰${parts[0]}年 ${parts[1]}月 ${parts[2]}日 ${parts[3]}時`;
+  if (!baziStr) return '';
+  const parts = baziStr.split(' ');
+  if (parts.length !== 4) return baziStr;
+  return `干支︰${parts[0]}年 ${parts[1]}月 ${parts[2]}日 ${parts[3]}時`;
 };
 
 export default function ZiweiPage() {
@@ -114,7 +114,7 @@ export default function ZiweiPage() {
   const displayChart = useMemo(() => {
     if (!chartData?.natalChart) return null;
     if (viewMode === 'natal') return chartData.natalChart;
-    
+
     try {
       return generateHoroscope(chartData.natalChart, queryDate, chartData.solarTimeIndex);
     } catch (e) {
@@ -134,15 +134,15 @@ export default function ZiweiPage() {
     const y = type === 'year' ? value : currentLunarDate.getYear();
     const m = type === 'month' ? value : currentLunarDate.getMonth();
     const d = type === 'day' ? value : currentLunarDate.getDay();
-    
+
     // Create new lunar date and convert to solar
     // Note: handling leap months is complex, here we default to non-leap or first month
     try {
-        const lunar = Lunar.fromYmd(y, m, d);
-        const solar = lunar.getSolar();
-        setQueryDate(solar.toString());
+      const lunar = Lunar.fromYmd(y, m, d);
+      const solar = lunar.getSolar();
+      setQueryDate(solar.toString());
     } catch (e) {
-        console.error('Invalid Lunar Date', e);
+      console.error('Invalid Lunar Date', e);
     }
   };
 
@@ -247,7 +247,7 @@ export default function ZiweiPage() {
         const sign = offsetInt >= 0 ? '+' : '';
         correctionNote = `經真太陽時校正：時辰由【${originalHourChar}】變更為【${solarHourChar}】（調整 ${sign}${offsetInt} 分）`;
         // Inject original hour for display
-        (solarTime as any).originalHourChar = originalHourChar; 
+        (solarTime as any).originalHourChar = originalHourChar;
         (solarTime as any).finalHourChar = solarHourChar;
       }
 
@@ -502,68 +502,74 @@ export default function ZiweiPage() {
 
   // Generate True Solar Time formatted string
   const trueSolarTimeString = useMemo(() => {
-      if (!chartData?.natalChart) return '';
-      const tst = (chartData.natalChart as any).trueSolarTimeObj as Date;
-      if (!tst) return '';
-      
-      try {
-          const lunar = Lunar.fromDate(tst);
-          // Format: 農曆:XXXX/XX/XX XX:XX分 X時(時辰)
-          // lunar.getYearInChinese() returns e.g. "二零二五"
-          // We want simple format maybe? Or traditional. User example: "農曆:XXXX/XX/XX XX:XX分 X時(時辰)"
-          // Let's use numeric year for clarity or Chinese if requested.
-          // User Example: "農曆:XXXX/XX/XX XX:XX分 X時(時辰)"
-          
-          const y = lunar.getYear();
-          const m = lunar.getMonth();
-          const d = lunar.getDay();
-          
-          // Get Time
-          const h = tst.getHours();
-          const min = tst.getMinutes();
-          
-          const timeIndex = getChineseTimeIndex(h);
-          const timeChar = getChineseHourName(timeIndex);
-          
-          let timeDisplay = `${timeChar}時(${timeChar})`;
-          
-          if ((tst as any).originalHourChar && (tst as any).finalHourChar) {
-              timeDisplay = `${timeChar}時 (${(tst as any).originalHourChar}時 -> ${(tst as any).finalHourChar}時)`;
-          }
-          
-          return `農曆:${y}/${m.toString().padStart(2,'0')}/${d.toString().padStart(2,'0')} ${h.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}分 ${timeDisplay}`;
-      } catch (e) {
-          return '';
+    if (!chartData?.natalChart) return '';
+    const tst = (chartData.natalChart as any).trueSolarTimeObj as Date;
+    if (!tst) return '';
+
+    try {
+      const lunar = Lunar.fromDate(tst);
+      // Format: 農曆:XXXX/XX/XX XX:XX分 X時(時辰)
+      // lunar.getYearInChinese() returns e.g. "二零二五"
+      // We want simple format maybe? Or traditional. User example: "農曆:XXXX/XX/XX XX:XX分 X時(時辰)"
+      // Let's use numeric year for clarity or Chinese if requested.
+      // User Example: "農曆:XXXX/XX/XX XX:XX分 X時(時辰)"
+
+      const y = lunar.getYear();
+      const m = lunar.getMonth();
+      const d = lunar.getDay();
+
+      // Get Time
+      const h = tst.getHours();
+      const min = tst.getMinutes();
+
+      const timeIndex = getChineseTimeIndex(h);
+      const timeChar = getChineseHourName(timeIndex);
+
+      let timeDisplay = `${timeChar}時(${timeChar})`;
+
+      if ((tst as any).originalHourChar && (tst as any).finalHourChar) {
+        timeDisplay = `${timeChar}時 (${(tst as any).originalHourChar}時 -> ${(tst as any).finalHourChar}時)`;
       }
+
+      return `農曆:${y}/${m.toString().padStart(2, '0')}/${d.toString().padStart(2, '0')} ${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}分 ${timeDisplay}`;
+    } catch (e) {
+      return '';
+    }
   }, [chartData]);
 
 
   return (
     <div className="min-h-screen flex flex-col">
-      
+
 
       {/* ===== Intro Phase ===== */}
       {step === 'intro' && (
-        <div className="flex flex-col items-center text-center space-y-8 fade-in py-12 px-4 min-h-[500px]">
-          <div className="w-48 h-48 relative mb-4 flex items-center justify-center">
-            <div className="absolute inset-0 bg-background-card/50 rounded-full border-2 border-accent animate-pulse-slow" />
-            <div className="text-8xl">🌟</div>
+        <div className="flex flex-col items-center text-center space-y-8 animate-in fade-in zoom-in-95 duration-700 py-12 px-4 min-h-[60vh] justify-center">
+          <div className="w-48 h-48 relative mb-6 flex items-center justify-center group cursor-pointer" onClick={() => setStep('input')}>
+            <div className="absolute inset-0 bg-accent/5 rounded-full border border-accent/20 animate-spin-slow group-hover:bg-accent/10 transition-colors"></div>
+            <div className="absolute inset-4 bg-background-card/80 backdrop-blur-sm rounded-full border border-white/10 dark:border-white/5 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-500">
+              <span className="text-8xl select-none group-hover:scale-110 transition-transform duration-300 transform origin-center">🌟</span>
+            </div>
           </div>
 
-          <div className="space-y-4 max-w-2xl">
-            <h2 className="text-3xl font-bold text-accent">探索命運的星圖</h2>
-            <p className="text-foreground-secondary leading-relaxed">
-              紫微斗數是中國古代占星術的精髓，透過出生時間排列星盤，
-              洞悉命運軌跡與流年運勢。以紫微星為主導，配合百餘顆星曜，
-              揭示人生各個層面的吉凶禍福。
+          <div className="space-y-6 max-w-2xl">
+            <h2 className="text-4xl font-heading font-medium text-foreground-primary tracking-tight">探索命運的星圖</h2>
+            <p className="text-foreground-secondary text-lg leading-relaxed font-light">
+              紫微斗數是中國古代占星術的精髓，<br className="hidden sm:block" />
+              透過出生時間排列星盤，洞悉命運軌跡與流年運勢。
             </p>
-            <p className="text-foreground-muted text-sm">
-              請準備好您的出生年月日時（國曆）及出生地點，開始探索您的命盤。
+            <p className="text-accent text-sm font-medium tracking-widest uppercase opacity-80">
+              知命造命 • 順勢而為
             </p>
           </div>
 
-          <Button onClick={() => setStep('input')} variant="gold" className="px-12 py-6 text-lg">
-            <Compass size={20} className="mr-2" />
+          <Button
+            onClick={() => setStep('input')}
+            variant="gold"
+            size="lg"
+            className="px-12 py-8 text-xl rounded-full shadow-xl shadow-gold/20 hover:shadow-gold/40 hover:scale-105 transition-all duration-300"
+          >
+            <Compass size={24} className="mr-3" />
             開始排盤
           </Button>
         </div>
@@ -742,216 +748,216 @@ export default function ZiweiPage() {
         <main className="w-full max-w-6xl mx-auto px-4 py-6 space-y-6">
           {/* Top Control Bar for View Mode */}
           <Card variant="glass" className="p-4 flex flex-col md:flex-row gap-4 items-center justify-between sticky top-[60px] z-30 shadow-md">
-             <div className="flex gap-4 items-center flex-wrap justify-center w-full md:justify-start">
-               {/* View Mode Tabs */}
-               <div className="flex bg-background-card rounded-lg p-1">
-                 {(['natal', 'yearly', 'monthly', 'daily'] as QueryType[]).map((mode) => (
-                   <button
-                     key={mode}
-                     type="button"
-                     onClick={() => setViewMode(mode)}
-                     className={`
+            <div className="flex gap-4 items-center flex-wrap justify-center w-full md:justify-start">
+              {/* View Mode Tabs */}
+              <div className="flex bg-background-card rounded-lg p-1">
+                {(['natal', 'yearly', 'monthly', 'daily'] as QueryType[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setViewMode(mode)}
+                    className={`
                        px-4 py-2 rounded-md text-sm font-bold transition-all
-                       ${viewMode === mode 
-                         ? 'bg-accent text-white shadow-sm' 
-                         : 'text-foreground-secondary hover:text-foreground-primary hover:bg-white/10'}
+                       ${viewMode === mode
+                        ? 'bg-accent text-white shadow-sm'
+                        : 'text-foreground-secondary hover:text-foreground-primary hover:bg-white/10'}
                      `}
-                   >
-                     {mode === 'natal' && '本命'}
-                     {mode === 'yearly' && '流年'}
-                     {mode === 'monthly' && '流月'}
-                     {mode === 'daily' && '流日'}
-                   </button>
-                 ))}
-               </div>
+                  >
+                    {mode === 'natal' && '本命'}
+                    {mode === 'yearly' && '流年'}
+                    {mode === 'monthly' && '流月'}
+                    {mode === 'daily' && '流日'}
+                  </button>
+                ))}
+              </div>
 
-               {/* Date Type Selector */}
-               {viewMode !== 'natal' && (
-                  <div className="flex bg-background-card rounded-lg p-1 text-xs">
-                      <button
-                        onClick={() => setDateType('solar')}
-                        className={`px-2 py-1.5 rounded ${dateType === 'solar' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
-                      >
-                        陽曆
-                      </button>
-                      <button
-                        onClick={() => setDateType('lunar')}
-                        className={`px-2 py-1.5 rounded ${dateType === 'lunar' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
-                      >
-                        農曆
-                      </button>
-                  </div>
-               )}
+              {/* Date Type Selector */}
+              {viewMode !== 'natal' && (
+                <div className="flex bg-background-card rounded-lg p-1 text-xs">
+                  <button
+                    onClick={() => setDateType('solar')}
+                    className={`px-2 py-1.5 rounded ${dateType === 'solar' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                  >
+                    陽曆
+                  </button>
+                  <button
+                    onClick={() => setDateType('lunar')}
+                    className={`px-2 py-1.5 rounded ${dateType === 'lunar' ? 'bg-amber-600 text-white' : 'text-gray-400'}`}
+                  >
+                    農曆
+                  </button>
+                </div>
+              )}
 
-               {/* Date Picker */}
-               <div className="flex gap-2 items-center">
-                  {viewMode === 'yearly' && (
-                    dateType === 'solar' ? (
-                        <div className="flex gap-1">
-                            <Select
-                                value={queryDate.slice(0, 4)}
-                                onChange={(e) => setQueryDate(`${e.target.value}-01-01`)}
-                                options={Array.from({ length: 100 }, (_, i) => {
-                                    const year = new Date().getFullYear() - 50 + i;
-                                    return { value: year.toString(), label: `${year} 年` };
-                                })}
-                                className="w-24 py-1.5 text-sm"
-                            />
-                            <Select
-                                value="1"
-                                disabled={true}
-                                options={[{ value: '1', label: '1月' }]}
-                                className="w-20 py-1.5 text-sm opacity-50"
-                            />
-                            <Select
-                                value="1"
-                                disabled={true}
-                                options={[{ value: '1', label: '1日' }]}
-                                className="w-20 py-1.5 text-sm opacity-50"
-                            />
-                        </div>
-                    ) : (
-                        <div className="flex gap-1">
-                            <Select
-                                value={currentLunarDate.getYear().toString()}
-                                onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
-                                options={Array.from({ length: 100 }, (_, i) => {
-                                    const year = new Date().getFullYear() - 50 + i;
-                                    return { value: year.toString(), label: `${year} 年` };
-                                })}
-                                className="w-24 py-1.5 text-sm"
-                            />
-                            <Select
-                                value="1"
-                                disabled={true}
-                                options={[{ value: '1', label: '1月' }]}
-                                className="w-20 py-1.5 text-sm opacity-50"
-                            />
-                            <Select
-                                value="1"
-                                disabled={true}
-                                options={[{ value: '1', label: '1日' }]}
-                                className="w-20 py-1.5 text-sm opacity-50"
-                            />
-                        </div>
-                    )
-                  )}
-                  {viewMode === 'monthly' && (
-                     dateType === 'solar' ? (
-                         <div className="flex gap-1">
-                             <Select
-                                value={queryDate.slice(0, 4)}
-                                onChange={(e) => setQueryDate(`${e.target.value}-${queryDate.slice(5, 7)}-01`)}
-                                options={Array.from({ length: 50 }, (_, i) => {
-                                    const year = new Date().getFullYear() - 25 + i;
-                                    return { value: year.toString(), label: `${year}年` };
-                                })}
-                                className="w-24 py-1.5 text-sm"
-                             />
-                             <Select
-                                value={parseInt(queryDate.slice(5, 7)).toString()}
-                                onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${e.target.value.padStart(2, '0')}-01`)}
-                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
-                                className="w-20 py-1.5 text-sm"
-                             />
-                             <Select
-                                value="1"
-                                disabled={true}
-                                options={[{ value: '1', label: '1日' }]}
-                                className="w-20 py-1.5 text-sm opacity-50"
-                             />
-                         </div>
-                     ) : (
-                         <div className="flex gap-1">
-                             <Select
-                                value={currentLunarDate.getYear().toString()}
-                                onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
-                                options={Array.from({ length: 50 }, (_, i) => {
-                                    const year = new Date().getFullYear() - 25 + i;
-                                    return { value: year.toString(), label: `${year}年` };
-                                })}
-                                className="w-24 py-1.5 text-sm"
-                             />
-                             <Select
-                                value={currentLunarDate.getMonth().toString()}
-                                onChange={(e) => handleLunarChange('month', parseInt(e.target.value))}
-                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
-                                className="w-20 py-1.5 text-sm"
-                             />
-                             <Select
-                                value="1"
-                                disabled={true}
-                                options={[{ value: '1', label: '1日' }]}
-                                className="w-20 py-1.5 text-sm opacity-50"
-                             />
-                         </div>
-                     )
-                  )}
-                  {viewMode === 'daily' && (
-                     dateType === 'solar' ? (
-                        <div className="flex gap-1">
-                             <Select
-                                value={queryDate.slice(0, 4)}
-                                onChange={(e) => setQueryDate(`${e.target.value}-${queryDate.slice(5, 7)}-${queryDate.slice(8, 10)}`)}
-                                options={Array.from({ length: 50 }, (_, i) => {
-                                    const year = new Date().getFullYear() - 25 + i;
-                                    return { value: year.toString(), label: `${year}年` };
-                                })}
-                                className="w-24 py-1.5 text-sm"
-                             />
-                             <Select
-                                value={parseInt(queryDate.slice(5, 7)).toString()}
-                                onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${e.target.value.padStart(2, '0')}-${queryDate.slice(8, 10)}`)}
-                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
-                                className="w-20 py-1.5 text-sm"
-                             />
-                             <Select
-                                value={parseInt(queryDate.slice(8, 10)).toString()}
-                                onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${queryDate.slice(5, 7)}-${e.target.value.padStart(2, '0')}`)}
-                                options={Array.from({ length: 31 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}日` }))}
-                                className="w-20 py-1.5 text-sm"
-                             />
-                        </div>
-                     ) : (
-                        <div className="flex gap-1">
-                             <Select
-                                value={currentLunarDate.getYear().toString()}
-                                onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
-                                options={Array.from({ length: 50 }, (_, i) => {
-                                    const year = new Date().getFullYear() - 25 + i;
-                                    return { value: year.toString(), label: `${year}年` };
-                                })}
-                                className="w-24 py-1.5 text-sm"
-                             />
-                             <Select
-                                value={currentLunarDate.getMonth().toString()}
-                                onChange={(e) => handleLunarChange('month', parseInt(e.target.value))}
-                                options={Array.from({ length: 12 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}月` }))}
-                                className="w-20 py-1.5 text-sm"
-                             />
-                             <Select
-                                value={currentLunarDate.getDay().toString()}
-                                onChange={(e) => handleLunarChange('day', parseInt(e.target.value))}
-                                options={Array.from({ length: 30 }, (_, i) => ({ value: (i+1).toString(), label: `${i+1}日` }))}
-                                className="w-20 py-1.5 text-sm"
-                             />
-                        </div>
-                     )
-                  )}
-               </div>
+              {/* Date Picker */}
+              <div className="flex gap-2 items-center">
+                {viewMode === 'yearly' && (
+                  dateType === 'solar' ? (
+                    <div className="flex gap-1">
+                      <Select
+                        value={queryDate.slice(0, 4)}
+                        onChange={(e) => setQueryDate(`${e.target.value}-01-01`)}
+                        options={Array.from({ length: 100 }, (_, i) => {
+                          const year = new Date().getFullYear() - 50 + i;
+                          return { value: year.toString(), label: `${year} 年` };
+                        })}
+                        className="w-24 py-1.5 text-sm"
+                      />
+                      <Select
+                        value="1"
+                        disabled={true}
+                        options={[{ value: '1', label: '1月' }]}
+                        className="w-20 py-1.5 text-sm opacity-50"
+                      />
+                      <Select
+                        value="1"
+                        disabled={true}
+                        options={[{ value: '1', label: '1日' }]}
+                        className="w-20 py-1.5 text-sm opacity-50"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex gap-1">
+                      <Select
+                        value={currentLunarDate.getYear().toString()}
+                        onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
+                        options={Array.from({ length: 100 }, (_, i) => {
+                          const year = new Date().getFullYear() - 50 + i;
+                          return { value: year.toString(), label: `${year} 年` };
+                        })}
+                        className="w-24 py-1.5 text-sm"
+                      />
+                      <Select
+                        value="1"
+                        disabled={true}
+                        options={[{ value: '1', label: '1月' }]}
+                        className="w-20 py-1.5 text-sm opacity-50"
+                      />
+                      <Select
+                        value="1"
+                        disabled={true}
+                        options={[{ value: '1', label: '1日' }]}
+                        className="w-20 py-1.5 text-sm opacity-50"
+                      />
+                    </div>
+                  )
+                )}
+                {viewMode === 'monthly' && (
+                  dateType === 'solar' ? (
+                    <div className="flex gap-1">
+                      <Select
+                        value={queryDate.slice(0, 4)}
+                        onChange={(e) => setQueryDate(`${e.target.value}-${queryDate.slice(5, 7)}-01`)}
+                        options={Array.from({ length: 50 }, (_, i) => {
+                          const year = new Date().getFullYear() - 25 + i;
+                          return { value: year.toString(), label: `${year}年` };
+                        })}
+                        className="w-24 py-1.5 text-sm"
+                      />
+                      <Select
+                        value={parseInt(queryDate.slice(5, 7)).toString()}
+                        onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${e.target.value.padStart(2, '0')}-01`)}
+                        options={Array.from({ length: 12 }, (_, i) => ({ value: (i + 1).toString(), label: `${i + 1}月` }))}
+                        className="w-20 py-1.5 text-sm"
+                      />
+                      <Select
+                        value="1"
+                        disabled={true}
+                        options={[{ value: '1', label: '1日' }]}
+                        className="w-20 py-1.5 text-sm opacity-50"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex gap-1">
+                      <Select
+                        value={currentLunarDate.getYear().toString()}
+                        onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
+                        options={Array.from({ length: 50 }, (_, i) => {
+                          const year = new Date().getFullYear() - 25 + i;
+                          return { value: year.toString(), label: `${year}年` };
+                        })}
+                        className="w-24 py-1.5 text-sm"
+                      />
+                      <Select
+                        value={currentLunarDate.getMonth().toString()}
+                        onChange={(e) => handleLunarChange('month', parseInt(e.target.value))}
+                        options={Array.from({ length: 12 }, (_, i) => ({ value: (i + 1).toString(), label: `${i + 1}月` }))}
+                        className="w-20 py-1.5 text-sm"
+                      />
+                      <Select
+                        value="1"
+                        disabled={true}
+                        options={[{ value: '1', label: '1日' }]}
+                        className="w-20 py-1.5 text-sm opacity-50"
+                      />
+                    </div>
+                  )
+                )}
+                {viewMode === 'daily' && (
+                  dateType === 'solar' ? (
+                    <div className="flex gap-1">
+                      <Select
+                        value={queryDate.slice(0, 4)}
+                        onChange={(e) => setQueryDate(`${e.target.value}-${queryDate.slice(5, 7)}-${queryDate.slice(8, 10)}`)}
+                        options={Array.from({ length: 50 }, (_, i) => {
+                          const year = new Date().getFullYear() - 25 + i;
+                          return { value: year.toString(), label: `${year}年` };
+                        })}
+                        className="w-24 py-1.5 text-sm"
+                      />
+                      <Select
+                        value={parseInt(queryDate.slice(5, 7)).toString()}
+                        onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${e.target.value.padStart(2, '0')}-${queryDate.slice(8, 10)}`)}
+                        options={Array.from({ length: 12 }, (_, i) => ({ value: (i + 1).toString(), label: `${i + 1}月` }))}
+                        className="w-20 py-1.5 text-sm"
+                      />
+                      <Select
+                        value={parseInt(queryDate.slice(8, 10)).toString()}
+                        onChange={(e) => setQueryDate(`${queryDate.slice(0, 4)}-${queryDate.slice(5, 7)}-${e.target.value.padStart(2, '0')}`)}
+                        options={Array.from({ length: 31 }, (_, i) => ({ value: (i + 1).toString(), label: `${i + 1}日` }))}
+                        className="w-20 py-1.5 text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex gap-1">
+                      <Select
+                        value={currentLunarDate.getYear().toString()}
+                        onChange={(e) => handleLunarChange('year', parseInt(e.target.value))}
+                        options={Array.from({ length: 50 }, (_, i) => {
+                          const year = new Date().getFullYear() - 25 + i;
+                          return { value: year.toString(), label: `${year}年` };
+                        })}
+                        className="w-24 py-1.5 text-sm"
+                      />
+                      <Select
+                        value={currentLunarDate.getMonth().toString()}
+                        onChange={(e) => handleLunarChange('month', parseInt(e.target.value))}
+                        options={Array.from({ length: 12 }, (_, i) => ({ value: (i + 1).toString(), label: `${i + 1}月` }))}
+                        className="w-20 py-1.5 text-sm"
+                      />
+                      <Select
+                        value={currentLunarDate.getDay().toString()}
+                        onChange={(e) => handleLunarChange('day', parseInt(e.target.value))}
+                        options={Array.from({ length: 30 }, (_, i) => ({ value: (i + 1).toString(), label: `${i + 1}日` }))}
+                        className="w-20 py-1.5 text-sm"
+                      />
+                    </div>
+                  )
+                )}
+              </div>
 
-               {/* Lunar/Solar Info Display */}
-               <div className="text-xs text-foreground-muted flex flex-col md:flex-row gap-2 md:gap-4 md:ml-auto items-center">
-                  {displayChart && (
-                    <>
-                      <span>
-                        <span className="opacity-70">真太陽時：</span>
-                        {trueSolarTimeString}
-                      </span>
-                    </>
-                  )}
-               </div>
-             </div>
+              {/* Lunar/Solar Info Display */}
+              <div className="text-xs text-foreground-muted flex flex-col md:flex-row gap-2 md:gap-4 md:ml-auto items-center">
+                {displayChart && (
+                  <>
+                    <span>
+                      <span className="opacity-70">真太陽時：</span>
+                      {trueSolarTimeString}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
           </Card>
 
           <ZiweiChart
@@ -984,18 +990,18 @@ export default function ZiweiPage() {
             <div className="space-y-4 mt-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative">
-                    <label htmlFor="question-input" className="block text-sm text-foreground-secondary mb-2">請輸入您的問題</label>
-                    <textarea
-                      id="question-input"
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent h-24 resize-none"
-                      placeholder={`請針對「${contextLabel}」提問...`}
-                      maxLength={500}
-                    />
-                    <div className="absolute top-9 right-3 text-xs bg-accent/20 text-accent px-2 py-1 rounded">
-                      {contextLabel}
-                    </div>
+                  <label htmlFor="question-input" className="block text-sm text-foreground-secondary mb-2">請輸入您的問題</label>
+                  <textarea
+                    id="question-input"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent h-24 resize-none"
+                    placeholder={`請針對「${contextLabel}」提問...`}
+                    maxLength={500}
+                  />
+                  <div className="absolute top-9 right-3 text-xs bg-accent/20 text-accent px-2 py-1 rounded">
+                    {contextLabel}
+                  </div>
                 </div>
               </div>
 

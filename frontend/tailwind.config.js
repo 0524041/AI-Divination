@@ -13,11 +13,13 @@ module.exports = {
           primary: 'var(--bg-primary)',
           secondary: 'var(--bg-secondary)',
           card: 'var(--bg-card)',
+          'card-hover': 'var(--bg-card-hover)',
         },
         foreground: {
           primary: 'var(--text-primary)',
           secondary: 'var(--text-secondary)',
           muted: 'var(--text-muted)',
+          accent: 'var(--text-accent)',
         },
         accent: {
           DEFAULT: 'var(--accent)',
@@ -45,11 +47,24 @@ module.exports = {
         },
       },
       fontFamily: {
-        serif: ['Noto Serif TC', 'serif'],
-        sans: ['Inter', 'sans-serif'],
+        serif: ['Cinzel', 'Playfair Display', 'Noto Serif TC', 'serif'],
+        sans: ['Outfit', 'Inter', 'sans-serif'],
+        heading: ['Cinzel', 'serif'],
+        body: ['Outfit', 'sans-serif'],
         // Legacy support
         chinese: ['Noto Serif TC', 'serif'],
       },
+      animation: {
+        'spin-slow': 'spin 3s linear infinite',
+        'float': 'float 6s ease-in-out infinite',
+        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        }
+      }
     },
   },
   plugins: [],

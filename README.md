@@ -1,4 +1,4 @@
-# ☯ 玄覺空間 (Mystic Mind Space) v1.2.0
+# ☯ 玄覺空間 (Mystic Mind Space) v1.4.0
 
 🌐 **網站上線啦！歡迎大家測試：[https://akspace99.dpdns.org](https://akspace99.dpdns.org)**
 
@@ -179,6 +179,19 @@ AI-Divination/
 4. 在設定頁面新增 Local AI 配置，填入 URL 和模型名稱
 
 ## 📚 版本歷史
+
+### v1.4.0 (2026-01-26) 🍃
+- 🎨 **Digital Zen 前端重構 (數位禪意)**：
+  - **全新視覺風格**：結合現代極簡與東方禪意，引入玻璃擬態 (Glassmorphism)、流體背景與金/琥珀色系。
+  - **字體升級**：全站啟用 **Zen Maru Gothic (圓體)**，提供更圓潤現代的閱讀體驗 (via `next/font`)。
+  - **流暢動畫**：
+    - 首頁卡片「Fade Up」浮現效果。
+    - 側邊欄 (Sidebar) 雙向滑動與淡入淡出動畫。
+    - Navbar 流動光澤 (Flow Shine) 效果。
+  - **深色模式優化**：針對高對比需求優化，與「氣」流動背景完美融合。
+- 🏗️ **架構改進**：
+  - 採用 Next.js **Route Groups** `(authenticated)` 優化專案結構。
+  - 修復 `tailwindcss-animate` 依賴問題，改用原生 CSS 動畫確保穩定性。
 
 ### v1.3.0 (2026-01-15) 🌌
 - **紫微斗數 (Zi Wei Dou Shu) 正式上線**：

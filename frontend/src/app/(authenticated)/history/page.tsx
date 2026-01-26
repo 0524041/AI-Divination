@@ -51,7 +51,7 @@ interface HistoryItem {
     zodiac?: string;
     timeChar?: string;
     correctionNote?: string;
-    
+
     cards?: Array<{
       id: number;
       name: string;
@@ -697,9 +697,10 @@ export default function HistoryPage() {
         )}
 
         {/* 歷史紀錄搜尋 */}
-        <div className="mb-4">
-          <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground-muted" />
+        <div className="mb-8">
+          <div className="relative group">
+            <div className="absolute inset-0 bg-accent/5 rounded-2xl blur-xl transition-opacity opacity-0 group-hover:opacity-100" />
+            <Search size={20} className="absolute left-5 top-1/2 -translate-y-1/2 text-foreground-muted group-hover:text-accent transition-colors" />
             <input
               type="text"
               value={searchInputValue}
@@ -710,8 +711,8 @@ export default function HistoryPage() {
                   setCurrentPage(1);
                 }
               }}
-              placeholder="搜尋問題內容... (按 Enter 搜尋)"
-              className="w-full pl-12 pr-24 py-3 bg-background-card border border-border rounded-xl text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+              placeholder="搜尋問題... (按 Enter 搜尋)"
+              className="w-full pl-14 pr-28 py-4 bg-white/80 dark:bg-black/50 backdrop-blur-md border border-white/10 dark:border-white/5 rounded-2xl text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent/50 shadow-lg shadow-black/5 transition-all"
             />
             {(searchInputValue || historySearchTerm) && (
               <button
@@ -720,15 +721,17 @@ export default function HistoryPage() {
                   setHistorySearchTerm('');
                   setCurrentPage(1);
                 }}
-                className="absolute right-20 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary p-1"
+                className="absolute right-24 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary p-2 transition-colors"
+                aria-label="clear"
               >
                 ✕
               </button>
             )}
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
               <Button
                 variant="gold"
                 size="sm"
+                className="rounded-xl px-4"
                 onClick={() => {
                   setHistorySearchTerm(searchInputValue);
                   setCurrentPage(1);
@@ -739,8 +742,9 @@ export default function HistoryPage() {
             </div>
           </div>
           {historySearchTerm && (
-            <div className="mt-2 text-sm text-foreground-muted">
-              搜尋「{historySearchTerm}」的結果，共 {totalCount} 筆
+            <div className="mt-3 text-sm text-foreground-muted flex items-center gap-2 px-2">
+              <Search size={14} />
+              搜尋「<span className="text-accent">{historySearchTerm}</span>」的結果，共 {totalCount} 筆
             </div>
           )}
         </div>
@@ -752,12 +756,18 @@ export default function HistoryPage() {
             <SkeletonCard />
           </div>
         ) : history.length === 0 ? (
-          <div className="text-center py-12">
-            <HistoryIcon className="mx-auto mb-4 text-foreground-muted" size={48} />
-            <p className="text-foreground-muted">還沒有任何紀錄</p>
+          <div className="text-center py-20 bg-background-card/30 backdrop-blur-sm rounded-3xl border border-dashed border-border/50">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-accent/5 flex items-center justify-center">
+              <HistoryIcon className="text-accent/50" size={40} />
+            </div>
+            <h3 className="text-xl font-medium text-foreground-primary mb-2">暫無占卜紀錄</h3>
+            <p className="text-foreground-secondary mb-8 max-w-sm mx-auto">
+              您的探索之旅尚未開始。嘗試一次占卜，尋找生命的指引。
+            </p>
             <Link href="/liuyao">
-              <Button variant="gold" className="mt-4">
-                開始占卜
+              <Button variant="gold" className="shadow-lg shadow-gold/20">
+                <TrendingUp size={18} className="mr-2" />
+                開始第一次占卜
               </Button>
             </Link>
           </div>
@@ -802,9 +812,9 @@ export default function HistoryPage() {
                               <span className="bg-background-card/50 px-2 py-0.5 rounded border border-border">
                                 類型：<span className="text-foreground-secondary">
                                   {item.chart_data.query_type === 'natal' ? '本命' :
-                                   item.chart_data.query_type === 'yearly' ? '流年' :
-                                   item.chart_data.query_type === 'monthly' ? '流月' :
-                                   item.chart_data.query_type === 'daily' ? '流日' : '本命'}
+                                    item.chart_data.query_type === 'yearly' ? '流年' :
+                                      item.chart_data.query_type === 'monthly' ? '流月' :
+                                        item.chart_data.query_type === 'daily' ? '流日' : '本命'}
                                 </span>
                               </span>
                               {item.chart_data.query_type && item.chart_data.query_type !== 'natal' && item.chart_data.query_date && (
@@ -968,17 +978,17 @@ export default function HistoryPage() {
                                       },
                                       correctionNote: data.correctionNote
                                     };
-                                    
+
                                     // 判斷 viewMode
                                     const viewMode = (data.query_type as 'natal' | 'yearly' | 'monthly' | 'daily') || 'natal';
-                                    
+
                                     return (
                                       <div className="overflow-x-auto">
                                         <div className="min-w-[350px] transform scale-[0.8] origin-top-left md:scale-100 md:origin-top">
-                                          <ZiweiChart 
-                                            chart={data} 
-                                            centerInfo={centerInfo as any} 
-                                            viewMode={viewMode} 
+                                          <ZiweiChart
+                                            chart={data}
+                                            centerInfo={centerInfo as any}
+                                            viewMode={viewMode}
                                           />
                                         </div>
                                       </div>
@@ -1077,6 +1087,6 @@ export default function HistoryPage() {
           </Card>
         )}
       </main>
-      </>
+    </>
   );
 }

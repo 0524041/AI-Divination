@@ -13,33 +13,41 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     ({ className, variant = 'default', padding, hover = false, onClick, children, ...props }, ref) => {
         const isGolden = variant === 'golden';
         const isInteractive = variant === 'interactive';
-        
+
         const effectiveVariant = isGolden ? 'default' : (isInteractive ? 'default' : variant);
-        
+
         return (
             <div
                 ref={ref}
                 onClick={onClick}
                 className={cn(
-                    'rounded-xl transition-all duration-300',
-                    (effectiveVariant === 'default') && 'bg-background-card border border-border',
-                    (effectiveVariant === 'glass') && 'bg-background-card backdrop-blur-md border border-border-accent',
+                    'rounded-2xl transition-all duration-300 relative overflow-hidden',
+                    // Default / Glass
+                    (effectiveVariant === 'default' || effectiveVariant === 'glass') && 'bg-background-card backdrop-blur-xl border border-white/20 dark:border-white/5 shadow-lg shadow-black/5',
+
+                    // Outline
                     (effectiveVariant === 'outline') && 'bg-transparent border border-border',
-                    
-                    isGolden && 'border-accent/50 shadow-[0_0_20px_rgba(212,175,55,0.1)]',
-                    
-                    (hover || isInteractive) && 'cursor-pointer hover:border-accent hover:shadow-lg hover:shadow-accent/10',
+
+                    // Golden Highlight
+                    isGolden && 'ring-1 ring-accent/30 shadow-[0_0_30px_rgba(212,175,55,0.15)]',
+
+                    // Interactive / Hover
+                    (hover || isInteractive) && 'cursor-pointer hover:translate-y-[-2px] hover:shadow-xl hover:shadow-accent/5 hover:border-accent/30',
                     onClick && 'cursor-pointer',
 
-                    padding === 'sm' && 'p-3',
-                    padding === 'md' && 'p-6',
-                    padding === 'lg' && 'p-8',
-                    
+                    padding === 'sm' && 'p-4',
+                    padding === 'md' && 'p-6 sm:p-8',
+                    padding === 'lg' && 'p-8 sm:p-10',
+
                     className
                 )}
                 {...props}
             >
-                {children}
+                {/* Subtle gradient overlay for depth */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent dark:from-white/5 pointer-events-none" />
+                <div className="relative z-10">
+                    {children}
+                </div>
             </div>
         );
     }
