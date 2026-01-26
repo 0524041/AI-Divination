@@ -13,7 +13,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, options, id, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s/g, '-');
-    
+
     return (
       <div className="w-full">
         {label && (
@@ -27,7 +27,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             ref={ref}
             className={cn(
               'w-full px-4 py-3 pr-10 rounded-lg appearance-none cursor-pointer',
-              'bg-background-card border border-border text-foreground-primary',
+              'bg-white/80 dark:bg-black/40 backdrop-blur-md border border-border text-foreground-primary',
               'focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent',
               'transition-all duration-200',
               error && 'border-red-500 focus:ring-red-500',
@@ -39,9 +39,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
-          <ChevronDown 
-            size={18} 
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" 
+          <ChevronDown
+            size={18}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
           />
         </div>
         {error && <p className="mt-1 text-sm text-red-500">{error}</p>}

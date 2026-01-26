@@ -5,7 +5,7 @@ interface Star {
     name: string;
     brightness?: string;
     type?: 'major' | 'minor' | 'adjective' | 'soft' | 'tough' | 'lucun' | 'tianma' | 'flower' | 'helper' | 'changsheng' | 'boshi';
-    mutagen?: string; 
+    mutagen?: string;
 }
 
 interface Palace {
@@ -85,7 +85,7 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
     }
 
     const soulPalaceIndex = baseChart.palaces.findIndex((p: any) => p.isSoulPalace);
-    
+
     const decadalIndex = flowData?.decadal?.index;
     const yearlyIndex = flowData?.yearly?.index;
     const monthlyIndex = flowData?.monthly?.index;
@@ -116,13 +116,13 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
 
         if (checkFlow(decadalMutagens)) return true;
         if (viewMode !== 'natal') {
-             if (checkFlow(yearlyMutagens)) return true;
-             if (viewMode === 'monthly' || viewMode === 'daily') {
-                 if (checkFlow(monthlyMutagens)) return true;
-             }
-             if (viewMode === 'daily') {
-                 if (checkFlow(dailyMutagens)) return true;
-             }
+            if (checkFlow(yearlyMutagens)) return true;
+            if (viewMode === 'monthly' || viewMode === 'daily') {
+                if (checkFlow(monthlyMutagens)) return true;
+            }
+            if (viewMode === 'daily') {
+                if (checkFlow(dailyMutagens)) return true;
+            }
         }
         return false;
     };
@@ -154,7 +154,7 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
     const getBrightnessColor = (brightness?: string) => {
         if (brightness === '廟' || brightness === '旺') return 'text-red-700 dark:text-[#ff3333] font-bold';
         if (brightness === '平' || brightness === '利' || brightness === '得') return 'text-gray-700 dark:text-gray-300';
-        return 'text-gray-500 dark:text-gray-500 opacity-80'; 
+        return 'text-gray-500 dark:text-gray-500 opacity-80';
     };
 
     const relatedIndices = focusedIndex !== null ? getRelatedIndices(focusedIndex) : [];
@@ -174,16 +174,16 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
     };
 
     return (
-        <div className="w-full overflow-x-auto rounded-lg shadow-2xl bg-white dark:bg-[#1a0b2e] border-4 border-double border-amber-600 dark:border-[#d4af37]">
+        <div className="w-full overflow-x-auto rounded-lg shadow-2xl bg-white dark:bg-[#0D1117] border-4 border-double border-amber-600 dark:border-[#d4af37]">
 
             <div className="min-w-[800px] md:w-full max-w-[1000px] mx-auto aspect-[4/4] p-1 relative font-serif text-gray-800 dark:text-[#d4af37] select-none">
 
                 <div className="absolute inset-0 opacity-5 pointer-events-none bg-center bg-no-repeat dark:block hidden"
                     style={{ backgroundImage: 'radial-gradient(circle, #d4af37 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
 
-                <div className="grid grid-cols-4 grid-rows-4 h-full w-full gap-[2px] bg-amber-200 dark:bg-[#d4af37]/20">
+                <div className="grid grid-cols-4 grid-rows-4 h-full w-full gap-[2px] bg-amber-200 dark:bg-[#161b22]">
 
-                    <div className="col-start-2 row-start-2 col-span-2 row-span-2 flex flex-col items-center justify-center p-2 text-center bg-white/95 dark:bg-[#1a0b2e]/95 z-20 shadow-lg border border-amber-100 overflow-y-auto">
+                    <div className="col-start-2 row-start-2 col-span-2 row-span-2 flex flex-col items-center justify-center p-2 text-center bg-white/95 dark:bg-[#0D1117]/95 z-20 shadow-lg border border-amber-100 overflow-y-auto">
                         {centerInfo ? (
                             <div className="w-full h-full flex flex-col justify-start py-2 text-sm">
                                 <div className="mb-2">
@@ -227,7 +227,7 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                         <span className="text-blue-600">科</span>
                                         <span className="text-amber-600">忌</span>
                                     </div>
-                                    
+
                                     <div className="grid grid-cols-5 text-sm items-center mb-1 font-medium">
                                         <span className="font-bold bg-red-100 dark:bg-red-900/30 px-1 rounded text-red-700">生年</span>
                                         {getFlowMutagens(baseChart.chineseDate?.charAt(0) || '').map((star, i) => (
@@ -308,9 +308,9 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                 className={`
                                     relative p-[2px] flex flex-col justify-between overflow-hidden cursor-pointer
                                     hover:z-30 hover:shadow-2xl transition-all duration-200 border
-                                    ${isCore ? 'bg-orange-200 dark:bg-orange-800/60 border-orange-400' : 
-                                      hasPositiveEnergy ? 'bg-green-100 dark:bg-green-800/40 border-green-300' :
-                                      'bg-white dark:bg-[#1f1137] border-gray-200 dark:border-white/10'}
+                                    ${isCore ? 'bg-orange-200 dark:bg-orange-800/60 border-orange-400' :
+                                        hasPositiveEnergy ? 'bg-green-100 dark:bg-green-800/40 border-green-300' :
+                                            'bg-white dark:bg-[#161b22] border-gray-200 dark:border-white/10'}
                                     
                                     ${isRelated ? 'bg-yellow-100 dark:bg-yellow-800/50 !border-yellow-500 ring-2 ring-yellow-500' : ''}
                                     ${isFocused ? 'ring-4 ring-accent z-20 shadow-xl scale-[1.02]' : ''}
@@ -334,7 +334,7 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                         `}>
                                             {palace.name}
                                         </div>
-                                        
+
                                         <div className="flex flex-wrap justify-center gap-[1px] w-full mt-[1px]">
                                             {isDecadal && <span className="text-[10px] bg-blue-600 text-white px-1 rounded-sm leading-tight font-bold">大{palace.name}</span>}
                                             {isYearly && <span className="text-[10px] bg-green-600 text-white px-1 rounded-sm leading-tight font-bold">年{palace.name}</span>}
@@ -352,7 +352,7 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                 </div>
 
                                 <div className="flex-1 grid grid-cols-2 gap-0.5 px-0.5 py-0.5 min-h-0 relative">
-                                    
+
                                     <div className="flex flex-col content-start gap-[1px] text-[11px] leading-tight overflow-hidden">
                                         {palace.minorStars?.map((star: Star) => (
                                             <div key={`${star.name}-minor`} className="flex items-center flex-wrap">
@@ -382,13 +382,13 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                             <div key={`${star.name}-major`} className={`flex flex-col items-end leading-none ${getBrightnessColor(star.brightness)}`}>
                                                 <div className="flex items-center justify-end flex-wrap gap-[1px]">
                                                     <span className="text-lg font-bold tracking-widest">{star.name}</span>
-                                                    
+
                                                     {star.mutagen && (
                                                         <span className={`text-[10px] w-3 h-3 flex items-center justify-center rounded font-bold ${getMutagenColor(star.mutagen)}`}>
                                                             {star.mutagen}
                                                         </span>
                                                     )}
-                                                    
+
                                                     <div className="flex flex-col gap-[1px] items-end">
                                                         {renderMutagenBadge(star.name, '大', decadalMutagens, 'text-blue-600 bg-blue-50 border-blue-200')}
                                                         {renderMutagenBadge(star.name, '年', yearlyMutagens, 'text-green-600 bg-green-50 border-green-200')}

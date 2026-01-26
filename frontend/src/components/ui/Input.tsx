@@ -25,7 +25,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           className={cn(
             'w-full px-4 py-3 rounded-xl transition-all duration-300 font-medium',
-            'bg-background-card/50 backdrop-blur-sm text-foreground-primary',
+            'bg-white/80 dark:bg-black/40 backdrop-blur-md text-foreground-primary',
             'placeholder:text-foreground-muted/50',
             'focus:outline-none focus:ring-2 focus:ring-accent/50 focus:bg-background-card',
             'disabled:opacity-50 disabled:cursor-not-allowed',
