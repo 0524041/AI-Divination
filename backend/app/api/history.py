@@ -207,6 +207,12 @@ def get_statistics(
     )
 
 
+from app.core.config import get_settings
+from fastapi import BackgroundTasks
+from app.services.ai_tasks import process_liuyao_task, process_tarot_task, process_ziwei_task
+
+settings = get_settings()
+
 # ========== Admin Endpoints ==========
 
 @router.get("/admin/all", response_model=HistoryListResponse)
@@ -315,6 +321,62 @@ def delete_history_item(
     db.commit()
     
     return {"message": "已刪除"}
+
+
+@router.post("/{history_id}/retry")
+def retry_ai_interpretation(
+    history_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    重試 AI 解盤
+    適用於狀態為 error 或 completed 的紀錄 (想重新生成)
+    """
+    history = db.query(History).filter(
+        History.id == history_id,
+        History.user_id == current_user.id
+    ).first()
+    
+    if not history:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="紀錄不存在"
+        )
+    
+    # 允許 error 的重新執行，也允許 completed 的重新執行 (如果是想要新的答案)
+    # 但 pending/processing 狀態中不建議重試，避免重複
+    if history.status in ["processing"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="目前正在解盤中，請稍候"
+        )
+    
+    # 重置狀態
+    history.status = "pending"
+    history.interpretation = None  # 清空舊的錯誤訊息或解盤
+    db.commit()
+    
+    # 根據類型分派任務
+    db_url = settings.DATABASE_URL
+    if db_url.startswith("sqlite") and "///" not in db_url:
+        db_url = db_url.replace("sqlite://", "sqlite:///")
+            
+    if history.divination_type == "liuyao":
+        background_tasks.add_task(process_liuyao_task, history.id, db_url)
+    elif history.divination_type == "tarot":
+        background_tasks.add_task(process_tarot_task, history.id, db_url)
+    elif history.divination_type == "ziwei":
+        background_tasks.add_task(process_ziwei_task, history.id, db_url)
+    else:
+        # 未知類型，恢復為 error
+        history.status = "error"
+        history.interpretation = f"不支援的占卜類型重試: {history.divination_type}"
+        db.commit()
+        raise HTTPException(status_code=400, detail=f"不支援的類型: {history.divination_type}")
+    
+    return {"message": "已觸發重新解盤", "status": "pending"}
 
 
 # ========== Share Endpoints ==========

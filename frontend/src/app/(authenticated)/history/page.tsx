@@ -289,6 +289,31 @@ export default function HistoryPage() {
     }
   };
 
+  const handleRetry = async (historyId: number) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/history/${historyId}/retry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        // 更新本地狀態為 pending
+        setHistory(prev => prev.map(item =>
+          item.id === historyId
+            ? { ...item, status: 'pending', interpretation: 'AI 重新解盤中...' }
+            : item
+        ));
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || '重試失敗');
+      }
+    } catch (err) {
+      console.error('Retry error:', err);
+      alert('重試請求發送失敗');
+    }
+  };
+
   const handleCopy = async (item: HistoryItem) => {
     // 準備不同占卜類型的文本
     let cardInfo = '';
@@ -863,7 +888,18 @@ export default function HistoryPage() {
                 {expandedId === item.id && (
                   <div className="border-t border-border p-4 space-y-4 fade-in">
                     {/* 操作按鈕 */}
-                    <div className="flex justify-end gap-3">
+                    <div className="flex justify-end gap-3 flex-wrap">
+                      {/* 重試按鈕 (僅在 error 狀態顯示) */}
+                      {item.status === 'error' && (
+                        <Button
+                          onClick={() => handleRetry(item.id)}
+                          variant="primary"
+                          className="bg-amber-600 hover:bg-amber-700 text-white border-transparent"
+                          leftIcon={<span className="text-lg">↻</span>}
+                        >
+                          重試解盤
+                        </Button>
+                      )}
                       <Button
                         onClick={() => handleShare(item)}
                         disabled={sharingState[item.id] === 'loading'}
