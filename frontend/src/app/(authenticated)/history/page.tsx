@@ -204,6 +204,31 @@ export default function HistoryPage() {
     return () => clearInterval(pollInterval);
   }, [history, loading, currentPage, pageSize, historySearchTerm, user, selectedUserId]);
 
+  // 自動解析已展開項目的新內容
+  useEffect(() => {
+    if (expandedId === null) return;
+
+    const expandedItem = history.find(item => item.id === expandedId);
+    if (!expandedItem || !expandedItem.interpretation) return;
+
+    // 如果已有解析結果，不重複解析
+    if (htmlContents[expandedId]) return;
+
+    // 自動解析 Markdown
+    (async () => {
+      try {
+        const result = await parseMarkdown(expandedItem.interpretation);
+        setHtmlContents((prev) => ({ ...prev, [expandedId]: result }));
+      } catch (err) {
+        console.error('Auto Markdown parsing error:', err);
+        setHtmlContents((prev) => ({
+          ...prev,
+          [expandedId]: { mainHtml: `<p class="text-red-400">解析失敗: ${err}</p>`, thinkContent: '' }
+        }));
+      }
+    })();
+  }, [expandedId, history, htmlContents]);
+
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -347,6 +372,13 @@ export default function HistoryPage() {
       });
 
       if (res.ok) {
+        // 清除舊的 Markdown 緩存，確保重新解析新內容
+        setHtmlContents(prev => {
+          const newContents = { ...prev };
+          delete newContents[historyId];
+          return newContents;
+        });
+
         // 更新本地狀態為 pending
         setHistory(prev => prev.map(item =>
           item.id === historyId

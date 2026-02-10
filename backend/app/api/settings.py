@@ -129,7 +129,7 @@ def create_ai_config(
 
     # 設定模型名稱
     model_name = request.model
-    
+
     if request.provider == "gemini":
         # Gemini 強制使用 gemini-3-flash-preview
         model_name = "gemini-3-flash-preview"
@@ -148,7 +148,7 @@ def create_ai_config(
         model=model_name,
         api_key_encrypted=encrypt_api_key(request.api_key) if request.api_key else None,
         local_url=request.local_url,
-        local_model=request.local_model, # 保留向後相容
+        local_model=request.local_model,  # 保留向後相容
         is_active=True,
     )
     db.add(config)
@@ -186,7 +186,7 @@ def update_ai_config(
 
     config.provider = request.provider
     config.name = request.name
-    
+
     # 更新模型名稱
     if request.provider == "gemini":
         config.model = "gemini-3-flash-preview"
@@ -223,6 +223,7 @@ def update_ai_config(
         id=config.id,
         provider=config.provider,
         name=config.name,
+        model=config.effective_model,
         has_api_key=bool(config.api_key_encrypted),
         local_url=config.local_url,
         local_model=config.local_model,
