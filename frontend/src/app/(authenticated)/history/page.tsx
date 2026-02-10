@@ -217,7 +217,7 @@ export default function HistoryPage() {
     // 自動解析 Markdown
     (async () => {
       try {
-        const result = await parseMarkdown(expandedItem.interpretation);
+        const result = await parseMarkdown(expandedItem.interpretation ?? '');
         setHtmlContents((prev) => ({ ...prev, [expandedId]: result }));
       } catch (err) {
         console.error('Auto Markdown parsing error:', err);
