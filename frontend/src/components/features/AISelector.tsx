@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Bot, ChevronDown, Check, Settings, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface AIConfig {
     id: number;
@@ -58,15 +59,21 @@ export function AISelector({
     const [configs, setConfigs] = useState<AIConfig[]>([]);
     const [activeConfig, setActiveConfig] = useState<AIConfig | null>(null);
     const [isOpen, setIsOpen] = useState(false);
+    const { isGuest } = useAuth();
 
-    // 使用外部配置或內部配置
     const currentConfig = externalActiveConfig !== undefined ? externalActiveConfig : activeConfig;
 
-    // 使用 ref 來存儲 onConfigChange，避免無限重渲染
     const onConfigChangeRef = useRef(onConfigChange);
     onConfigChangeRef.current = onConfigChange;
 
     const fetchConfigs = useCallback(async () => {
+        if (isGuest) {
+            setConfigs([]);
+            setActiveConfig(null);
+            onConfigChangeRef.current?.(null);
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
             const res = await fetch('/api/settings/ai', {
@@ -77,13 +84,12 @@ export function AISelector({
                 setConfigs(data);
                 const active = data.find((c: AIConfig) => c.is_active);
                 setActiveConfig(active || null);
-                // 通知父組件
                 onConfigChangeRef.current?.(active || null);
             }
         } catch (err) {
             console.error('Fetch AI configs error:', err);
         }
-    }, []);
+    }, [isGuest]);
 
     useEffect(() => {
         fetchConfigs();
@@ -115,20 +121,25 @@ export function AISelector({
                         <div className="flex items-center gap-3">
                             <Bot className="text-accent" size={20} />
                             <span className="text-sm text-foreground-muted">當前 AI：</span>
-                            {currentConfig ? (
+                            {isGuest ? (
+                                <span className="text-accent font-medium">NVIDIA AI (試用)</span>
+                            ) : currentConfig ? (
                                 <span className="text-accent font-medium">{getAIDisplayName(currentConfig)}</span>
                             ) : (
                                 <span className="text-red-400">未設定</span>
                             )}
                         </div>
 
-                        <button
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="text-sm text-foreground-muted hover:text-accent flex items-center gap-1 transition-colors"
-                        >
-                            切換 AI
-                            <ChevronDown size={16} className={cn('transition-transform', isOpen && 'rotate-180')} />
-                        </button>
+                        {!isGuest && (
+                            <button
+                                type="button"
+                                onClick={() => setIsOpen(!isOpen)}
+                                className="text-sm text-foreground-muted hover:text-accent flex items-center gap-1 transition-colors"
+                            >
+                                切換 AI
+                                <ChevronDown size={16} className={cn('transition-transform', isOpen && 'rotate-180')} />
+                            </button>
+                        )}
                     </div>
 
                     {shouldShowWarning && (
@@ -173,58 +184,76 @@ export function AISelector({
     if (variant === 'card') {
         return (
             <div className={cn('relative z-20', className)}>
-                <button
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="w-full flex items-center justify-between px-6 py-4 bg-background-card border border-border rounded-2xl hover:border-accent hover:shadow-md transition-all duration-300 backdrop-blur-sm group"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
-                            <Bot className="text-accent" size={24} />
-                        </div>
-                        <div className="text-left">
-                            <div className="text-xs text-foreground-muted uppercase tracking-wider mb-1">AI 解盤服務</div>
-                            <div className="font-medium text-foreground-primary text-lg">
-                                {currentConfig ? getAIDisplayName(currentConfig) : '未設定 AI'}
+                {isGuest ? (
+                    <div className="w-full flex items-center justify-between px-6 py-4 bg-background-card border border-border rounded-2xl backdrop-blur-sm">
+                        <div className="flex items-center gap-4">
+                            <div className="p-2 bg-accent/10 rounded-lg">
+                                <Bot className="text-accent" size={24} />
+                            </div>
+                            <div className="text-left">
+                                <div className="text-xs text-foreground-muted uppercase tracking-wider mb-1">AI 解盤服務</div>
+                                <div className="font-medium text-foreground-primary text-lg">NVIDIA AI (試用)</div>
                             </div>
                         </div>
                     </div>
-                    <ChevronDown size={20} className={cn('text-foreground-muted transition-transform duration-300 group-hover:text-accent', isOpen && 'rotate-180')} />
-                </button>
-
-                {isOpen && configs.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-background-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        {configs.map((config) => {
-                            const isSelected = currentConfig?.id === config.id;
-                            return (
-                                <button
-                                    key={config.id}
-                                    onClick={() => handleSwitch(config.id)}
-                                    className={cn(
-                                        'w-full px-6 py-4 flex items-center justify-between hover:bg-background-secondary transition',
-                                        isSelected && 'bg-accent/5'
-                                    )}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn(
-                                            'w-2 h-2 rounded-full',
-                                            isSelected ? 'bg-accent shadow-[0_0_10px_var(--accent)]' : 'bg-gray-400 dark:bg-gray-600'
-                                        )} />
-                                        <span className={isSelected ? 'text-accent font-medium' : 'text-foreground-secondary'}>
-                                            {getAIDisplayName(config)}
-                                        </span>
-                                    </div>
-                                    {isSelected && <Check size={18} className="text-accent" />}
-                                </button>
-                            );
-                        })}
-                        <Link
-                            href="/settings"
-                            className="w-full px-6 py-4 flex items-center gap-3 text-foreground-muted hover:bg-background-secondary hover:text-accent border-t border-border transition"
+                ) : (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setIsOpen(!isOpen)}
+                            className="w-full flex items-center justify-between px-6 py-4 bg-background-card border border-border rounded-2xl hover:border-accent hover:shadow-md transition-all duration-300 backdrop-blur-sm group"
                         >
-                            <Settings size={18} />
-                            <span>管理 AI 設定</span>
-                        </Link>
-                    </div>
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors">
+                                    <Bot className="text-accent" size={24} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-xs text-foreground-muted uppercase tracking-wider mb-1">AI 解盤服務</div>
+                                    <div className="font-medium text-foreground-primary text-lg">
+                                        {currentConfig ? getAIDisplayName(currentConfig) : '未設定 AI'}
+                                    </div>
+                                </div>
+                            </div>
+                            <ChevronDown size={20} className={cn('text-foreground-muted transition-transform duration-300 group-hover:text-accent', isOpen && 'rotate-180')} />
+                        </button>
+
+                        {isOpen && configs.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-background-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                {configs.map((config) => {
+                                    const isSelected = currentConfig?.id === config.id;
+                                    return (
+                                        <button
+                                            key={config.id}
+                                            type="button"
+                                            onClick={() => handleSwitch(config.id)}
+                                            className={cn(
+                                                'w-full px-6 py-4 flex items-center justify-between hover:bg-background-secondary transition',
+                                                isSelected && 'bg-accent/5'
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn(
+                                                    'w-2 h-2 rounded-full',
+                                                    isSelected ? 'bg-accent shadow-[0_0_10px_var(--accent)]' : 'bg-gray-400 dark:bg-gray-600'
+                                                )} />
+                                                <span className={isSelected ? 'text-accent font-medium' : 'text-foreground-secondary'}>
+                                                    {getAIDisplayName(config)}
+                                                </span>
+                                            </div>
+                                            {isSelected && <Check size={18} className="text-accent" />}
+                                        </button>
+                                    );
+                                })}
+                                <Link
+                                    href="/settings"
+                                    className="w-full px-6 py-4 flex items-center gap-3 text-foreground-muted hover:bg-background-secondary hover:text-accent border-t border-border transition"
+                                >
+                                    <Settings size={18} />
+                                    <span>管理 AI 設定</span>
+                                </Link>
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {shouldShowWarning && (
@@ -243,13 +272,18 @@ export function AISelector({
             <div className="flex items-center gap-2">
                 <Bot className="text-accent" size={16} />
                 <span className="text-sm text-foreground-muted">AI:</span>
-                <button
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="text-sm text-accent hover:underline flex items-center gap-1"
-                >
-                    {currentConfig ? getAIDisplayName(currentConfig) : '未設定'}
-                    <ChevronDown size={14} className={cn('transition-transform', isOpen && 'rotate-180')} />
-                </button>
+                {isGuest ? (
+                    <span className="text-sm text-accent">NVIDIA AI (試用)</span>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="text-sm text-accent hover:underline flex items-center gap-1"
+                    >
+                        {currentConfig ? getAIDisplayName(currentConfig) : '未設定'}
+                        <ChevronDown size={14} className={cn('transition-transform', isOpen && 'rotate-180')} />
+                    </button>
+                )}
             </div>
 
             {isOpen && configs.length > 0 && (
