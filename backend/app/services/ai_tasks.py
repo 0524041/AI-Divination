@@ -42,7 +42,7 @@ def get_guest_ai_config(db, user_id: int):
     user = db.query(User).filter(User.id == user_id).first()
     if user and user.role == "guest":
         settings = get_settings()
-        nvidia_api_key = os.getenv("NVIDIA_API_KEY", "")
+        nvidia_api_key = settings.NVIDIA_API_KEY
 
         if not nvidia_api_key:
             raise ValueError("NVIDIA_API_KEY not found in environment")
