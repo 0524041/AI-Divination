@@ -47,10 +47,10 @@ module.exports = {
         },
       },
       fontFamily: {
-        serif: ['var(--font-serif)', 'Noto Serif TC', 'serif'],
-        sans: ['var(--font-noto-sans)', 'var(--font-inter)', 'sans-serif'],
-        heading: ['var(--font-serif)', 'serif'],
-        body: ['var(--font-noto-sans)', 'sans-serif'],
+        serif: ['Noto Serif TC', 'Georgia', 'serif'],
+        sans: ['Inter', 'Noto Sans TC', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        heading: ['Noto Serif TC', 'Georgia', 'serif'],
+        body: ['Inter', 'Noto Sans TC', 'sans-serif'],
       },
       animation: {
         'spin-slow': 'spin 3s linear infinite',

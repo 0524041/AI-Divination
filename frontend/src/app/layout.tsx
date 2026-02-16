@@ -3,31 +3,9 @@ import type { Metadata } from 'next';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import dynamic from 'next/dynamic';
-import { Inter, Noto_Sans_TC, Noto_Serif_TC } from 'next/font/google';
 
 const BackgroundCanvas = dynamic(() => import('@/components/ui/BackgroundCanvas'), {
   ssr: false,
-});
-
-// Load fonts
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-});
-
-const notoSansTC = Noto_Sans_TC({
-  weight: ['300', '400', '500', '700'],
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-noto-sans',
-});
-
-const notoSerifTC = Noto_Serif_TC({
-  weight: ['400', '500', '600', '700'],
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-serif',
 });
 
 export const metadata: Metadata = {
@@ -39,7 +17,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-TW" suppressHydrationWarning>
-      <body className={`${inter.variable} ${notoSansTC.variable} ${notoSerifTC.variable} font-sans antialiased bg-background-primary text-foreground-primary transition-colors duration-300 relative min-h-screen`}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="font-sans antialiased bg-background-primary text-foreground-primary transition-colors duration-300 relative min-h-screen">
         <ThemeProvider>
           <AuthProvider>
             <BackgroundCanvas />
