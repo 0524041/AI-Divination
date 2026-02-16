@@ -4,7 +4,7 @@
 
 import json
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -54,7 +54,8 @@ class TarotResponse(BaseModel):
 
 @router.post("", response_model=TarotResponse)
 async def create_tarot_divination(
-    request: TarotRequest,
+    tarot_request: TarotRequest,
+    http_request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user_or_guest),
@@ -63,9 +64,13 @@ async def create_tarot_divination(
 
     if current_user.role == "guest":
         from app.utils.security import check_guest_daily_limit
-        from fastapi import Request as FastAPIRequest
 
-        ai_config = None
+        allowed, today_count = check_guest_daily_limit(http_request, db)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"訪客試用每日限制 5 次，今日已使用 {today_count} 次。請註冊帳號以使用完整功能。",
+            )
     else:
         ai_config = (
             db.query(AIConfig)
@@ -79,25 +84,22 @@ async def create_tarot_divination(
                 detail="請先在設定頁面配置 AI 服務",
             )
 
-    # 牌陣類型名稱映射
     spread_names = {
         "three_card": "三牌陣",
         "single": "單抽牌",
         "celtic_cross": "凱爾特十字",
     }
 
-    # 準備 chart_data
     chart_data = {
-        "spread": request.spread_type,
-        "spread_name": spread_names.get(request.spread_type, "未知牌陣"),
-        "cards": [card.dict() for card in request.cards],
+        "spread": tarot_request.spread_type,
+        "spread_name": spread_names.get(tarot_request.spread_type, "未知牌陣"),
+        "cards": [card.dict() for card in tarot_request.cards],
     }
 
-    # 建立歷史紀錄
     history = History(
         user_id=current_user.id,
         divination_type="tarot",
-        question=request.question,
+        question=tarot_request.question,
         chart_data=json.dumps(chart_data, ensure_ascii=False),
         status="pending",
     )
@@ -106,10 +108,8 @@ async def create_tarot_divination(
     db.commit()
     db.refresh(history)
 
-    # 觸發背景任務 - 使用 shared task
     db_url = settings.DATABASE_URL
     if db_url.startswith("sqlite"):
-        # 修正 SQLite URL 格式以供背景任務使用
         if "///" not in db_url:
             db_url = db_url.replace("sqlite://", "sqlite:///")
 

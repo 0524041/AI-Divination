@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -48,15 +48,20 @@ class DivinationResponse(BaseModel):
 @router.post("", response_model=DivinationResponse)
 async def create_divination(
     data: ZiweiDivinationRequest,
+    http_request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_or_guest),
 ):
     if current_user.role == "guest":
         from app.utils.security import check_guest_daily_limit
-        from fastapi import Request as FastAPIRequest
 
-        ai_config = None
+        allowed, today_count = check_guest_daily_limit(http_request, db)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail=f"訪客試用每日限制 5 次，今日已使用 {today_count} 次。請註冊帳號以使用完整功能。",
+            )
     else:
         ai_config = (
             db.query(AIConfig)
