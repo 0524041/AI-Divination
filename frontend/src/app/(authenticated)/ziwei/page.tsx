@@ -75,6 +75,7 @@ const formatBazi = (baziStr?: string) => {
 
 export default function ZiweiPage() {
   const router = useRouter();
+  const { isGuest } = useAuth();
   const [step, setStep] = useState<Step>('intro');
 
   // Birth Data Form
@@ -325,7 +326,7 @@ export default function ZiweiPage() {
       setError('請輸入問題');
       return;
     }
-    if (!activeAI) {
+    if (!isGuest && !activeAI) {
       setError('請先配置 AI 服務');
       return;
     }
@@ -1017,7 +1018,7 @@ export default function ZiweiPage() {
                 </Button>
                 <Button
                   onClick={handleSubmitQuery}
-                  disabled={isProcessing || !question.trim() || !activeAI}
+                  disabled={isProcessing || !question.trim() || (!isGuest && !activeAI)}
                   className="flex-1"
                 >
                   {isProcessing ? (
@@ -1034,7 +1035,7 @@ export default function ZiweiPage() {
                 </Button>
               </div>
 
-              {!activeAI && (
+              {!isGuest && !activeAI && (
                 <p className="text-center text-sm text-amber-400">
                   請先到<Link href="/settings" className="underline hover:text-accent">設定頁面</Link>配置 AI 服務
                 </p>

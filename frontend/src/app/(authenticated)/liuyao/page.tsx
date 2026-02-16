@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { LiuyaoChart } from '@/components/liuyao/LiuyaoChart';
 import CoinTossing from '@/components/CoinTossing';
 import { AISelector, AIConfig } from '@/components/features/AISelector';
+import { useAuth } from '@/contexts/AuthContext';
 import { apiGet, apiPost } from '@/lib/api-client';
 import {
   Compass,
@@ -51,6 +52,7 @@ const AI_TIMEOUT = 5 * 60 * 1000; // 5 分鐘超時
 
 export default function LiuYaoPage() {
   const router = useRouter();
+  const { isGuest } = useAuth();
   const [step, setStep] = useState<'intro' | 'divine'>('intro');
   const [activeTab, setActiveTab] = useState<Tab>('divine');
   const [question, setQuestion] = useState('');
@@ -569,7 +571,7 @@ export default function LiuYaoPage() {
                       type="submit"
                       variant="gold"
                       fullWidth
-                      disabled={loading || !question.trim() || !activeAI}
+                      disabled={loading || !question.trim() || (!isGuest && !activeAI)}
                       className="flex items-center justify-center gap-2"
                     >
                       {loading ? (
@@ -584,7 +586,7 @@ export default function LiuYaoPage() {
                         </>
                       )}
                     </Button>
-                    {!activeAI && (
+                    {!isGuest && !activeAI && (
                       <p className="text-center text-sm text-amber-400">
                         請先到<Link href="/settings" className="underline hover:text-accent">設定頁面</Link>配置 AI 服務
                       </p>

@@ -159,7 +159,7 @@ class CustomAIService(AIService):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": 0.6,
+            "temperature": 1.0,
             "top_p": 0.7,
             "max_tokens": 16384,
         }
