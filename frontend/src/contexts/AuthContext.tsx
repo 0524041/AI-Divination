@@ -13,6 +13,7 @@ export interface AuthContextType {
     user: User | null;
     loading: boolean;
     isAuthenticated: boolean;
+    isGuest: boolean;
     login: (token: string) => void;
     logout: () => void;
     checkAuth: () => Promise<boolean>;
@@ -100,6 +101,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         user,
         loading,
         isAuthenticated: !!user,
+        isGuest: user?.role === 'guest',
         login,
         logout,
         checkAuth,

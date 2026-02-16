@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 export default function LoginPage() {
   const router = useRouter();
   const [isInit, setIsInit] = useState<boolean | null>(null);
-  const [mode, setMode] = useState<'login' | 'register' | 'init'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'init' | 'guest'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,7 +48,6 @@ export default function LoginPage() {
       let endpoint = '';
       let body: Record<string, string> = {};
 
-      // Common Validation
       const validateLength = (str: string, min: number, max: number, name: string) => {
         if (str.length < min || str.length > max) return `${name}長度需為 ${min}-${max} 字`;
         return null;
@@ -61,7 +60,10 @@ export default function LoginPage() {
 
       const validatePassword = (pwd: string) => validateLength(pwd, 6, 20, "密碼");
 
-      if (mode === 'init') {
+      if (mode === 'guest') {
+        endpoint = '/api/auth/guest-login';
+        body = {};
+      } else if (mode === 'init') {
         const pwdError = validatePassword(password);
         if (pwdError) { setError(pwdError); setLoading(false); return; }
         if (password !== confirmPassword) {
@@ -158,6 +160,7 @@ export default function LoginPage() {
             {mode === 'init' && '初始化系統'}
             {mode === 'login' && '登入'}
             {mode === 'register' && '註冊帳號'}
+            {mode === 'guest' && '訪客試用'}
           </h2>
 
           {mode === 'init' && (
@@ -165,10 +168,21 @@ export default function LoginPage() {
               首次使用，請設定管理員密碼
             </p>
           )}
+          
+          {mode === 'guest' && (
+            <div className="bg-accent/10 border border-accent/30 rounded-lg p-4 mb-6 text-sm">
+              <p className="text-foreground-primary mb-2">⚡ 訪客試用規則：</p>
+              <ul className="text-foreground-secondary space-y-1 list-disc list-inside">
+                <li>每日限制 5 次占卜（不限類型）</li>
+                <li>無法查看歷史紀錄</li>
+                <li>使用 NVIDIA AI 服務</li>
+              </ul>
+              <p className="text-accent mt-3 font-medium">註冊帳號即可使用完整功能！</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 用戶名 (登入和註冊時顯示) */}
-            {mode !== 'init' && (
+            {mode !== 'init' && mode !== 'guest' && (
               <div>
                 <label className="block text-sm text-foreground-secondary mb-2">用戶名</label>
                 <div className="relative">
@@ -185,49 +199,51 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* 密碼 */}
-            <div>
-              <label className="block text-sm text-foreground-secondary mb-2">
-                {mode === 'init' ? '設定管理員密碼' : '密碼'}
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" size={18} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                  placeholder="請輸入密碼"
-                  required
-                  minLength={6}
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {/* 確認密碼 (初始化和註冊時) */}
-            {(mode === 'init' || mode === 'register') && (
-              <div>
-                <label className="block text-sm text-foreground-secondary mb-2">確認密碼</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" size={18} />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    placeholder="再次輸入密碼"
-                    required
-                    minLength={6}
-                  />
+            {mode !== 'guest' && (
+              <>
+                <div>
+                  <label className="block text-sm text-foreground-secondary mb-2">
+                    {mode === 'init' ? '設定管理員密碼' : '密碼'}
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" size={18} />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-12 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                      placeholder="請輸入密碼"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+
+                {(mode === 'init' || mode === 'register') && (
+                  <div>
+                    <label className="block text-sm text-foreground-secondary mb-2">確認密碼</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" size={18} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                        placeholder="再次輸入密碼"
+                        required
+                        minLength={6}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* 錯誤訊息 */}
@@ -237,14 +253,26 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* 提交按鈕 */}
             <Button variant="gold" fullWidth loading={loading} type="submit">
-              {mode === 'init' ? '建立管理員帳號' : mode === 'login' ? '登入' : '註冊'}
+              {mode === 'init' ? '建立管理員帳號' : mode === 'login' ? '登入' : mode === 'guest' ? '開始試用' : '註冊'}
             </Button>
+            
+            {mode === 'login' && (
+              <Button 
+                variant="outline" 
+                fullWidth 
+                type="button"
+                onClick={() => {
+                  setMode('guest');
+                  setError('');
+                }}
+              >
+                訪客試用
+              </Button>
+            )}
           </form>
 
-          {/* 切換模式 */}
-          {isInit && mode !== 'init' && (
+          {isInit && mode !== 'init' && mode !== 'guest' && (
             <div className="mt-6 text-center text-sm">
               {mode === 'login' ? (
                 <p className="text-foreground-secondary">

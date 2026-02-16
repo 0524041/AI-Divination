@@ -10,7 +10,12 @@ from typing import Optional, List
 from app.core.database import get_db
 from app.models.user import User
 from app.models.settings import AIConfig
-from app.utils.auth import get_current_user, encrypt_api_key, decrypt_api_key
+from app.utils.auth import (
+    get_current_user,
+    get_current_user_or_guest,
+    encrypt_api_key,
+    decrypt_api_key,
+)
 from app.services.ai import CustomAIService
 from app.utils.security import sanitize_url, RateLimitDep
 
@@ -65,9 +70,16 @@ class TestConnectionResponse(BaseModel):
 
 @router.get("/ai", response_model=List[AIConfigResponse])
 def get_ai_configs(
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
 ):
     """取得用戶的 AI 設定"""
+    if current_user.role == "guest":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="訪客無法存取設定功能，請註冊帳號",
+        )
+
     configs = db.query(AIConfig).filter(AIConfig.user_id == current_user.id).all()
 
     return [

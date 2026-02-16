@@ -14,12 +14,13 @@ from app.core.config import get_settings, BASE_DIR
 from app.models.user import User
 from app.models.settings import AIConfig
 from app.models.history import History
-from app.utils.auth import get_current_user, decrypt_api_key
+from app.utils.auth import get_current_user, get_current_user_or_guest, decrypt_api_key
 from app.services.ai import get_ai_service
 from app.services.ai_tasks import process_ziwei_task
 
 router = APIRouter(prefix="/api/ziwei", tags=["紫微斗數"], redirect_slashes=False)
 settings = get_settings()
+
 
 class ZiweiDivinationRequest(BaseModel):
     birth_data_id: Optional[int] = None
@@ -49,15 +50,20 @@ async def create_divination(
     data: ZiweiDivinationRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_guest),
 ):
-    ai_config = (
-        db.query(AIConfig)
-        .filter(AIConfig.user_id == current_user.id, AIConfig.is_active == True)
-        .first()
-    )
+    if current_user.role == "guest":
+        from app.utils.security import check_guest_daily_limit
+        from fastapi import Request as FastAPIRequest
+        ai_config = None
+    else:
+        ai_config = (
+            db.query(AIConfig)
+            .filter(AIConfig.user_id == current_user.id, AIConfig.is_active == True)
+            .first()
+        )
 
-    if not ai_config:
+        if not ai_config:
         raise HTTPException(status_code=400, detail="請先設定 AI 服務")
 
     if data.query_type != "natal" and not data.query_date:

@@ -19,7 +19,11 @@ export interface NavbarClientProps {
 export function NavbarClient({ items }: NavbarClientProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, isGuest } = useAuth();
+  
+  const visibleItems = isGuest 
+    ? items.filter(item => item.href !== '/history' && item.href !== '/settings')
+    : items;
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -46,7 +50,7 @@ export function NavbarClient({ items }: NavbarClientProps) {
       <div className="flex items-center gap-4">
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center space-x-8">
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
             return (
@@ -143,7 +147,7 @@ export function NavbarClient({ items }: NavbarClientProps) {
                   Menu
                 </div>
 
-                {items.map((item, index) => {
+                {visibleItems.map((item, index) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
 
