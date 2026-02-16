@@ -55,6 +55,7 @@ async def create_divination(
     if current_user.role == "guest":
         from app.utils.security import check_guest_daily_limit
         from fastapi import Request as FastAPIRequest
+
         ai_config = None
     else:
         ai_config = (
@@ -64,7 +65,7 @@ async def create_divination(
         )
 
         if not ai_config:
-        raise HTTPException(status_code=400, detail="請先設定 AI 服務")
+            raise HTTPException(status_code=400, detail="請先設定 AI 服務")
 
     if data.query_type != "natal" and not data.query_date:
         raise HTTPException(status_code=400, detail="流年/流月/流日需要提供查詢日期")
