@@ -3,6 +3,7 @@
 # ============================================
 # AI-Divination 啟動腳本
 # 使用 uv 進行 Python 版本管理和虛擬環境
+# Smart Deploy: 偵測變更，有變更才 build/install
 # ============================================
 
 # 顏色定義
@@ -19,6 +20,7 @@ BACKEND_DIR="$PROJECT_DIR/backend"
 FRONTEND_DIR="$PROJECT_DIR/frontend"
 VENV_DIR="$BACKEND_DIR/.venv"
 DB_FILE="$BACKEND_DIR/divination.db"
+STATE_FILE="$PROJECT_DIR/.deploy_state"
 
 # Python 版本要求 (使用 uv 管理)
 PYTHON_VERSION="3.10"
@@ -34,11 +36,12 @@ show_help() {
     echo -e "${YELLOW}用法:${NC} ./start.sh [選項]"
     echo ""
     echo -e "${YELLOW}選項:${NC}"
-    echo -e "  ${GREEN}(無參數)${NC}        啟動服務 (強制清除快取並重新構建前端)"
+    echo -e "  ${GREEN}(無參數)${NC}        Smart Deploy: 有變更才重建/安裝，無變更直接啟動"
+    echo -e "  ${GREEN}--force-build${NC}   強制重建前端（忽略變更偵測）"
     echo -e "  ${GREEN}--reset${NC}         重置資料庫 (清空所有資料回到初始狀態)"
     echo -e "  ${GREEN}--clean-cache${NC}   清理所有快取 (包含 __pycache__, .next, node_modules/.cache)"
     echo -e "  ${GREEN}--stop${NC}          停止所有服務"
-    echo -e "  ${GREEN}--restart${NC}       重啟服務 (不重新構建前端)"
+    echo -e "  ${GREEN}--restart${NC}       重啟服務 (Smart: 有變更才重建)"
     echo -e "  ${GREEN}--status${NC}        查看服務狀態"
     echo -e "  ${GREEN}--logs [-f]${NC}     查看服務日誌 (-f 可動態追蹤)"
     echo -e "  ${GREEN}--install${NC}       只安裝依賴，不啟動服務"
@@ -47,9 +50,17 @@ show_help() {
     echo -e "  ${GREEN}--dev${NC}           開發模式 (前端 npm run dev + 後端 uvicorn --reload)"
     echo -e "  ${GREEN}--help, -h${NC}      顯示此幫助信息"
     echo ""
+    echo -e "${YELLOW}Smart Deploy 說明:${NC}"
+    echo -e "  啟動時自動比較上次部署狀態 (.deploy_state)"
+    echo -e "  - 程式碼變更 → 重建前端"
+    echo -e "  - uv.lock 變更 → 更新 Python 依賴"
+    echo -e "  - package-lock.json 變更 → 更新前端依賴"
+    echo -e "  - 無變更 → 直接啟動 (秒速)"
+    echo ""
     echo -e "${YELLOW}範例:${NC}"
-    echo -e "  ./start.sh              # 啟動服務 (清除快取 + 重新構建)"
-    echo -e "  ./start.sh --restart    # 快速重啟 (使用現有構建)"
+    echo -e "  ./start.sh              # Smart Deploy (推薦)"
+    echo -e "  ./start.sh --restart    # 快速重啟 (有變更才重建)"
+    echo -e "  ./start.sh --force-build # 強制重建前端後啟動"
     echo -e "  ./start.sh --build only # 只構建前端 (不啟動)"
     echo -e "  ./start.sh --dev        # 開發模式 (有熱重載)"
     echo -e "  ./start.sh --reset      # 重置資料庫後啟動"
@@ -60,23 +71,108 @@ show_help() {
 }
 
 # ============================================
+# 變更偵測：計算狀態 hash
+# ============================================
+compute_state() {
+    local code_hash backend_deps_hash frontend_deps_hash
+
+    # 程式碼狀態：優先使用 git commit（含 dirty 標記）
+    if git -C "$PROJECT_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+        local head
+        head=$(git -C "$PROJECT_DIR" rev-parse HEAD 2>/dev/null || echo "no-commit")
+        local dirty=""
+        if git -C "$PROJECT_DIR" status --porcelain -- backend frontend scripts 2>/dev/null | grep -q .; then
+            dirty="-dirty"
+        fi
+        code_hash="${head}${dirty}"
+    else
+        # 無 git 環境：使用檔案 checksum fallback
+        code_hash=$(find "$BACKEND_DIR/app" "$BACKEND_DIR/prompts" "$FRONTEND_DIR/src" \
+            -type f 2>/dev/null | sort | xargs shasum 2>/dev/null | shasum | cut -d' ' -f1)
+    fi
+
+    # 依賴狀態
+    backend_deps_hash=$(shasum "$BACKEND_DIR/uv.lock" 2>/dev/null | cut -d' ' -f1 || echo "missing")
+    frontend_deps_hash=$(shasum "$FRONTEND_DIR/package-lock.json" 2>/dev/null | cut -d' ' -f1 || echo "missing")
+
+    echo "code=${code_hash}"
+    echo "backend_deps=${backend_deps_hash}"
+    echo "frontend_deps=${frontend_deps_hash}"
+}
+
+# 從 state 檔案讀取單一 key 的值
+read_state_value() {
+    local key="$1"
+    [ -f "$STATE_FILE" ] || return 1
+    grep "^${key}=" "$STATE_FILE" 2>/dev/null | cut -d= -f2-
+}
+
+# 比較狀態，回傳需要做的事（全域變數）
+# NEEDS_CODE_BUILD / NEEDS_BACKEND_DEPS / NEEDS_FRONTEND_DEPS
+compare_state() {
+    local current
+    current=$(compute_state)
+
+    local current_code current_backend current_frontend
+    local last_code last_backend last_frontend
+
+    current_code=$(echo "$current" | grep "^code=" | cut -d= -f2-)
+    current_backend=$(echo "$current" | grep "^backend_deps=" | cut -d= -f2-)
+    current_frontend=$(echo "$current" | grep "^frontend_deps=" | cut -d= -f2-)
+
+    last_code=$(read_state_value "code")
+    last_backend=$(read_state_value "backend_deps")
+    last_frontend=$(read_state_value "frontend_deps")
+
+    NEEDS_CODE_BUILD=false
+    NEEDS_BACKEND_DEPS=false
+    NEEDS_FRONTEND_DEPS=false
+
+    # 程式碼變更判斷
+    if [ -z "$last_code" ] || [ "$current_code" != "$last_code" ]; then
+        NEEDS_CODE_BUILD=true
+    fi
+
+    # 後端依賴變更判斷
+    if [ -z "$last_backend" ] || [ "$current_backend" != "$last_backend" ]; then
+        NEEDS_BACKEND_DEPS=true
+    fi
+
+    # 前端依賴變更判斷
+    if [ -z "$last_frontend" ] || [ "$current_frontend" != "$last_frontend" ]; then
+        NEEDS_FRONTEND_DEPS=true
+    fi
+
+    # 前端沒有建置產物時，一定要 build
+    if [ ! -f "$FRONTEND_DIR/.next/BUILD_ID" ]; then
+        NEEDS_CODE_BUILD=true
+    fi
+}
+
+# 寫入部署狀態
+save_state() {
+    compute_state > "$STATE_FILE"
+    echo -e "${GREEN}✓ 已更新部署狀態${NC}"
+}
+
+# ============================================
 # 重置資料庫
 # ============================================
 reset_database() {
     echo -e "\n${YELLOW}[重置] 清空資料庫...${NC}"
-    
+
     if [ -f "$DB_FILE" ]; then
         rm -f "$DB_FILE"
         echo -e "${GREEN}✓ 已刪除資料庫檔案${NC}"
     else
         echo -e "${CYAN}ℹ 資料庫檔案不存在${NC}"
     fi
-    
+
     # 刪除加密金鑰 (重置後需要重新初始化)
     rm -f "$BACKEND_DIR/.secret_key" 2>/dev/null
     rm -f "$BACKEND_DIR/.encryption_key" 2>/dev/null
     echo -e "${GREEN}✓ 已清除金鑰檔案${NC}"
-    
+
     echo -e "${GREEN}✓ 資料庫重置完成，下次啟動時將重新初始化${NC}"
 }
 
@@ -85,30 +181,30 @@ reset_database() {
 # ============================================
 clean_cache() {
     echo -e "\n${YELLOW}[清理] 清除所有快取...${NC}"
-    
+
     # 清理 Python 快取
     find "$BACKEND_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     find "$BACKEND_DIR" -type f -name "*.pyc" -delete 2>/dev/null || true
     find "$BACKEND_DIR" -type f -name "*.pyo" -delete 2>/dev/null || true
     echo -e "${GREEN}✓ Python 快取已清除${NC}"
-    
+
     # 清理 Next.js 快取
     if [ -d "$FRONTEND_DIR/.next" ]; then
         rm -rf "$FRONTEND_DIR/.next"
         echo -e "${GREEN}✓ Next.js 快取已清除${NC}"
     fi
-    
+
     # 清理 node_modules 快取
     if [ -d "$FRONTEND_DIR/node_modules/.cache" ]; then
         rm -rf "$FRONTEND_DIR/node_modules/.cache"
         echo -e "${GREEN}✓ Node.js 快取已清除${NC}"
     fi
-    
+
     # 清理日誌檔案
     rm -f "$PROJECT_DIR/backend.log" 2>/dev/null
     rm -f "$PROJECT_DIR/frontend.log" 2>/dev/null
     echo -e "${GREEN}✓ 日誌檔案已清除${NC}"
-    
+
     echo -e "${GREEN}✓ 所有快取清理完成${NC}"
 }
 
@@ -117,10 +213,10 @@ clean_cache() {
 # ============================================
 stop_services() {
     echo -e "\n${YELLOW}[停止] 正在停止所有服務...${NC}"
-    
+
     local BACKEND_STOPPED=false
     local FRONTEND_STOPPED=false
-    
+
     # Step 1: 優雅停止 (SIGTERM)
     if pgrep -f "uvicorn app.main:app" > /dev/null 2>&1; then
         pkill -TERM -f "uvicorn app.main:app" 2>/dev/null
@@ -128,7 +224,7 @@ stop_services() {
         BACKEND_STOPPED=true
         echo -e "${CYAN}ℹ 後端服務未運行${NC}"
     fi
-    
+
     if pgrep -f "next-server|next dev|next start" > /dev/null 2>&1; then
         pkill -TERM -f "next-server" 2>/dev/null
         pkill -TERM -f "next dev" 2>/dev/null
@@ -137,13 +233,13 @@ stop_services() {
         FRONTEND_STOPPED=true
         echo -e "${CYAN}ℹ 前端服務未運行${NC}"
     fi
-    
+
     # Step 2: 等待優雅退出
     if [ "$BACKEND_STOPPED" = false ] || [ "$FRONTEND_STOPPED" = false ]; then
         echo -e "${CYAN}等待進程優雅退出...${NC}"
         sleep 2
     fi
-    
+
     # Step 3: 確認後端停止
     if [ "$BACKEND_STOPPED" = false ]; then
         if pgrep -f "uvicorn app.main:app" > /dev/null 2>&1; then
@@ -151,14 +247,14 @@ stop_services() {
             pkill -9 -f "uvicorn app.main:app" 2>/dev/null
             sleep 1
         fi
-        
+
         if ! pgrep -f "uvicorn app.main:app" > /dev/null 2>&1; then
             echo -e "${GREEN}✓ 後端服務已停止${NC}"
         else
             echo -e "${RED}✗ 後端服務停止失敗${NC}"
         fi
     fi
-    
+
     # Step 4: 確認前端停止
     if [ "$FRONTEND_STOPPED" = false ]; then
         if pgrep -f "next-server|next dev|next start" > /dev/null 2>&1; then
@@ -168,14 +264,14 @@ stop_services() {
             pkill -9 -f "next start" 2>/dev/null
             sleep 1
         fi
-        
+
         if ! pgrep -f "next-server|next dev|next start" > /dev/null 2>&1; then
             echo -e "${GREEN}✓ 前端服務已停止${NC}"
         else
             echo -e "${RED}✗ 前端服務停止失敗${NC}"
         fi
     fi
-    
+
     # Step 5: 確保端口已釋放
     local PORT_ISSUES=false
     for port in 3000 8000; do
@@ -185,11 +281,11 @@ stop_services() {
             PORT_ISSUES=true
         fi
     done
-    
+
     if [ "$PORT_ISSUES" = true ]; then
         sleep 1
     fi
-    
+
     # 最終確認
     local FINAL_OK=true
     for port in 3000 8000; do
@@ -198,7 +294,7 @@ stop_services() {
             FINAL_OK=false
         fi
     done
-    
+
     if [ "$FINAL_OK" = true ]; then
         echo -e "${GREEN}✓ 服務停止完成，端口已釋放${NC}"
     else
@@ -215,9 +311,9 @@ cleanup_processes_and_ports() {
     pkill -f "next-server" 2>/dev/null || true
     pkill -f "next dev" 2>/dev/null || true
     pkill -f "next start" 2>/dev/null || true
-    
+
     sleep 2
-    
+
     # 檢查端口並強制釋放
     for port in 3000 8000; do
         if lsof -ti:$port > /dev/null 2>&1; then
@@ -249,51 +345,71 @@ show_startup_info() {
 }
 
 # ============================================
-# 純啟動服務（用於 restart，不構建前端）
+# 啟動後端 (生產模式，無 --reload)
 # ============================================
-start_services_only() {
-    echo -e "\n${YELLOW}[啟動] 啟動服務（不重新構建）...${NC}"
-    
-    # 清理殘留進程並釋放端口
-    cleanup_processes_and_ports
-    
-    # 啟動後端
+start_backend() {
     echo "啟動後端服務 (Port 8000, localhost only)..."
     cd "$BACKEND_DIR"
-    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
+    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 > "$PROJECT_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
-    
+}
+
+# ============================================
+# 純啟動服務（不 build，用於 restart / smart deploy）
+# ============================================
+start_services_only() {
+    echo -e "\n${YELLOW}[啟動] 啟動服務...${NC}"
+
+    # 清理殘留進程並釋放端口
+    cleanup_processes_and_ports
+
+    # 啟動後端
+    start_backend
+
     # 啟動前端（使用現有構建）
-    echo "啟動前端服務 (Port 3000, 使用現有構建)..."
-    cd "$FRONTEND_DIR"
-    
-    if [ ! -d ".next" ] || [ ! -f ".next/BUILD_ID" ]; then
+    if [ ! -d "$FRONTEND_DIR/.next" ] || [ ! -f "$FRONTEND_DIR/.next/BUILD_ID" ]; then
         echo -e "${RED}✗ 未找到前端構建檔案，請先執行 ./start.sh --build${NC}"
         exit 1
     fi
-    
+
+    echo "啟動前端服務 (Port 3000, 使用現有構建)..."
+    cd "$FRONTEND_DIR"
     nohup npm start -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
-    
+
     sleep 3
     show_startup_info
 }
 
 # ============================================
-# 重啟服務（單純重啟，不檢查前端更新）
+# 重啟服務（Smart: 有變更才重建）
 # ============================================
 restart_services() {
     echo -e "\n${YELLOW}[重啟] 正在重啟所有服務...${NC}"
-    
+
     # 停止服務
     stop_services
     sleep 2
-    
-    # 直接啟動服務，不檢查前端變更
-    # 使用 SKIP_FRONTEND_BUILD 標記跳過前端構建
-    SKIP_FRONTEND_BUILD=true
+
     cd "$PROJECT_DIR"
+
+    # 比較狀態（只在需要時重建）
+    compare_state
+
+    if [ "$NEEDS_BACKEND_DEPS" = true ]; then
+        install_python_deps
+    fi
+
+    if [ "$NEEDS_FRONTEND_DEPS" = true ]; then
+        install_frontend_deps
+    fi
+
+    if [ "$NEEDS_CODE_BUILD" = true ]; then
+        build_frontend
+    fi
+
     start_services_only
+    save_state
 }
 
 # ============================================
@@ -303,7 +419,7 @@ show_status() {
     echo -e "\n${BLUE}============================================${NC}"
     echo -e "${BLUE}       服務狀態${NC}"
     echo -e "${BLUE}============================================${NC}"
-    
+
     # 檢查後端
     if pgrep -f "uvicorn app.main:app" > /dev/null; then
         BACKEND_PID=$(pgrep -f "uvicorn app.main:app")
@@ -311,7 +427,7 @@ show_status() {
     else
         echo -e "後端服務: ${RED}未運行${NC}"
     fi
-    
+
     # 檢查前端
     if pgrep -f "next-server|next dev|next start" > /dev/null; then
         FRONTEND_PID=$(pgrep -f "next-server|next dev|next start")
@@ -319,7 +435,7 @@ show_status() {
     else
         echo -e "前端服務: ${RED}未運行${NC}"
     fi
-    
+
     echo -e "${BLUE}============================================${NC}"
 }
 
@@ -337,7 +453,7 @@ show_logs() {
         echo -e "${CYAN}完整日誌檔案位於: $PROJECT_DIR/backend.log, frontend.log${NC}"
         echo -e "${CYAN}提示: 使用 ./start.sh --logs -f 可進行動態追蹤${NC}"
     fi
-    
+
     if [ "$FOLLOW" == "-f" ]; then
         # 如果是跟隨模式，合併輸出
         tail -f "$PROJECT_DIR/backend.log" "$PROJECT_DIR/frontend.log"
@@ -346,7 +462,7 @@ show_logs() {
             echo -e "\n${YELLOW}=== 後端日誌 (backend.log) ===${NC}"
             tail -50 "$PROJECT_DIR/backend.log"
         fi
-        
+
         if [ -f "$PROJECT_DIR/frontend.log" ]; then
             echo -e "\n${YELLOW}=== 前端日誌 (frontend.log) ===${NC}"
             tail -50 "$PROJECT_DIR/frontend.log"
@@ -362,7 +478,7 @@ check_uv() {
         echo -e "${YELLOW}uv 未安裝，正在安裝...${NC}"
         curl -LsSf https://astral.sh/uv/install.sh | sh
         export PATH="$HOME/.local/bin:$PATH"
-        
+
         if ! command -v uv &> /dev/null; then
             echo -e "${RED}✗ uv 安裝失敗${NC}"
             exit 1
@@ -372,63 +488,82 @@ check_uv() {
 }
 
 # ============================================
-# 設置 Python 環境 (使用 uv)
+# 檢查環境變數
+# ============================================
+check_env() {
+    echo -e "\n${YELLOW}[環境檢查] 檢查環境變數...${NC}"
+
+    if [ ! -f "$BACKEND_DIR/.env" ]; then
+        if [ -f "$BACKEND_DIR/.env.example" ]; then
+            cp "$BACKEND_DIR/.env.example" "$BACKEND_DIR/.env"
+            echo -e "${YELLOW}✓ 已從 .env.example 建立 backend/.env${NC}"
+            echo -e "${RED}⚠ 請務必編輯 backend/.env 填入 OPENCODE_API_KEY 後再啟動！${NC}"
+            exit 1
+        else
+            echo -e "${RED}✗ 缺少 backend/.env 且無範例檔案${NC}"
+            exit 1
+        fi
+    fi
+
+    # 檢查 OPENCODE_API_KEY 是否已填
+    local key
+    key=$(grep "^OPENCODE_API_KEY=" "$BACKEND_DIR/.env" | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [ -z "$key" ]; then
+        echo -e "${RED}✗ backend/.env 中 OPENCODE_API_KEY 為空${NC}"
+        echo -e "${YELLOW}請編輯 backend/.env 填入 API Key 後再啟動${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ 環境變數檢查完成 (OPENCODE_API_KEY 已設定)${NC}"
+}
+
+# ============================================
+# 設置 Python 環境 + 安裝依賴 (uv sync)
 # ============================================
 setup_python_env() {
-    echo -e "\n${YELLOW}[2/7] 設置 Python 環境 (使用 uv)...${NC}"
-    
+    echo -e "\n${YELLOW}[Python] 設置環境與安裝依賴 (uv sync)...${NC}"
+
     cd "$BACKEND_DIR"
-    
+
     # 檢查虛擬環境是否存在且 Python 版本正確
-    NEED_CREATE_VENV=false
-    
+    local NEED_CREATE_VENV=false
+
     if [ ! -d "$VENV_DIR" ]; then
         NEED_CREATE_VENV=true
     else
-        # 檢查現有虛擬環境的 Python 版本
+        local ACTUAL_VERSION
         ACTUAL_VERSION=$("$VENV_DIR/bin/python" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
         if [ "$ACTUAL_VERSION" != "$PYTHON_VERSION" ]; then
             echo -e "${YELLOW}⚠ 虛擬環境 Python 版本不符 (目前: $ACTUAL_VERSION, 需要: $PYTHON_VERSION)${NC}"
-            echo "移除舊的虛擬環境..."
             rm -rf "$VENV_DIR"
             NEED_CREATE_VENV=true
         fi
     fi
-    
+
     if [ "$NEED_CREATE_VENV" = true ]; then
         echo "建立虛擬環境 (Python $PYTHON_VERSION)..."
         uv venv --python $PYTHON_VERSION "$VENV_DIR"
         echo -e "${GREEN}✓ 虛擬環境已建立${NC}"
-        
-        # 新建環境後需要重新安裝依賴
-        if [ -f "requirements.txt" ]; then
-            echo "安裝 Python 依賴..."
-            uv pip install -r requirements.txt --quiet
-        fi
     else
         echo -e "${GREEN}✓ 虛擬環境已存在 (Python $PYTHON_VERSION)${NC}"
     fi
-    
+
+    # 安裝依賴（uv sync 會自動偵測變更，使用 lock file）
+    # --no-dev: 生產環境不安裝 pytest/ruff 等開發工具
+    uv sync --no-dev --python $PYTHON_VERSION
+    echo -e "${GREEN}✓ Python 依賴已同步 (uv sync)${NC}"
+
     # 顯示 Python 版本
-    ACTUAL_VERSION=$("$VENV_DIR/bin/python" --version 2>&1)
-    echo -e "${GREEN}✓ $ACTUAL_VERSION${NC}"
+    echo -e "${GREEN}✓ $("$VENV_DIR/bin/python" --version 2>&1)${NC}"
 }
 
 # ============================================
-# 安裝 Python 依賴 (使用 uv)
+# 安裝 Python 依賴 (uv sync)
 # ============================================
 install_python_deps() {
-    echo -e "\n${YELLOW}[3/7] 安裝 Python 依賴 (使用 uv)...${NC}"
-    
+    echo -e "\n${YELLOW}[Python] 更新 Python 依賴 (uv sync)...${NC}"
     cd "$BACKEND_DIR"
-    
-    if [ -f "requirements.txt" ]; then
-        uv pip install -r requirements.txt --quiet
-        echo -e "${GREEN}✓ Python 依賴已安裝${NC}"
-    else
-        echo -e "${RED}✗ requirements.txt 不存在${NC}"
-        exit 1
-    fi
+    uv sync --no-dev --python $PYTHON_VERSION
+    echo -e "${GREEN}✓ Python 依賴已更新${NC}"
 }
 
 # ============================================
@@ -436,13 +571,13 @@ install_python_deps() {
 # ============================================
 check_dependencies() {
     echo -e "\n${YELLOW}[依賴檢查] 驗證核心套件...${NC}"
-    
+
     local packages=("fastapi" "httpx"
     "google.genai"
     "openai"
 )
     local missing=0
-    
+
     for pkg in "${packages[@]}"; do
         if ! "$VENV_DIR/bin/python" -c "import $pkg" &>/dev/null; then
             echo -e "${RED}✗ 缺失關鍵套件: $pkg${NC}"
@@ -451,7 +586,7 @@ check_dependencies() {
             echo -e "${GREEN}✓ 已安裝: $pkg${NC}"
         fi
     done
-    
+
     if [ $missing -gt 0 ]; then
         echo -e "${YELLOW}正在嘗試自動修復缺失套件...${NC}"
         install_python_deps
@@ -462,8 +597,8 @@ check_dependencies() {
 # 初始化資料庫
 # ============================================
 init_database() {
-    echo -e "\n${YELLOW}[4/8] 初始化資料庫...${NC}"
-    
+    echo -e "\n${YELLOW}[資料庫] 初始化資料庫...${NC}"
+
     cd "$BACKEND_DIR"
     "$VENV_DIR/bin/python" -c "from app.core.database import init_db; init_db()"
     echo -e "${GREEN}✓ 資料庫初始化完成${NC}"
@@ -473,11 +608,11 @@ init_database() {
 # 執行資料庫遷移
 # ============================================
 run_migrations() {
-    echo -e "\n${YELLOW}[4.5/8] 檢查並執行資料庫遷移...${NC}"
-    
+    echo -e "\n${YELLOW}[資料庫] 檢查並執行資料庫遷移...${NC}"
+
     cd "$BACKEND_DIR"
     MIGRATIONS_DIR="$BACKEND_DIR/migrations"
-    
+
     if [ -d "$MIGRATIONS_DIR" ]; then
         for script in "$MIGRATIONS_DIR"/*.py; do
             if [ -f "$script" ] && [ "$(basename "$script")" != "__init__.py" ]; then
@@ -496,12 +631,12 @@ run_migrations() {
 # 配置安全機制（簡化版 - 不再使用簽名密鑰）
 # ============================================
 configure_security() {
-    echo -e "\n${YELLOW}[5/8] 配置安全機制...${NC}"
-    
+    echo -e "\n${YELLOW}[安全] 配置安全機制...${NC}"
+
     # 後端會在 Settings 初始化時自動生成 SECRET_KEY 和 ENCRYPTION_KEY
     cd "$BACKEND_DIR"
     "$VENV_DIR/bin/python" -c "from app.core.config import get_settings; get_settings()"
-    
+
     echo -e "${GREEN}✓ 安全機制配置完成${NC}"
 }
 
@@ -512,19 +647,19 @@ optimize_database() {
     echo -e "\n${BLUE}============================================${NC}"
     echo -e "${BLUE}       資料庫優化${NC}"
     echo -e "${BLUE}============================================${NC}"
-    
+
     cd "$BACKEND_DIR"
-    
+
     if [ ! -f "divination.db" ]; then
         echo -e "${RED}✗ 找不到資料庫檔案${NC}"
         echo -e "${YELLOW}請先啟動服務一次以創建資料庫${NC}"
         exit 1
     fi
-    
+
     echo -e "${YELLOW}正在執行資料庫優化...${NC}\n"
-    
+
     python3 optimize_db_simple.py all
-    
+
     echo -e "\n${BLUE}============================================${NC}"
     echo -e "${GREEN}✓ 資料庫優化完成！${NC}"
     echo -e "${BLUE}============================================${NC}"
@@ -537,8 +672,8 @@ optimize_database() {
 # 檢查 Node.js
 # ============================================
 check_nodejs() {
-    echo -e "\n${YELLOW}[6/8] 檢查 Node.js 版本...${NC}"
-    
+    echo -e "\n${YELLOW}[Node] 檢查 Node.js 版本...${NC}"
+
     if command -v node &> /dev/null; then
         NODE_VERSION=$(node -v | sed 's/v//' | cut -d. -f1)
         if [ "$NODE_VERSION" -ge 18 ]; then
@@ -554,16 +689,15 @@ check_nodejs() {
 }
 
 # ============================================
-# 安裝前端依賴
+# 安裝前端依賴 (npm ci - 使用 lock file，更快更確定)
 # ============================================
 install_frontend_deps() {
-    echo -e "\n${YELLOW}[7/8] 安裝前端依賴...${NC}"
-    
+    echo -e "\n${YELLOW}[Frontend] 安裝前端依賴 (npm ci)...${NC}"
+
     cd "$FRONTEND_DIR"
-    
+
     if [ -f "package.json" ]; then
-        echo "檢查並更新前端依賴..."
-        npm install --silent
+        npm ci --silent
         echo -e "${GREEN}✓ 前端依賴已安裝${NC}"
     else
         echo -e "${RED}✗ package.json 不存在${NC}"
@@ -572,49 +706,53 @@ install_frontend_deps() {
 }
 
 # ============================================
-# 啟動服務（預設：強制清除快取並重新構建前端）
+# 構建前端 (生產模式)
 # ============================================
-start_services() {
-    echo -e "\n${YELLOW}[8/8] 啟動服務...${NC}"
-    
-    # 預設啟動：強制清除快取並重建前端
-    echo -e "${CYAN}清除前端快取...${NC}"
-    if [ -d "$FRONTEND_DIR/.next" ]; then
-        rm -rf "$FRONTEND_DIR/.next"
-        echo -e "${GREEN}✓ .next 快取已清除${NC}"
-    fi
-    if [ -d "$FRONTEND_DIR/node_modules/.cache" ]; then
-        rm -rf "$FRONTEND_DIR/node_modules/.cache"
-        echo -e "${GREEN}✓ node_modules/.cache 已清除${NC}"
-    fi
-    
-    # 清理殘留進程並釋放端口
-    cleanup_processes_and_ports
-    
-    # 啟動後端
-    echo "啟動後端服務 (Port 8000, localhost only)..."
-    cd "$BACKEND_DIR"
-    nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
-    BACKEND_PID=$!
-    
-    # 構建並啟動前端
-    echo "啟動前端服務 (Port 3000, 0.0.0.0)..."
+build_frontend() {
+    echo -e "\n${CYAN}[Frontend] 正在構建前端 (生產模式)...${NC}"
     cd "$FRONTEND_DIR"
-    
-    echo -e "${CYAN}正在構建前端 (生產模式)...${NC}"
     npm run build
     if [ $? -ne 0 ]; then
         echo -e "${RED}✗ 前端構建失敗${NC}"
         exit 1
     fi
     echo -e "${GREEN}✓ 前端構建完成${NC}"
-    
-    # 啟動生產伺服器
-    nohup npm start -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
-    FRONTEND_PID=$!
-    
-    sleep 3
-    show_startup_info
+}
+
+# ============================================
+# 啟動服務（Smart Deploy 主流程）
+# ============================================
+start_services() {
+    echo -e "\n${YELLOW}[啟動] Smart Deploy 啟動流程...${NC}"
+
+    # 比較變更
+    compare_state
+
+    # 1. 後端依賴變更 → uv sync
+    if [ "$NEEDS_BACKEND_DEPS" = true ]; then
+        echo -e "${YELLOW}ℹ 偵測到後端依賴變更 (uv.lock)${NC}"
+        install_python_deps
+    fi
+
+    # 2. 前端依賴變更 → npm ci
+    if [ "$NEEDS_FRONTEND_DEPS" = true ]; then
+        echo -e "${YELLOW}ℹ 偵測到前端依賴變更 (package-lock.json)${NC}"
+        install_frontend_deps
+    fi
+
+    # 3. 程式碼變更 → 重建前端
+    if [ "$NEEDS_CODE_BUILD" = true ]; then
+        echo -e "${YELLOW}ℹ 偵測到程式碼變更，重建前端...${NC}"
+        build_frontend
+    else
+        echo -e "${CYAN}ℹ 程式碼無變更，跳過前端構建${NC}"
+    fi
+
+    # 4. 啟動服務
+    start_services_only
+
+    # 5. 儲存部署狀態
+    save_state
 }
 
 # ============================================
@@ -622,21 +760,21 @@ start_services() {
 # ============================================
 start_dev_services() {
     echo -e "\n${YELLOW}[開發模式] 啟動服務...${NC}"
-    
+
     cleanup_processes_and_ports
-    
+
     echo "啟動後端服務 (開發模式 Port 8000)..."
     cd "$BACKEND_DIR"
     nohup "$VENV_DIR/bin/uvicorn" app.main:app --host 127.0.0.1 --port 8000 --reload > "$PROJECT_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
-    
+
     echo "啟動前端服務 (開發模式 Port 3000, 0.0.0.0)..."
     cd "$FRONTEND_DIR"
     nohup npm run dev -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
-    
+
     sleep 3
-    
+
     echo -e "\n${BLUE}============================================${NC}"
     echo -e "${GREEN}       開發模式服務已啟動！${NC}"
     echo -e "${BLUE}============================================${NC}"
@@ -659,13 +797,14 @@ main() {
     echo -e "${BLUE}============================================${NC}"
     echo -e "${BLUE}       AI-Divination 啟動程序${NC}"
     echo -e "${BLUE}============================================${NC}"
-    
+
     # 解析命令行參數
     RESET_DB=false
     CLEAN_CACHE=false
     INSTALL_ONLY=false
     DEV_MODE=false
-    
+    FORCE_BUILD=false
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             --help|-h)
@@ -674,6 +813,10 @@ main() {
                 ;;
             --reset)
                 RESET_DB=true
+                shift
+                ;;
+            --force-build)
+                FORCE_BUILD=true
                 shift
                 ;;
             --build|--rebuild)
@@ -689,10 +832,9 @@ main() {
                     fi
                     exit 0
                 else
-                    echo -e "${CYAN}ℹ 預設啟動現在會自動清除快取並重新構建前端${NC}"
-                    echo -e "${CYAN}  如只需構建不啟動，請使用: ./start.sh --build only${NC}"
+                    FORCE_BUILD=true
+                    shift
                 fi
-                shift
                 ;;
             --optimize-db)
                 optimize_database
@@ -737,52 +879,55 @@ main() {
                 ;;
         esac
     done
-    
+
     # 執行重置資料庫
     if [ "$RESET_DB" = true ]; then
         reset_database
     fi
-    
+
     # 執行清理快取
     if [ "$CLEAN_CACHE" = true ]; then
         clean_cache
     fi
-    
+
+    # 0. 檢查環境變數
+    check_env
+
     # 1. 檢查 uv
     echo -e "\n${YELLOW}[1/7] 檢查 uv 套件管理器...${NC}"
     check_uv
-    
-    # 2. 設置 Python 環境
+
+    # 2. 設置 Python 環境 + 安裝依賴
     setup_python_env
-    
-    # 3. 安裝 Python 依賴
-    install_python_deps
-    
+
     # 檢查依賴
     check_dependencies
-    
-    # 4. 初始化資料庫
+
+    # 3. 初始化資料庫
     init_database
 
-    # 4.5. 執行資料庫遷移
+    # 4. 執行資料庫遷移
     run_migrations
-    
+
     # 5. 配置安全機制
     configure_security
-    
+
     # 6. 檢查 Node.js
     check_nodejs
-    
-    # 7. 安裝前端依賴
-    install_frontend_deps
-    
-    # 8. 啟動服務 (除非只安裝)
+
+    # 7. 啟動服務 (除非只安裝)
     if [ "$INSTALL_ONLY" = true ]; then
         echo -e "\n${GREEN}✓ 安裝完成！${NC}"
         echo -e "${CYAN}使用 ${GREEN}./start.sh${CYAN} 啟動服務${NC}"
+        save_state
     elif [ "$DEV_MODE" = true ]; then
         start_dev_services
     else
+        # Smart Deploy: 有變更才 build，無變更直接啟動
+        if [ "$FORCE_BUILD" = true ]; then
+            echo -e "${YELLOW}ℹ 強制重建前端${NC}"
+            build_frontend
+        fi
         start_services
     fi
 }

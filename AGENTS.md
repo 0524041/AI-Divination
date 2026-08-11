@@ -43,16 +43,34 @@ AI-Divination/
 
 ### Master Control Script
 
+`start.sh` 使用 **Smart Deploy**：以 `.deploy_state` 記錄上次部署狀態，啟動時偵測變更，有變更才執行對應動作（程式碼變更 → 重建前端；uv.lock 變更 → uv sync；package-lock.json 變更 → npm ci），無變更則直接啟動。
+
 ```bash
-./start.sh                  # Production: build + start both services
+./start.sh                  # Smart Deploy: only rebuild/install when changed
+./start.sh --force-build    # Force frontend rebuild
 ./start.sh --dev            # Development: hot-reload enabled
 ./start.sh --stop           # Stop all services
-./start.sh --restart        # Restart services
+./start.sh --restart        # Restart (Smart: rebuild only when changed)
 ./start.sh --status         # Check running processes
 ./start.sh --logs -f        # Tail logs
 ./start.sh --build          # Force frontend rebuild
 ./start.sh --install        # Install dependencies only
 ./start.sh --reset          # ⚠️ Destructive — resets the database
+```
+
+#### Production Deploy Flow
+
+```bash
+# 初次部署
+git clone <repo> && cd AI-Divination
+cp backend/.env.example backend/.env   # 填入 OPENCODE_API_KEY
+./start.sh
+
+# 更新部署（無變更時秒速重啟，有變更自動 rebuild）
+git pull && ./start.sh
+
+# 無 git 的環境（rsync/scp 上傳後同樣有效，自動 fallback 到 checksum 偵測）
+./start.sh
 ```
 
 ### Frontend (from `frontend/`)

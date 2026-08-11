@@ -17,6 +17,9 @@ backend/.venv/
 .backend.pid
 .frontend.pid
 
+# Deploy state (Smart Deploy 變更偵測)
+.deploy_state
+
 # Node.js
 frontend/node_modules/
 frontend/.next/
