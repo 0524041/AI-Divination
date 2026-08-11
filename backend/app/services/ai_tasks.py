@@ -38,21 +38,21 @@ def get_tarot_system_prompt(spread_type: str) -> str:
 
 
 def get_guest_ai_config(db, user_id: int):
-    """為訪客創建虛擬 AI 配置（NVIDIA NIM）"""
+    """為訪客創建虛擬 AI 配置（opencode OpenAI-compatible endpoint）"""
     user = db.query(User).filter(User.id == user_id).first()
     if user and user.role == "guest":
         settings = get_settings()
-        nvidia_api_key = settings.NVIDIA_API_KEY
+        opencode_api_key = settings.OPENCODE_API_KEY
 
-        if not nvidia_api_key:
-            raise ValueError("NVIDIA_API_KEY not found in environment")
+        if not opencode_api_key:
+            raise ValueError("OPENCODE_API_KEY not found in environment")
 
         class GuestAIConfig:
             provider = "custom"
-            local_url = "https://integrate.api.nvidia.com"
-            effective_model = "qwen/qwen3-next-80b-a3b-thinking"
+            local_url = "https://opencode.ai/zen/go"
+            effective_model = "deepseek-v4-flash"
             api_key_encrypted = None
-            _api_key = nvidia_api_key
+            _api_key = opencode_api_key
 
         return GuestAIConfig()
     return None

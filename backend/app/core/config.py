@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
 
     # 訪客模式 AI 服務
-    NVIDIA_API_KEY: str = ""
+    OPENCODE_API_KEY: str = ""
 
     # CORS 設定
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
