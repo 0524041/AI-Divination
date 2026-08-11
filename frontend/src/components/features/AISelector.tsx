@@ -16,6 +16,13 @@ export interface AIConfig {
     is_active: boolean;
 }
 
+export const DEFAULT_AI_DISPLAY_NAME = 'DeepSeek V4 Flash（預設）';
+
+export function getAIProviderDisplayName(provider: string | null, model: string | null): string {
+    if (provider === 'opencode') return DEFAULT_AI_DISPLAY_NAME;
+    return `${provider || 'unknown'}${model ? ` (${model})` : ''}`;
+}
+
 export interface AISelectorProps {
     /** 額外的 CSS class */
     className?: string;
@@ -121,12 +128,10 @@ export function AISelector({
                         <div className="flex items-center gap-3">
                             <Bot className="text-accent" size={20} />
                             <span className="text-sm text-foreground-muted">當前 AI：</span>
-                            {isGuest ? (
-                                <span className="text-accent font-medium">NVIDIA AI (試用)</span>
-                            ) : currentConfig ? (
-                                <span className="text-accent font-medium">{getAIDisplayName(currentConfig)}</span>
+                            {isGuest || !currentConfig ? (
+                                <span className="text-accent font-medium">{DEFAULT_AI_DISPLAY_NAME}</span>
                             ) : (
-                                <span className="text-red-400">未設定</span>
+                                <span className="text-accent font-medium">{getAIDisplayName(currentConfig)}</span>
                             )}
                         </div>
 
@@ -192,7 +197,7 @@ export function AISelector({
                             </div>
                             <div className="text-left">
                                 <div className="text-xs text-foreground-muted uppercase tracking-wider mb-1">AI 解盤服務</div>
-                                <div className="font-medium text-foreground-primary text-lg">NVIDIA AI (試用)</div>
+                                <div className="font-medium text-foreground-primary text-lg">{DEFAULT_AI_DISPLAY_NAME}</div>
                             </div>
                         </div>
                     </div>
@@ -210,7 +215,7 @@ export function AISelector({
                                 <div className="text-left">
                                     <div className="text-xs text-foreground-muted uppercase tracking-wider mb-1">AI 解盤服務</div>
                                     <div className="font-medium text-foreground-primary text-lg">
-                                        {currentConfig ? getAIDisplayName(currentConfig) : '未設定 AI'}
+                                        {currentConfig ? getAIDisplayName(currentConfig) : DEFAULT_AI_DISPLAY_NAME}
                                     </div>
                                 </div>
                             </div>
@@ -272,15 +277,15 @@ export function AISelector({
             <div className="flex items-center gap-2">
                 <Bot className="text-accent" size={16} />
                 <span className="text-sm text-foreground-muted">AI:</span>
-                {isGuest ? (
-                    <span className="text-sm text-accent">NVIDIA AI (試用)</span>
+                {isGuest || !currentConfig ? (
+                    <span className="text-sm text-accent">{DEFAULT_AI_DISPLAY_NAME}</span>
                 ) : (
                     <button
                         type="button"
                         onClick={() => setIsOpen(!isOpen)}
                         className="text-sm text-accent hover:underline flex items-center gap-1"
                     >
-                        {currentConfig ? getAIDisplayName(currentConfig) : '未設定'}
+                        {getAIDisplayName(currentConfig)}
                         <ChevronDown size={14} className={cn('transition-transform', isOpen && 'rotate-180')} />
                     </button>
                 )}

@@ -10,6 +10,7 @@ import {
     AlertCircle,
     Clock,
 } from 'lucide-react';
+import { getAIProviderDisplayName } from '@/components/features/AISelector';
 
 interface SharedData {
     divination_type: string;
@@ -196,7 +197,7 @@ export default function SharePage() {
                     {data.ai_provider && (
                         <div className="text-sm text-gray-500 flex items-center gap-2">
                             <Clock size={14} />
-                            AI: {data.ai_provider} {data.ai_model && `(${data.ai_model})`}
+                            AI: {getAIProviderDisplayName(data.ai_provider, data.ai_model)}
                         </div>
                     )}
 

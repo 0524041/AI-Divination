@@ -137,6 +137,32 @@ class OpenAIService(AIService):
             raise e
 
 
+class OpenCodeService(AIService):
+    """opencode 預設 AI 服務（訪客 / 未設定自訂模型的用戶）"""
+
+    BASE_URL = "https://opencode.ai/zen/go/v1"
+    DEFAULT_MODEL = "deepseek-v4-flash"
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.model = self.DEFAULT_MODEL
+        self.client = AsyncOpenAI(base_url=self.BASE_URL, api_key=api_key)
+
+    async def generate(self, prompt: str, system_prompt: str) -> str:
+        """生成回應（思考開到 max，temperature 0.9，輸出上限 46800 tokens）"""
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.9,
+            max_tokens=46800,
+            reasoning_effort="max",
+        )
+        return response.choices[0].message.content or ""
+
+
 class CustomAIService(AIService):
     """其他 AI 服務 (OpenAI Compatible)"""
 
@@ -271,6 +297,12 @@ def get_ai_service(provider: str, **kwargs) -> AIService:
         if not api_key:
             raise ValueError("OpenAI API Key 未提供")
         return OpenAIService(api_key, model=model)
+
+    elif provider == "opencode":
+        api_key = kwargs.get("api_key")
+        if not api_key:
+            raise ValueError("opencode API Key 未提供")
+        return OpenCodeService(api_key)
 
     elif provider == "local" or provider == "custom":
         base_url = kwargs.get("base_url") or kwargs.get("local_url")

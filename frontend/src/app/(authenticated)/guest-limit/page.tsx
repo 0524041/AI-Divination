@@ -39,7 +39,7 @@ export default function GuestLimitPage() {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-accent mt-0.5">•</span>
-              <span>使用固定的 NVIDIA AI 服務</span>
+              <span>使用固定的 DeepSeek V4 Flash AI 服務</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-accent mt-0.5">•</span>

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
 import { LiuyaoChart } from '@/components/liuyao/LiuyaoChart';
+import { getAIProviderDisplayName } from '@/components/features/AISelector';
 
 interface HistoryItem {
   id: number;
@@ -1023,7 +1024,7 @@ export default function HistoryPage() {
                     {/* AI 資訊 */}
                     {item.ai_provider && (
                       <div className="text-sm text-foreground-muted">
-                        AI: {item.ai_provider} {item.ai_model && `(${item.ai_model})`}
+                        AI: {getAIProviderDisplayName(item.ai_provider, item.ai_model)}
                       </div>
                     )}
 

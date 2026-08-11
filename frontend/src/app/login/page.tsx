@@ -175,7 +175,7 @@ export default function LoginPage() {
               <ul className="text-foreground-secondary space-y-1 list-disc list-inside">
                 <li>每日限制 5 次占卜（不限類型）</li>
                 <li>無法查看歷史紀錄</li>
-                <li>使用 NVIDIA AI 服務</li>
+                <li>使用 DeepSeek V4 Flash 預設 AI 服務</li>
               </ul>
               <p className="text-accent mt-3 font-medium">註冊帳號即可使用完整功能！</p>
             </div>

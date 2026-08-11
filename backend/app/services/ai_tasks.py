@@ -37,25 +37,33 @@ def get_tarot_system_prompt(spread_type: str) -> str:
         raise FileNotFoundError(f"找不到 Prompt 檔案：{filename}")
 
 
-def get_guest_ai_config(db, user_id: int):
-    """為訪客創建虛擬 AI 配置（opencode OpenAI-compatible endpoint）"""
+def get_default_ai_config(db, user_id: int):
+    """為未設定自訂 AI 服務的用戶建立預設配置（opencode）"""
     user = db.query(User).filter(User.id == user_id).first()
-    if user and user.role == "guest":
-        settings = get_settings()
-        opencode_api_key = settings.OPENCODE_API_KEY
+    if not user:
+        return None
 
-        if not opencode_api_key:
-            raise ValueError("OPENCODE_API_KEY not found in environment")
+    settings = get_settings()
+    opencode_api_key = settings.OPENCODE_API_KEY
 
-        class GuestAIConfig:
-            provider = "custom"
-            local_url = "https://opencode.ai/zen/go"
-            effective_model = "deepseek-v4-flash"
-            api_key_encrypted = None
-            _api_key = opencode_api_key
+    if not opencode_api_key:
+        raise ValueError("OPENCODE_API_KEY not found in environment")
 
-        return GuestAIConfig()
-    return None
+    # TODO: 預留預設 AI 用量限制邏輯（暫未啟用，需時再開啟）
+    # from app.utils.security import check_guest_daily_limit
+    # if user.role == "guest":
+    #     allowed, today_count = check_guest_daily_limit(request, db)
+    #     if not allowed:
+    #         raise ValueError(f"訪客試用每日限制 X 次，今日已使用 {today_count} 次。")
+
+    class DefaultAIConfig:
+        provider = "opencode"
+        local_url = None  # get_ai_service('opencode') 不使用 local_url
+        effective_model = "deepseek-v4-flash"
+        api_key_encrypted = None
+        _api_key = opencode_api_key
+
+    return DefaultAIConfig()
 
 
 # ========== 六爻任務 ==========
@@ -82,7 +90,7 @@ async def process_liuyao_task(history_id: int, db_url: str):
         )
 
         if not ai_config:
-            ai_config = get_guest_ai_config(db, history.user_id)
+            ai_config = get_default_ai_config(db, history.user_id)
             if not ai_config:
                 history.status = "error"
                 history.interpretation = "錯誤：未設定 AI 服務"
@@ -178,7 +186,7 @@ async def process_tarot_task(history_id: int, db_url: str):
         )
 
         if not ai_config:
-            ai_config = get_guest_ai_config(db, history.user_id)
+            ai_config = get_default_ai_config(db, history.user_id)
             if not ai_config:
                 history.status = "error"
                 history.interpretation = "錯誤：未設定 AI 服務"
@@ -336,7 +344,7 @@ async def process_ziwei_task(history_id: int, db_url: str):
         )
 
         if not ai_config:
-            ai_config = get_guest_ai_config(db, history.user_id)
+            ai_config = get_default_ai_config(db, history.user_id)
             if not ai_config:
                 history.status = "error"
                 history.interpretation = "錯誤：未設定 AI 服務"

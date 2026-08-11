@@ -231,10 +231,6 @@ export default function TarotPage() {
       alert('請先輸入您想問的問題');
       return;
     }
-    if (!isGuest && !activeAI) {
-      alert('請先設定 AI 服務');
-      return;
-    }
     setStep('shuffle');
     setIsShuffling(true);
 
