@@ -4,18 +4,19 @@ AI 背景任務處理模組
 """
 
 import json
-import logging
-import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import get_settings, BASE_DIR
+from app.core.config import BASE_DIR, get_settings
 from app.models.history import History
-from app.models.user import User
 from app.models.settings import AIConfig
+from app.models.user import User
+from app.schemas.ziwei import ZiweiBirthDetails, ZiweiProcessRequest, ZiweiQuerySettings
 from app.services.ai import get_ai_service
+from app.services.ziwei_service import ziwei_service
 from app.utils.auth import decrypt_api_key
 
 
@@ -85,7 +86,7 @@ async def process_liuyao_task(history_id: int, db_url: str):
 
         ai_config = (
             db.query(AIConfig)
-            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active == True)
+            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active)
             .first()
         )
 
@@ -156,7 +157,7 @@ async def process_liuyao_task(history_id: int, db_url: str):
                 history.status = "error"
                 history.interpretation = f"系統錯誤：{str(e)}"
                 db.commit()
-            except:
+            except Exception:
                 pass
     finally:
         db.close()
@@ -181,7 +182,7 @@ async def process_tarot_task(history_id: int, db_url: str):
 
         ai_config = (
             db.query(AIConfig)
-            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active == True)
+            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active)
             .first()
         )
 
@@ -310,16 +311,13 @@ Please interpret this Celtic Cross spread.
                 history.status = "error"
                 history.interpretation = f"系統錯誤：{str(e)}"
                 db.commit()
-            except:
+            except Exception:
                 pass
     finally:
         db.close()
 
 
 # ========== 紫微斗數任務 ==========
-
-from app.services.ziwei_service import ziwei_service
-from app.schemas.ziwei import ZiweiProcessRequest, ZiweiBirthDetails, ZiweiQuerySettings
 
 
 async def process_ziwei_task(history_id: int, db_url: str):
@@ -339,7 +337,7 @@ async def process_ziwei_task(history_id: int, db_url: str):
 
         ai_config = (
             db.query(AIConfig)
-            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active == True)
+            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active)
             .first()
         )
 
@@ -408,7 +406,7 @@ async def process_ziwei_task(history_id: int, db_url: str):
                 process_request.birth_details.birth_date = datetime.strptime(
                     chart_data_json["solarDate"], "%Y-%m-%d"
                 )
-            except:
+            except Exception:
                 pass
 
         prompt_data = ziwei_service.process_chart(process_request)
@@ -445,7 +443,7 @@ async def process_ziwei_task(history_id: int, db_url: str):
                 history.status = "error"
                 history.interpretation = f"系統錯誤：{str(e)}"
                 db.commit()
-            except:
+            except Exception:
                 pass
     finally:
         db.close()

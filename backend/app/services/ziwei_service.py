@@ -1,8 +1,6 @@
 import json
 from datetime import datetime
-from typing import Dict, Any, List, Optional
-from pathlib import Path
-from lunar_python import Lunar, Solar
+from typing import Any, Dict, List, Optional
 
 from app.schemas.ziwei import ZiweiProcessRequest
 

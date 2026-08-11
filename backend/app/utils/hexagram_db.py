@@ -34,7 +34,6 @@ import csv
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 # 資料檔案路徑
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 HEXAGRAMS_CSV = DATA_DIR / "hexagrams_64.csv"

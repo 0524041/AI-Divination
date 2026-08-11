@@ -8,15 +8,18 @@
 4. 密碼強度驗證
 """
 
-import html
-import re
 import hashlib
-from typing import Optional
-from fastapi import Request, HTTPException, status
-from fastapi.responses import JSONResponse
+import html
+import ipaddress
+import logging
+import re
+import socket
 from collections import defaultdict
 from datetime import datetime, timedelta
-import logging
+from typing import Optional
+from urllib.parse import urlparse
+
+from fastapi import HTTPException, Request, status
 
 logger = logging.getLogger(__name__)
 
@@ -222,11 +225,6 @@ def sanitize_text_input(text: str, max_length: int = 1000) -> str:
     text = text[:max_length]
 
     return text.strip()
-
-
-import socket
-import ipaddress
-from urllib.parse import urlparse
 
 
 def is_safe_url(url: str) -> bool:

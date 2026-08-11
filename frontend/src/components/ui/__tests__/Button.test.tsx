@@ -9,8 +9,15 @@ describe('Button', () => {
         expect(screen.getByRole('button')).toHaveTextContent('Click me');
     });
 
-    it('applies gold variant by default', () => {
+    it('applies primary variant by default', () => {
         render(<Button>Test</Button>);
+        const button = screen.getByRole('button');
+        // Primary variant uses accent background
+        expect(button.className).toContain('bg-accent');
+    });
+
+    it('applies gold variant when specified', () => {
+        render(<Button variant="gold">Test</Button>);
         const button = screen.getByRole('button');
         // Gold variant uses gradient background
         expect(button.className).toContain('bg-gradient-to-r');

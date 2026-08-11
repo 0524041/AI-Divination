@@ -2,7 +2,9 @@
 歷史紀錄模型
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+
 from app.core.database import Base
 
 

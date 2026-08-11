@@ -2,10 +2,11 @@
 Server-Sent Events (SSE) 工具模組
 用於安全的長時間通訊
 """
-import json
 import asyncio
+import json
 import logging
-from typing import AsyncGenerator, Any, Optional
+from typing import Any, AsyncGenerator
+
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 

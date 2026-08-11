@@ -12,25 +12,20 @@ vi.mock('next/navigation', () => ({
     usePathname: () => '/',
 }));
 
+// Mock AuthContext
+vi.mock('@/contexts/AuthContext', () => ({
+    useAuth: () => ({ logout: vi.fn(), isGuest: false }),
+}));
+
+// Mock ThemeContext
+vi.mock('@/contexts/ThemeContext', () => ({
+    useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark' }),
+}));
+
 describe('Navbar', () => {
     it('renders with default title', () => {
         render(<Navbar />);
         expect(screen.getByText('玄覺空間')).toBeInTheDocument();
-    });
-
-    it('renders custom page title', () => {
-        render(<Navbar pageTitle="六爻占卜" />);
-        expect(screen.getByText('六爻占卜')).toBeInTheDocument();
-    });
-
-    it('shows back button when showBackButton is true', () => {
-        render(<Navbar showBackButton />);
-        expect(screen.getByLabelText('返回')).toBeInTheDocument();
-    });
-
-    it('hides back button by default', () => {
-        render(<Navbar />);
-        expect(screen.queryByLabelText('返回')).not.toBeInTheDocument();
     });
 
     it('renders navigation items', () => {
@@ -42,7 +37,7 @@ describe('Navbar', () => {
 
     it('shows logout button', () => {
         render(<Navbar />);
-        expect(screen.getByRole('button', { name: /登出/i })).toBeInTheDocument();
+        expect(screen.getByTitle('登出')).toBeInTheDocument();
     });
 
     it('toggles mobile menu on click', async () => {

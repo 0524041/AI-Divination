@@ -3,18 +3,18 @@
 """
 
 import json
-from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
 from app.core.database import get_db
-from app.core.config import get_settings, BASE_DIR
-from app.models.settings import AIConfig
 from app.models.history import History
-from app.utils.auth import get_current_user, get_current_user_or_guest, decrypt_api_key
+from app.models.settings import AIConfig
 from app.services.ai_tasks import process_tarot_task
+from app.utils.auth import get_current_user, get_current_user_or_guest
 
 router = APIRouter(prefix="/api/tarot", tags=["塔羅"])
 settings = get_settings()
@@ -74,7 +74,7 @@ async def create_tarot_divination(
     else:
         ai_config = (
             db.query(AIConfig)
-            .filter(AIConfig.user_id == current_user.id, AIConfig.is_active == True)
+            .filter(AIConfig.user_id == current_user.id, AIConfig.is_active)
             .first()
         )
 

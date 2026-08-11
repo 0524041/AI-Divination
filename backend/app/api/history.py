@@ -3,18 +3,25 @@
 """
 
 import json
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime, timedelta
+from typing import List, Optional
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
 from app.core.database import get_db
-from app.models.user import User
 from app.models.history import History
 from app.models.share_token import ShareToken
-from app.utils.auth import get_current_user, get_admin_user, get_current_user_or_guest
+from app.models.user import User
+from app.services.ai_tasks import (
+    process_liuyao_task,
+    process_tarot_task,
+    process_ziwei_task,
+)
+from app.utils.auth import get_admin_user, get_current_user, get_current_user_or_guest
 
 router = APIRouter(prefix="/api/history", tags=["歷史紀錄"])
 share_router = APIRouter(prefix="/api/share", tags=["分享"])
@@ -235,14 +242,6 @@ def get_statistics(
         last_7_days_type_counts=type_counts_dict,
     )
 
-
-from app.core.config import get_settings
-from fastapi import BackgroundTasks
-from app.services.ai_tasks import (
-    process_liuyao_task,
-    process_tarot_task,
-    process_ziwei_task,
-)
 
 settings = get_settings()
 
@@ -470,7 +469,7 @@ def create_share_token(
         )
         query = query.filter(History.user_id == current_user.id)
     else:
-        print(f"[DEBUG] User is admin. No user_id filter applied.")
+        print("[DEBUG] User is admin. No user_id filter applied.")
 
     history = query.first()
 
@@ -485,7 +484,7 @@ def create_share_token(
                 f"[DEBUG] Record EXISTS but access denied. Record owner: {raw_check.user_id}, Requester: {current_user.id}"
             )
         else:
-            print(f"[DEBUG] Record DOES NOT EXIST in DB.")
+            print("[DEBUG] Record DOES NOT EXIST in DB.")
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="紀錄不存在或無權限分享"

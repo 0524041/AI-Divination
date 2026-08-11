@@ -2,8 +2,9 @@
 OpenCodeService 測試（系統邊界：mock 外部 opencode API）
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.ai import OpenCodeService, get_ai_service
 

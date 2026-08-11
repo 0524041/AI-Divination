@@ -3,7 +3,8 @@
 """
 
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
+
 from .config import get_settings
 
 settings = get_settings()
@@ -42,7 +43,6 @@ def get_db():
 def init_db():
     """初始化資料庫 (建立所有表)"""
     # 導入所有模型以註冊
-    from app.models import user, history, settings as settings_model, share_token
 
     # 建立表
     Base.metadata.create_all(bind=engine)

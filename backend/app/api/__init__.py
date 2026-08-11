@@ -1,11 +1,12 @@
 """
 API 路由模組
 """
-from .auth import router as auth_router
-from .settings import router as settings_router
-from .liuyao import router as liuyao_router
-from .history import router as history_router, share_router
 from .admin import router as admin_router
+from .auth import router as auth_router
+from .history import router as history_router
+from .history import share_router
+from .liuyao import router as liuyao_router
+from .settings import router as settings_router
 from .tarot import router as tarot_router
 
 __all__ = [

@@ -3,9 +3,9 @@
 """
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from app.services.ai_tasks import get_default_ai_config
 

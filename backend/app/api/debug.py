@@ -1,13 +1,13 @@
 """
 除錯與性能分析 API
 """
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from pydantic import BaseModel
-from typing import List, Dict, Any
-from datetime import datetime
 import time
+from typing import Any, Dict, List
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.user import User
@@ -68,9 +68,10 @@ def get_database_stats(
 ):
     """取得資料庫統計（僅管理員）"""
     import os
-    from app.models.user import User
+
     from app.models.history import History
     from app.models.settings import AIConfig
+    from app.models.user import User
     
     # 取得資料庫檔案大小
     db_path = "divination.db"

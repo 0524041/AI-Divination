@@ -2,25 +2,22 @@
 認證 API 路由
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from typing import Optional
+from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.user import User
 from app.utils.auth import (
-    hash_password,
-    verify_password,
     create_access_token,
     get_current_user,
-    get_current_user_or_guest,
+    hash_password,
+    verify_password,
 )
 from app.utils.security import (
-    check_rate_limit,
     RateLimitDep,
-    get_guest_identifier,
     check_guest_daily_limit,
+    get_guest_identifier,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["認證"])

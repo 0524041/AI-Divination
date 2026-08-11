@@ -4,11 +4,12 @@
 
 from datetime import datetime, timedelta
 from typing import Optional
-from passlib.context import CryptContext
-from jose import JWTError, jwt
+
 from cryptography.fernet import Fernet
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings

@@ -2,18 +2,18 @@
 AI 服務模組
 """
 
-import httpx
-import logging
 import asyncio
-import random
 import json
-from typing import Optional, AsyncGenerator, Any, Callable
-from app.core.config import get_settings
-from app.utils.auth import decrypt_api_key
+import logging
+import random
+from typing import Any, AsyncGenerator, Callable, Optional
+
+import httpx
 from google import genai
 from google.genai import types
-
 from openai import AsyncOpenAI
+
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class GeminiService(AIService):
 
                 # 🔴 429 錯誤（配額用完）立即終止，不重試
                 if is_429:
-                    logger.error(f"Gemini API 配額已用完 (429 RESOURCE_EXHAUSTED)")
+                    logger.error("Gemini API 配額已用完 (429 RESOURCE_EXHAUSTED)")
                     raise Exception(
                         "⚠️ Gemini API 配額已用完，請稍後再試或檢查 API 配額限制"
                     ) from e

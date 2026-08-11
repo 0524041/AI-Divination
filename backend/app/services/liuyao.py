@@ -2,10 +2,11 @@
 六爻占卜核心計算庫
 """
 
-from datetime import datetime
-from lunar_python import Lunar, Solar
-from typing import List, Dict, Any, Optional
 import random
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from lunar_python import Lunar, Solar
 
 # ========== 基礎數據 ==========
 
@@ -544,7 +545,7 @@ class LiuYaoChart:
         self._find_fushen()  # 確保伏神已計算
         
         lines = []
-        lines.append(f"【基本資訊】")
+        lines.append("【基本資訊】")
         lines.append(f"起卦時間：{self.dt.strftime('%Y年%m月%d日 %H:%M')}")
         lines.append(f"干支：{self.bazi}  (日空: {''.join(self.kongwang)})")
         
@@ -560,10 +561,10 @@ class LiuYaoChart:
             bg_gong, _, _ = self._find_gong_and_shi(self.bian_upper_gua, self.bian_lower_gua)
             bian_gong_info = f"{bg_gong}宮: {self.biangua_name}"
             
-        lines.append(f"【卦象結構】")
+        lines.append("【卦象結構】")
         lines.append(f"本卦：{ben_gong_info:<20} 變卦：{bian_gong_info}")
         lines.append("-" * 60)
-        lines.append(f"六神  伏神        本      卦                  變      卦")
+        lines.append("六神  伏神        本      卦                  變      卦")
         lines.append("-" * 60)
         
         # 倒序輸出 (從上爻到初爻)
@@ -580,8 +581,10 @@ class LiuYaoChart:
             
             # 3. 本卦爻
             ben_marks = []
-            if yao['is_shi']: ben_marks.append('世')
-            if yao['is_ying']: ben_marks.append('應')
+            if yao['is_shi']:
+                ben_marks.append('世')
+            if yao['is_ying']:
+                ben_marks.append('應')
             
             ben_info = f"{yao['liuqin']}{yao['zhi']}{yao['wuxing']}"
             ben_line = '▅▅▅▅▅' if yao['is_yang'] else '▅▅　▅▅'

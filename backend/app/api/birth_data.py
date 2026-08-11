@@ -1,14 +1,15 @@
 """生辰八字管理 API"""
 
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
 from app.core.database import get_db
-from app.models.user import User
 from app.models.birth_data import UserBirthData
+from app.models.user import User
 from app.utils.auth import get_current_user
 
 router = APIRouter(prefix="/api/birth-data", tags=["生辰八字"], redirect_slashes=False)

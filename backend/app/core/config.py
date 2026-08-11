@@ -2,11 +2,11 @@
 核心配置模組
 """
 
-import os
 import secrets
-from pathlib import Path
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings
 
 # 專案根目錄
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -48,7 +48,6 @@ class Settings(BaseSettings):
         """確保金鑰存在"""
         secret_key_file = BASE_DIR / ".secret_key"
         encryption_key_file = BASE_DIR / ".encryption_key"
-        api_signature_key_file = BASE_DIR / ".api_signature_key"
 
         # JWT Secret Key
         if not self.SECRET_KEY:

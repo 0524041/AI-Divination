@@ -1,10 +1,12 @@
 """
 性能監控 Middleware
 """
-import time
 import logging
+import time
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+
 from app.utils.performance import request_logger
 
 logger = logging.getLogger(__name__)

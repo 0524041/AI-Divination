@@ -3,26 +3,29 @@ FastAPI 主應用程式
 """
 
 import logging
-from fastapi import FastAPI
+import traceback
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api import (
-    auth_router,
-    settings_router,
-    liuyao_router,
-    history_router,
     admin_router,
-    tarot_router,
+    auth_router,
+    history_router,
+    liuyao_router,
+    settings_router,
     share_router,
+    tarot_router,
 )
-from app.api.ziwei import router as ziwei_router
-from app.api.websocket import router as websocket_router
 from app.api.birth_data import router as birth_data_router
 from app.api.debug import router as debug_router
-from app.middleware.performance import PerformanceMiddleware
-from app.middleware.security import APISecurityMiddleware
+from app.api.websocket import router as websocket_router
+from app.api.ziwei import router as ziwei_router
 from app.core.config import get_settings
 from app.core.database import run_migrations
+from app.middleware.performance import PerformanceMiddleware
+from app.middleware.security import APISecurityMiddleware
 
 # 設定日誌
 logging.basicConfig(
@@ -45,11 +48,6 @@ app = FastAPI(
 )
 
 # 全局異常處理
-from fastapi import Request
-from fastapi.responses import JSONResponse
-import traceback
-
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     error_msg = f"Global Error: {str(exc)}\n{traceback.format_exc()}"

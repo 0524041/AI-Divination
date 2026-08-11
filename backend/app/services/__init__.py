@@ -1,8 +1,8 @@
 """
 服務模組
 """
-from .liuyao import perform_divination, LiuYaoChart, toss_coins
-from .ai import AIService, GeminiService, CustomAIService, get_ai_service
+from .ai import AIService, CustomAIService, GeminiService, get_ai_service
+from .liuyao import LiuYaoChart, perform_divination, toss_coins
 
 __all__ = [
     'perform_divination',
@@ -10,6 +10,6 @@ __all__ = [
     'toss_coins',
     'AIService',
     'GeminiService',
-    'LocalAIService',
+    'CustomAIService',
     'get_ai_service'
 ]

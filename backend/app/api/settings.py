@@ -2,22 +2,22 @@
 設定 API 路由
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.user import User
 from app.models.settings import AIConfig
+from app.models.user import User
+from app.services.ai import CustomAIService
 from app.utils.auth import (
+    encrypt_api_key,
     get_current_user,
     get_current_user_or_guest,
-    encrypt_api_key,
-    decrypt_api_key,
 )
-from app.services.ai import CustomAIService
-from app.utils.security import sanitize_url, RateLimitDep
+from app.utils.security import RateLimitDep, sanitize_url
 
 router = APIRouter(prefix="/api/settings", tags=["設定"])
 

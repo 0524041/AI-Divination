@@ -90,6 +90,7 @@ export function NavbarClient({ items }: NavbarClientProps) {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMenuOpen(true)}
+          aria-label={menuOpen ? '關閉選單' : '開啟選單'}
           className="md:hidden p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           {menuOpen ? <X size={24} /> : <Menu size={24} />}
