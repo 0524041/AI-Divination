@@ -116,6 +116,12 @@ export function AISelector({
         }
     };
 
+    const handleUseDefault = () => {
+        setActiveConfig(null);
+        onConfigChangeRef.current?.(null);
+        setIsOpen(false);
+    };
+
     // 判斷是否需要顯示警告（非 gemini 的都顯示）
     const shouldShowWarning = showWarning && currentConfig && currentConfig.provider !== 'gemini';
 
@@ -158,6 +164,19 @@ export function AISelector({
                 {/* Dropdown */}
                 {isOpen && configs.length > 0 && (
                     <div className="absolute right-0 top-full mt-2 bg-background-card border border-border rounded-lg shadow-xl min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
+                        {/* 使用預設 AI 選項 */}
+                        <button
+                            type="button"
+                            onClick={handleUseDefault}
+                            className={cn(
+                                'w-full text-left px-4 py-3 hover:bg-background-secondary transition-colors flex items-center justify-between',
+                                !currentConfig ? 'text-accent' : 'text-foreground-secondary'
+                            )}
+                        >
+                            <span>{DEFAULT_AI_DISPLAY_NAME}</span>
+                            {!currentConfig && <Check size={14} />}
+                        </button>
+
                         {configs.map((config) => (
                             <button
                                 key={config.id}
@@ -224,6 +243,27 @@ export function AISelector({
 
                         {isOpen && configs.length > 0 && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-background-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                {/* 使用預設 AI 選項 */}
+                                <button
+                                    type="button"
+                                    onClick={handleUseDefault}
+                                    className={cn(
+                                        'w-full px-6 py-4 flex items-center justify-between hover:bg-background-secondary transition',
+                                        !currentConfig && 'bg-accent/5'
+                                    )}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            'w-2 h-2 rounded-full',
+                                            !currentConfig ? 'bg-accent shadow-[0_0_10px_var(--accent)]' : 'bg-gray-400 dark:bg-gray-600'
+                                        )} />
+                                        <span className={!currentConfig ? 'text-accent font-medium' : 'text-foreground-secondary'}>
+                                            {DEFAULT_AI_DISPLAY_NAME}
+                                        </span>
+                                    </div>
+                                    {!currentConfig && <Check size={18} className="text-accent" />}
+                                </button>
+
                                 {configs.map((config) => {
                                     const isSelected = currentConfig?.id === config.id;
                                     return (
@@ -293,6 +333,19 @@ export function AISelector({
 
             {isOpen && configs.length > 0 && (
                 <div className="absolute left-0 top-full mt-1 bg-background-card border border-border rounded-lg shadow-xl min-w-[180px] overflow-hidden z-50">
+                    {/* 使用預設 AI 選項 */}
+                    <button
+                        type="button"
+                        onClick={handleUseDefault}
+                        className={cn(
+                            'w-full text-left px-3 py-2 text-sm hover:bg-background-secondary transition-colors flex items-center justify-between',
+                            !currentConfig ? 'text-accent' : 'text-foreground-secondary'
+                        )}
+                    >
+                        <span>{DEFAULT_AI_DISPLAY_NAME}</span>
+                        {!currentConfig && <Check size={12} />}
+                    </button>
+
                     {configs.map((config) => (
                         <button
                             key={config.id}

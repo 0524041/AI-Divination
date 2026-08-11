@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
-import { AISelector } from '@/components/features/AISelector';
+import { AISelector, AIConfig } from '@/components/features/AISelector';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -131,6 +131,9 @@ export default function TarotPage() {
   const [isShuffling, setIsShuffling] = useState(false);
   const [reshuffleCount, setReshuffleCount] = useState(0);
 
+  // AI 設定相關
+  const [activeAI, setActiveAI] = useState<AIConfig | null>(null);
+
   // 初始化
   useEffect(() => {
     checkAuth();
@@ -204,7 +207,8 @@ export default function TarotPage() {
         body: JSON.stringify({
           question,
           cards: cardsPayload,
-          spread_type: spreadType
+          spread_type: spreadType,
+          use_default_ai: !activeAI
         })
       });
 
@@ -605,6 +609,7 @@ export default function TarotPage() {
             {/* AI Selector */}
             <AISelector
               variant="card"
+              onConfigChange={(config) => setActiveAI(config)}
               showWarning={true}
               warningMessage="使用其他 AI 服務時，解盤最長可能需要等待 5 分鐘，取決於伺服器性能。"
             />

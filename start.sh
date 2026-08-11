@@ -374,7 +374,8 @@ start_services_only() {
 
     echo "啟動前端服務 (Port 3000, 使用現有構建)..."
     cd "$FRONTEND_DIR"
-    nohup npm start -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
+    # NODE_OPTIONS: 抑制依賴套件產生的 DEP0060 (util._extend) 無害警告
+    nohup env NODE_OPTIONS="--disable-warning=DEP0060" npm start -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
 
     sleep 3
@@ -697,7 +698,8 @@ install_frontend_deps() {
     cd "$FRONTEND_DIR"
 
     if [ -f "package.json" ]; then
-        npm ci --silent
+        # NODE_OPTIONS: 抑制依賴套件產生的 DEP0060 (util._extend) 無害警告
+        env NODE_OPTIONS="--disable-warning=DEP0060" npm ci --silent
         echo -e "${GREEN}✓ 前端依賴已安裝${NC}"
     else
         echo -e "${RED}✗ package.json 不存在${NC}"
@@ -770,7 +772,8 @@ start_dev_services() {
 
     echo "啟動前端服務 (開發模式 Port 3000, 0.0.0.0)..."
     cd "$FRONTEND_DIR"
-    nohup npm run dev -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
+    # NODE_OPTIONS: 抑制依賴套件產生的 DEP0060 (util._extend) 無害警告
+    nohup env NODE_OPTIONS="--disable-warning=DEP0060" npm run dev -- -H 0.0.0.0 > "$PROJECT_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
 
     sleep 3

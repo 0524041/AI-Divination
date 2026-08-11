@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.history import History
-from app.models.settings import AIConfig
 from app.models.user import User
 from app.services.ai_tasks import process_liuyao_task
 from app.services.liuyao import perform_divination
@@ -32,6 +31,9 @@ class LiuYaoRequest(BaseModel):
     gender: Optional[str] = Field(None, description="'male' | 'female'")
     target: Optional[str] = Field(
         None, description="'self' | 'parent' | 'friend' | 'other'"
+    )
+    use_default_ai: bool = Field(
+        default=False, description="使用者明確選擇使用預設 AI 服務"
     )
 
 
@@ -68,18 +70,6 @@ async def create_liuyao_divination(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"訪客試用每日限制 5 次，今日已使用 {today_count} 次。請註冊帳號以使用完整功能。",
                 )
-        else:
-            ai_config = (
-                db.query(AIConfig)
-                .filter(AIConfig.user_id == current_user.id, AIConfig.is_active)
-                .first()
-            )
-
-            if not ai_config:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="請先在設定頁面配置 AI 服務",
-                )
 
         result = perform_divination(question=liuyao_request.question)
 
@@ -91,6 +81,7 @@ async def create_liuyao_divination(
             target=liuyao_request.target,
             chart_data=json.dumps(result, ensure_ascii=False),
             status="pending",
+            ai_provider="default" if liuyao_request.use_default_ai else None,
         )
         db.add(history)
         db.commit()

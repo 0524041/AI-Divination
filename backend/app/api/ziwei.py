@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.history import History
-from app.models.settings import AIConfig
 from app.models.user import User
 from app.services.ai_tasks import process_ziwei_task
 from app.utils.auth import get_current_user, get_current_user_or_guest
@@ -34,6 +33,9 @@ class ZiweiDivinationRequest(BaseModel):
     chart_data: dict
     prompt_context: Optional[str] = (
         None  # Make optional as we generate it in backend now
+    )
+    use_default_ai: bool = Field(
+        default=False, description="使用者明確選擇使用預設 AI 服務"
     )
 
 
@@ -60,15 +62,6 @@ async def create_divination(
                 status_code=429,
                 detail=f"訪客試用每日限制 5 次，今日已使用 {today_count} 次。請註冊帳號以使用完整功能。",
             )
-    else:
-        ai_config = (
-            db.query(AIConfig)
-            .filter(AIConfig.user_id == current_user.id, AIConfig.is_active)
-            .first()
-        )
-
-        if not ai_config:
-            raise HTTPException(status_code=400, detail="請先設定 AI 服務")
 
     if data.query_type != "natal" and not data.query_date:
         raise HTTPException(status_code=400, detail="流年/流月/流日需要提供查詢日期")
@@ -89,6 +82,7 @@ async def create_divination(
             gender=data.gender,
             chart_data=json.dumps(final_chart_data, ensure_ascii=False),
             status="pending",
+            ai_provider="default" if data.use_default_ai else None,
         )
         db.add(history)
         db.commit()

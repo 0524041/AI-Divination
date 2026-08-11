@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.history import History
-from app.models.settings import AIConfig
 from app.services.ai_tasks import process_tarot_task
 from app.utils.auth import get_current_user, get_current_user_or_guest
 
@@ -37,8 +36,12 @@ class TarotRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500)
     cards: List[TarotCard] = Field(..., min_items=1, max_items=10)  # 支援 1-10 張牌
     spread_type: str = Field(
-        default="three_card"
+        default="three_card",
+        pattern="^(three_card|single|celtic_cross)$",
     )  # "three_card", "single", "celtic_cross"
+    use_default_ai: bool = Field(
+        default=False, description="使用者明確選擇使用預設 AI 服務"
+    )
 
 
 class TarotResponse(BaseModel):
@@ -71,18 +74,6 @@ async def create_tarot_divination(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"訪客試用每日限制 5 次，今日已使用 {today_count} 次。請註冊帳號以使用完整功能。",
             )
-    else:
-        ai_config = (
-            db.query(AIConfig)
-            .filter(AIConfig.user_id == current_user.id, AIConfig.is_active)
-            .first()
-        )
-
-        if not ai_config:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="請先在設定頁面配置 AI 服務",
-            )
 
     spread_names = {
         "three_card": "三牌陣",
@@ -102,6 +93,7 @@ async def create_tarot_divination(
         question=tarot_request.question,
         chart_data=json.dumps(chart_data, ensure_ascii=False),
         status="pending",
+        ai_provider="default" if tarot_request.use_default_ai else None,
     )
 
     db.add(history)

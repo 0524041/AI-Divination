@@ -67,6 +67,27 @@ def get_default_ai_config(db, user_id: int):
     return DefaultAIConfig()
 
 
+def resolve_ai_config(db, user_id: int, use_default: bool = False):
+    """決定背景任務使用的 AI 配置
+
+    - use_default=True（使用者明確選預設）→ 直接使用預設配置
+    - 否則：有 active config 用使用者的，沒有則 fallback 預設
+    """
+    if use_default:
+        return get_default_ai_config(db, user_id)
+
+    ai_config = (
+        db.query(AIConfig)
+        .filter(AIConfig.user_id == user_id, AIConfig.is_active)
+        .first()
+    )
+
+    if not ai_config:
+        return get_default_ai_config(db, user_id)
+
+    return ai_config
+
+
 # ========== 六爻任務 ==========
 
 
@@ -84,15 +105,11 @@ async def process_liuyao_task(history_id: int, db_url: str):
         history.status = "processing"
         db.commit()
 
-        ai_config = (
-            db.query(AIConfig)
-            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active)
-            .first()
+        ai_config = resolve_ai_config(
+            db, history.user_id, use_default=history.ai_provider == "default"
         )
 
         if not ai_config:
-            ai_config = get_default_ai_config(db, history.user_id)
-            if not ai_config:
                 history.status = "error"
                 history.interpretation = "錯誤：未設定 AI 服務"
                 db.commit()
@@ -180,15 +197,11 @@ async def process_tarot_task(history_id: int, db_url: str):
         history.status = "processing"
         db.commit()
 
-        ai_config = (
-            db.query(AIConfig)
-            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active)
-            .first()
+        ai_config = resolve_ai_config(
+            db, history.user_id, use_default=history.ai_provider == "default"
         )
 
         if not ai_config:
-            ai_config = get_default_ai_config(db, history.user_id)
-            if not ai_config:
                 history.status = "error"
                 history.interpretation = "錯誤：未設定 AI 服務"
                 db.commit()
@@ -335,15 +348,11 @@ async def process_ziwei_task(history_id: int, db_url: str):
         history.status = "processing"
         db.commit()
 
-        ai_config = (
-            db.query(AIConfig)
-            .filter(AIConfig.user_id == history.user_id, AIConfig.is_active)
-            .first()
+        ai_config = resolve_ai_config(
+            db, history.user_id, use_default=history.ai_provider == "default"
         )
 
         if not ai_config:
-            ai_config = get_default_ai_config(db, history.user_id)
-            if not ai_config:
                 history.status = "error"
                 history.interpretation = "錯誤：未設定 AI 服務"
                 db.commit()

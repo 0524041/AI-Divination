@@ -356,6 +356,7 @@ export default function ZiweiPage() {
         question,
         chart_data: chartData?.natalChart, // Store Natal chart
         prompt_context: chartContext,      // AI uses the flow chart
+        use_default_ai: !activeAI,
       });
 
       if (res.ok) {

@@ -194,7 +194,12 @@ export default function LiuYaoPage() {
 
     try {
       console.log('[LiuYao] Sending request to /api/liuyao');
-      const res = await apiPost('/api/liuyao', { question, gender, target });
+      const res = await apiPost('/api/liuyao', {
+        question,
+        gender,
+        target,
+        use_default_ai: !activeAI,
+      });
       console.log('[LiuYao] Response received', { status: res.status, statusText: res.statusText });
 
       const contentType = res.headers.get('content-type');
