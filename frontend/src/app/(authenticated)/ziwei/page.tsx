@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -76,7 +74,6 @@ const formatBazi = (baziStr?: string) => {
 
 export default function ZiweiPage() {
   const router = useRouter();
-  const { isGuest } = useAuth();
   const [step, setStep] = useState<Step>('intro');
 
   // Birth Data Form
@@ -325,10 +322,6 @@ export default function ZiweiPage() {
   const handleSubmitQuery = async () => {
     if (!question.trim()) {
       setError('請輸入問題');
-      return;
-    }
-    if (!isGuest && !activeAI) {
-      setError('請先配置 AI 服務');
       return;
     }
 
@@ -1019,7 +1012,7 @@ export default function ZiweiPage() {
                 </Button>
                 <Button
                   onClick={handleSubmitQuery}
-                  disabled={isProcessing || !question.trim() || (!isGuest && !activeAI)}
+                  disabled={isProcessing || !question.trim()}
                   className="flex-1"
                 >
                   {isProcessing ? (
@@ -1035,12 +1028,6 @@ export default function ZiweiPage() {
                   )}
                 </Button>
               </div>
-
-              {!isGuest && !activeAI && (
-                <p className="text-center text-sm text-amber-400">
-                  請先到<Link href="/settings" className="underline hover:text-accent">設定頁面</Link>配置 AI 服務
-                </p>
-              )}
             </div>
           </Card>
         </main>

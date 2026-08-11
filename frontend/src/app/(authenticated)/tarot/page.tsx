@@ -4,12 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { parseMarkdown } from '@/lib/markdown';
-import { AISelector, AIConfig } from '@/components/features/AISelector';
+import { AISelector } from '@/components/features/AISelector';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Sparkles, RotateCcw, Play, Check, ChevronDown, Copy, Share2, Loader2, X, Eye, History, ArrowLeft } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 import { TAROT_CARDS, TarotCardData } from '@/lib/tarot-data';
 
 // 牌背組件 - 增加質感與光澤
@@ -115,7 +114,6 @@ const SPREAD_CONFIGS: SpreadConfig[] = [
 
 export default function TarotPage() {
   const router = useRouter();
-  const { isGuest } = useAuth();
   const [step, setStep] = useState<'intro' | 'spread_select' | 'input' | 'shuffle' | 'select' | 'reveal' | 'interpreting' | 'result'>('intro');
   const [spreadType, setSpreadType] = useState<SpreadType>('three_card');
   const [question, setQuestion] = useState('');
@@ -132,9 +130,6 @@ export default function TarotPage() {
   // 洗牌動畫狀態
   const [isShuffling, setIsShuffling] = useState(false);
   const [reshuffleCount, setReshuffleCount] = useState(0);
-
-  // AI 設定相關
-  const [activeAI, setActiveAI] = useState<AIConfig | null>(null);
 
   // 初始化
   useEffect(() => {
@@ -610,7 +605,6 @@ export default function TarotPage() {
             {/* AI Selector */}
             <AISelector
               variant="card"
-              onConfigChange={(config) => setActiveAI(config)}
               showWarning={true}
               warningMessage="使用其他 AI 服務時，解盤最長可能需要等待 5 分鐘，取決於伺服器性能。"
             />
