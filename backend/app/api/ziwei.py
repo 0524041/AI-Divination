@@ -37,6 +37,10 @@ class ZiweiDivinationRequest(BaseModel):
     use_default_ai: bool = Field(
         default=False, description="使用者明確選擇使用預設 AI 服務"
     )
+    mode: str = Field(
+        default="legacy",
+        description="'legacy'（背景任務+輪詢）| 'thread'（驗證後立即返回+SSE 串流）",
+    )
 
 
 class DivinationResponse(BaseModel):
@@ -66,7 +70,19 @@ async def create_divination(
     if data.query_type != "natal" and not data.query_date:
         raise HTTPException(status_code=400, detail="流年/流月/流日需要提供查詢日期")
 
+    is_thread = data.mode == "thread"
+
+    if is_thread:
+        # 新管線：後端 schema 驗證（前端 iztro 排盤，拒收畸形資料）
+        from app.services.prompts import validate_ziwei_chart
+
+        try:
+            validate_ziwei_chart(data.chart_data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"命盤資料不完整：{exc}")
+
     try:
+
         final_chart_data = data.chart_data
         final_chart_data["prompt_context"] = data.prompt_context
         # Save query metadata to chart_data so it persists in history
@@ -87,6 +103,13 @@ async def create_divination(
         db.add(history)
         db.commit()
         db.refresh(history)
+
+        if is_thread:
+            return {
+                "id": history.id,
+                "status": history.status,
+                "message": "命盤已生成，請開啟串流取得解盤。",
+            }
 
         background_tasks.add_task(
             process_ziwei_task, history.id, str(settings.DATABASE_URL)

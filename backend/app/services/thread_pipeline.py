@@ -35,18 +35,36 @@ def _sse_ping() -> str:
 
 
 def _build_first_messages(record: History) -> tuple[str, str]:
-    """依占卜類型組出首次解盤訊息；未支援類型明確報錯（Ticket 05 擴充）"""
-    if record.divination_type != "liuyao":
-        raise NotImplementedError(f"類型 {record.divination_type} 尚未接入新管線")
-
+    """依占卜類型組出首次解盤訊息"""
     chart_data = json.loads(record.chart_data)
-    system, user_message = build_liuyao_messages(
-        question=record.question,
-        gender=record.gender,
-        target=record.target,
-        chart_data=chart_data,
-    )
-    return system, user_message
+
+    if record.divination_type == "liuyao":
+        return build_liuyao_messages(
+            question=record.question,
+            gender=record.gender,
+            target=record.target,
+            chart_data=chart_data,
+        )
+
+    if record.divination_type == "tarot":
+        from app.services.prompts import build_tarot_messages
+
+        cards = chart_data.get("cards", [])
+        spread_type = chart_data.get("spread_type", "three_card")
+        return build_tarot_messages(
+            question=record.question, spread_type=spread_type, cards=cards
+        )
+
+    if record.divination_type == "ziwei":
+        from app.services.prompts import build_ziwei_messages
+
+        return build_ziwei_messages(
+            question=record.question,
+            chart_data=chart_data,
+            query_context=record.gender or chart_data.get("query_type"),
+        )
+
+    raise NotImplementedError(f"類型 {record.divination_type} 尚未接入新管線")
 
 
 def stream_is_active(record_id: int) -> bool:

@@ -329,10 +329,10 @@ async def test_concurrent_second_stream_conflict(make_user, auth_headers, fake_a
         thread_pipeline._active_streams.discard(record_id)
 
 
-# --- 未接入類型明確報錯（Ticket 05 擴充前） ---
+# --- 未知類型明確報錯 ---
 
 
-async def test_non_liuyao_type_reports_not_implemented(
+async def test_unknown_type_reports_not_implemented(
     make_user, auth_headers, fake_ai
 ):
     user = make_user(username="legacy-type-user")
@@ -343,7 +343,7 @@ async def test_non_liuyao_type_reports_not_implemented(
     with SessionLocal() as db:
         record = History(
             user_id=user.id,
-            divination_type="ziwei",
+            divination_type="astrology_x",
             question="q",
             chart_data="{}",
             status="pending",
@@ -360,5 +360,5 @@ async def test_non_liuyao_type_reports_not_implemented(
 
     assert events[-1] == (
         "error",
-        {"kind": "upstream", "message": "類型 ziwei 尚未接入新管線"},
+        {"kind": "upstream", "message": "類型 astrology_x 尚未接入新管線"},
     )

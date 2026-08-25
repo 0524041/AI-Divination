@@ -136,3 +136,141 @@ def build_liuyao_messages(
     """回傳 (system_prompt, user_message)"""
     system = load_prompt("liuyao_system.md") + "\n" + CONVERSATION_RULES
     return system, build_liuyao_context(question, gender, target, chart_data)
+
+
+# ========== 塔羅（Ticket 05） ==========
+
+TAROT_POSITION_NAMES = {
+    "single": "單張",
+    "past": "過去",
+    "present": "現在",
+    "future": "未來",
+    "heart": "核心",
+    "challenge": "挑戰",
+    "conscious": "顯意識",
+    "foundation": "潛意識",
+    "attitude": "自我態度",
+    "external": "外部環境",
+    "hopes_fears": "希望與恐懼",
+    "outcome": "結果",
+}
+
+
+def format_tarot_cards_compact(cards: list[dict]) -> str:
+    """塔羅牌陣 → 繁中緊湊結構化文字"""
+    lines = ["【牌陣】"]
+    for index, card in enumerate(cards, start=1):
+        position_key = card.get("position") or str(index)
+        position = TAROT_POSITION_NAMES.get(position_key, position_key)
+        orientation = "逆位" if card.get("reversed") else "正位"
+        lines.append(
+            f"{index}. {position}｜{card['name_cn']}（{card['name']}）｜{orientation}"
+        )
+    return "\n".join(lines)
+
+
+def build_tarot_messages(
+    question: str, spread_type: str, cards: list[dict]
+) -> tuple[str, str]:
+    spread_names = {"single": "單張牌陣", "three_card": "三牌陣（時間流）", "celtic_cross": "凱爾特十字十牌陣"}
+    prompt_name = {
+        "single": "tarot_system_prompt_single.md",
+        "three_card": "tarot_system_prompt_three_card.md",
+        "celtic_cross": "tarot_system_prompt_celtic_cross.md",
+    }.get(spread_type, "tarot_system_prompt_single.md")
+
+    system = load_prompt(prompt_name) + "\n" + CONVERSATION_RULES
+    user = (
+        f"所問之事：{question}\n"
+        f"使用牌陣：{spread_names.get(spread_type, spread_type)}\n\n"
+        + format_tarot_cards_compact(cards)
+    )
+    return system, user
+
+
+# ========== 紫微（Ticket 05） ==========
+
+
+def validate_ziwei_chart(chart_data: dict) -> None:
+    """紫微盤面 schema 驗證：拒收畸形資料（前端 iztro 產出）"""
+    if not isinstance(chart_data, dict):
+        raise ValueError("盤面必須是物件")
+    palaces = chart_data.get("palaces")
+    if not isinstance(palaces, list) or len(palaces) != 12:
+        raise ValueError(f"十二宮缺失或不完整（收到 {len(palaces) if isinstance(palaces, list) else '非陣列'} 宮）")
+    for palace in palaces:
+        if not isinstance(palace, dict):
+            raise ValueError("宮位格式錯誤")
+        for field in ("name", "earthlyBranch"):
+            if not palace.get(field):
+                raise ValueError(f"宮位缺少欄位：{field}")
+        major_stars = palace.get("majorStars")
+        if not isinstance(major_stars, list):
+            raise ValueError(f"宮位 {palace.get('name')} 主星格式錯誤")
+
+
+def format_ziwei_chart_compact(chart_data: dict, birth_summary: dict | None = None) -> str:
+    """紫微命盤 → 繁中緊湊結構化文字"""
+    lines = ["【命盤】"]
+    if birth_summary:
+        parts = [
+            f"{k}：{v}" for k, v in birth_summary.items() if v
+        ]
+        if parts:
+            lines.extend(parts)
+            lines.append("")
+    lines.append(f"五行局：{chart_data.get('fiveElementsClass', '未知')}　生肖：{chart_data.get('zodiac', '未知')}")
+    lines.append("")
+    lines.append("【十二宮】")
+
+    for palace in chart_data.get("palaces", []):
+        stars = []
+        for star in palace.get("majorStars", []):
+            text = star["name"]
+            if star.get("brightness"):
+                text += f"({star['brightness']})"
+            if star.get("mutagen"):
+                text += f"[化{star['mutagen']}]"
+            stars.append(text)
+        minor = [s["name"] for s in palace.get("minorStars", [])]
+        adjective = [s["name"] for s in palace.get("adjectiveStars", [])]
+
+        line = f"{palace['name']}｜{palace.get('heavenlyStem', '')}{palace['earthlyBranch']}"
+        if stars:
+            line += f"｜主星:{'、'.join(stars)}"
+        if minor:
+            line += f"｜副星:{'、'.join(minor)}"
+        if adjective:
+            line += f"｜雜曜:{'、'.join(adjective[:6])}"
+        decadal = palace.get("decadal", {}).get("range", [])
+        if len(decadal) == 2:
+            line += f"｜大限:{decadal[0]}-{decadal[1]}"
+        if palace.get("isBodyPalace"):
+            line += "｜身宮"
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
+def build_ziwei_messages(
+    question: str,
+    chart_data: dict,
+    birth_details: dict | None = None,
+    query_context: str | None = None,
+) -> tuple[str, str]:
+    system = load_prompt("ziwei_system.md").split("{{")[0].strip() + "\n" + CONVERSATION_RULES
+    birth_summary = {}
+    if birth_details:
+        birth_summary = {
+            "姓名": birth_details.get("name"),
+            "性別": "男" if birth_details.get("gender") == "male" else "女",
+            "出生日期": birth_details.get("birth_date"),
+            "出生地": birth_details.get("birth_location"),
+        }
+
+    parts = [f"所問之事：{question}"]
+    if query_context:
+        parts.append(f"查詢範圍：{query_context}")
+    parts.append("")
+    parts.append(format_ziwei_chart_compact(chart_data, birth_summary))
+    return system, "\n".join(parts)

@@ -3,7 +3,7 @@
 """
 
 import json
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -34,13 +34,22 @@ class TarotRequest(BaseModel):
     """塔羅占卜請求"""
 
     question: str = Field(..., min_length=1, max_length=500)
-    cards: List[TarotCard] = Field(..., min_items=1, max_items=10)  # 支援 1-10 張牌
+    cards: Optional[List[TarotCard]] = Field(
+        default=None,
+        min_items=1,
+        max_items=10,
+        description="legacy 模式必填（前端抽牌）；thread 模式由後端抽取",
+    )
     spread_type: str = Field(
         default="three_card",
         pattern="^(three_card|single|celtic_cross)$",
     )  # "three_card", "single", "celtic_cross"
     use_default_ai: bool = Field(
         default=False, description="使用者明確選擇使用預設 AI 服務"
+    )
+    mode: str = Field(
+        default="legacy",
+        description="'legacy'（背景任務+輪詢）| 'thread'（後端抽牌+SSE 串流）",
     )
 
 
@@ -50,6 +59,8 @@ class TarotResponse(BaseModel):
     id: int
     status: str
     message: str
+    coins: list = Field(default_factory=list)
+    chart_data: dict = Field(default_factory=dict)
 
 
 # ========== Endpoints ==========
@@ -81,10 +92,32 @@ async def create_tarot_divination(
         "celtic_cross": "凱爾特十字",
     }
 
+    is_thread = tarot_request.mode == "thread"
+
+    if is_thread:
+        # 新管線：牌面由後端決定（前端不再送牌）
+        from app.services.tarot_draw import draw_cards, validate_cards
+
+        cards = draw_cards(tarot_request.spread_type)
+        validate_cards(cards, tarot_request.spread_type)
+    else:
+        if not tarot_request.cards:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="legacy 模式必須提供 cards",
+            )
+        from app.services.tarot_draw import validate_cards
+
+        cards = [card.dict() for card in tarot_request.cards]
+        validate_cards(
+            [{**c, "id": int(c["id"])} for c in cards], tarot_request.spread_type
+        )
+
     chart_data = {
         "spread": tarot_request.spread_type,
         "spread_name": spread_names.get(tarot_request.spread_type, "未知牌陣"),
-        "cards": [card.dict() for card in tarot_request.cards],
+        "spread_type": tarot_request.spread_type,
+        "cards": cards,
     }
 
     history = History(
@@ -99,6 +132,15 @@ async def create_tarot_divination(
     db.add(history)
     db.commit()
     db.refresh(history)
+
+    if is_thread:
+        return TarotResponse(
+            id=history.id,
+            status=history.status,
+            message="牌陣已生成，請開啟串流取得解盤。",
+            coins=[card["reversed"] for card in cards],
+            chart_data=chart_data,
+        )
 
     db_url = settings.DATABASE_URL
     if db_url.startswith("sqlite"):
