@@ -157,7 +157,7 @@ export default function SharePage() {
   return (
     <div className="min-h-screen">
       {/* 導航 */}
-      <nav className="glass-card mx-4 mt-4 flex items-center justify-between rounded-2xl px-6 py-4">
+      <nav className="mx-4 mt-4 flex items-center justify-between rounded-2xl border border-border bg-background-card px-6 py-4">
         <div className="flex items-center gap-3">
           <Share2 className="text-accent" size={22} aria-hidden />
           <h1 className="font-heading text-lg font-semibold text-accent">分享結果</h1>

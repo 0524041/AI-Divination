@@ -4,13 +4,13 @@
 
 **Blocked by:** 02, 08
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] /admin 路由＋角色守衛
-- [ ] 系統端點管理 UI（新 primitives）＋測試連線回饋（可更換端點與模型；溫度/思考程度為系統常數 0.9，**不提供 admin 欄位**）
-- [ ] 指定預設即時生效（無需重啟）
-- [ ] 用量統計 API（聚合）＋儀表呈現
-- [ ] 用戶管理搬入；settings 移除 admin tab
+- [x] /admin 路由＋角色守衛
+- [x] 系統端點管理 UI（新 primitives）＋測試連線回饋（可更換端點與模型；溫度/思考程度為系統常數 0.9，**不提供 admin 欄位**）
+- [x] 指定預設即時生效（無需重啟）
+- [x] 用量統計 API（聚合）＋儀表呈現
+- [x] 用戶管理搬入；settings 移除 admin tab
 
 ## 測試項目（Seam①＋③）
 1. 非 admin 存取 /admin API 與頁面皆被拒

@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.history import History
 from app.models.share_token import ShareToken
+from app.models.thread_message import ThreadMessage
 from app.models.user import User
 from app.services.ai_tasks import (
     process_liuyao_task,
@@ -42,6 +43,7 @@ class HistoryItem(BaseModel):
     interpretation: Optional[str]
     ai_provider: Optional[str]
     ai_model: Optional[str]
+    messages: list = []  # Thread 訊息流（Ticket 15：分享頁渲染對話）
     status: str
     created_at: datetime
     username: Optional[str] = None  # Admin 查看時顯示
@@ -94,6 +96,7 @@ class SharedHistoryItem(BaseModel):
     interpretation: Optional[str]
     ai_provider: Optional[str]
     ai_model: Optional[str]
+    messages: list = []  # Thread 訊息流（Ticket 15：分享頁渲染對話）
 
 
 # ========== Endpoints ==========
@@ -328,6 +331,19 @@ def get_history_item(
         ai_model=history.ai_model,
         status=history.status,
         created_at=history.created_at,
+        messages=[
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "think": m.think,
+                "model": m.model,
+            }
+            for m in db.query(ThreadMessage)
+            .filter(ThreadMessage.record_id == history.id)
+            .order_by(ThreadMessage.id)
+            .all()
+        ],
     )
 
 
@@ -560,4 +576,18 @@ def get_shared_history(token: str, db: Session = Depends(get_db)):
         interpretation=history.interpretation,
         ai_provider=history.ai_provider,
         ai_model=history.ai_model,
+        messages=[
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                # 公開分享不暴露 AI 內部推理鏈
+                "think": None,
+                "model": m.model,
+            }
+            for m in db.query(ThreadMessage)
+            .filter(ThreadMessage.record_id == history.id)
+            .order_by(ThreadMessage.id)
+            .all()
+        ],
     )

@@ -4,12 +4,12 @@
 
 **Blocked by:** 06, 08, 12
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] 首頁改版（含姓名學卡維持 disabled 呈現）
-- [ ] login 重造（行為不變）
-- [ ] 分享 API 回傳訊息流＋公開渲染（未認證可讀）
-- [ ] guest-limit 路由移除＋額度 toast 接線
+- [x] 首頁改版（含姓名學卡維持 disabled 呈現）
+- [x] login 重造（行為不變）
+- [x] 分享 API 回傳訊息流＋公開渲染（未認證可讀）
+- [x] guest-limit 路由移除＋額度 toast 接線
 
 ## 測試項目
 1. login 四流程回歸：註冊/登入/初始化/訪客 行為與 token 處理不變

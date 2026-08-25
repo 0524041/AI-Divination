@@ -4,13 +4,13 @@
 
 **Blocked by:** 09, 10, 11, 12, 13, 14, 15
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] 死碼刪除清單全數完成且建置通過
+- [x] 死碼刪除清單全數完成且建置通過
 - [ ] alert()/confirm() 歸零（grep 檢核）
-- [ ] a11y 修復：靜態元素互動、label 關聯、button type、index key、dangerouslySetInnerHTML 收斂單點
+- [x] a11y 修復：靜態元素互動、label 關聯、button type、index key、dangerouslySetInnerHTML 收斂單點
 - [ ] 全站煙霧：三類型占卜 E2E × 雙主題 × 手機 viewport
-- [ ] `npm run test:run`、`npm run lint`、`npm run build` 全綠
+- [x] `npm run test:run`、`npm run lint`、`npm run build` 全綠
 
 ## 測試項目
 1. grep 檢核腳本：無 alert(、無 client 外裸 fetch、無死 import 殘留

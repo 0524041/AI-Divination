@@ -18,12 +18,12 @@ from app.models.history import History
 from app.models.user import User
 from app.services.thread_pipeline import (
     QuotaExceeded,
+    acquire_stream_slot,
     enforce_guest_quota,
     guest_quota_status,
     retry_last_response,
     stream_followup,
-    stream_interpretation,
-    stream_is_active,
+    stream_interpretation_preclaimed,
 )
 from app.utils.auth import decode_token
 
@@ -58,8 +58,8 @@ def _owned_record(record_id: int, user: User) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="紀錄不存在")
 
 
-def _guard(record_id: int, user: User) -> None:
-    """擁有權＋訪客限額＋併發守衛"""
+def _guard(record_id: int, user: User, *, check_slot: bool = False) -> None:
+    """擁有權＋訪客限額（＋可選的串流佔位）"""
     _owned_record(record_id, user)
 
     with SessionLocal() as db:
@@ -76,16 +76,30 @@ def _guard(record_id: int, user: User) -> None:
                 },
             )
 
-    if stream_is_active(record_id):
+    if check_slot and not acquire_stream_slot(record_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="此紀錄已有進行中的解盤串流"
         )
 
 
-def _sse_response(generator) -> StreamingResponse:
+def _sse_response(generator_factory, record_id: int) -> StreamingResponse:
+    """以同步佔位避免 lazy-generator 造成的 409 競態；斷線/錯誤轉 error 事件"""
+    import json as _json
+
     async def event_stream():
-        async for chunk in generator:
-            yield chunk
+        try:
+            async for chunk in generator_factory():
+                yield chunk
+        except RuntimeError as exc:
+            yield (
+                "event: error\ndata: "
+                + _json.dumps({"kind": "conflict", "message": str(exc)}, ensure_ascii=False)
+                + "\n\n"
+            )
+        finally:
+            from app.services.thread_pipeline import release_stream_slot
+
+            release_stream_slot(record_id)
 
     return StreamingResponse(
         event_stream(),
@@ -98,7 +112,8 @@ def _sse_response(generator) -> StreamingResponse:
 async def get_quota(token: str = Query(default="")):
     """訪客額度餘量；登入使用者不受限"""
     user = _authenticate(token)
-    return guest_quota_status(SessionLocal(), user.id)
+    with SessionLocal() as db:
+        return guest_quota_status(db, user.id)
 
 
 @router.get("/{record_id}/stream")
@@ -109,17 +124,13 @@ async def stream_record(
 ):
     """訂閱占卜紀錄的首解串流"""
     user = _authenticate(token)
-    _owned_record(record_id, user)
-
-    if stream_is_active(record_id):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="此紀錄已有進行中的解盤串流"
-        )
+    _guard(record_id, user, check_slot=True)
 
     return _sse_response(
-        stream_interpretation(
+        lambda: stream_interpretation_preclaimed(
             record_id, user_id=user.id, heartbeat_interval=heartbeat
-        )
+        ),
+        record_id,
     )
 
 
@@ -132,15 +143,17 @@ async def followup_record(
 ):
     """追問：問題持久化後，回應以 SSE 串流送達"""
     user = _authenticate(token)
-    _guard(record_id, user)
+    _guard(record_id, user, check_slot=True)
 
     return _sse_response(
-        stream_followup(
+        lambda: stream_followup(
             record_id,
             user_id=user.id,
             question=body.question,
             heartbeat_interval=heartbeat,
-        )
+            preclaimed=True,
+        ),
+        record_id,
     )
 
 
@@ -155,7 +168,11 @@ async def retry_record(
     _guard(record_id, user)
 
     return _sse_response(
-        retry_last_response(
-            record_id, user_id=user.id, heartbeat_interval=heartbeat
-        )
+        lambda: retry_last_response(
+            record_id,
+            user_id=user.id,
+            heartbeat_interval=heartbeat,
+            preclaimed=True,
+        ),
+        record_id,
     )

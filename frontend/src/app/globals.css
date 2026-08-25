@@ -197,101 +197,17 @@ body {
 }
 
 /* Glass Effect */
-.glass-card {
-  background: var(--bg-card);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-accent);
-  border-radius: 1rem;
-  box-shadow: var(--shadow);
-  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-}
 
-.dark .glass-card {
-  background: var(--bg-card);
-  /* Uses the rgba value in dark mode */
-}
 
 /* 為不支援 backdrop-filter 的瀏覽器提供 fallback */
 @supports not (backdrop-filter: blur(10px)) {
-  .glass-card {
-    background: rgba(255, 255, 255, 0.95);
-    /* 淺色模式 fallback */
-  }
 }
 
 @supports not (backdrop-filter: blur(10px)) {
-  .dark .glass-card {
-    background: rgba(22, 33, 62, 0.95);
-    /* 深色模式 fallback */
-  }
 }
 
 /* Gold Button */
-.btn-gold {
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-  color: var(--bg-primary);
-  /* Use bg color for text on gold button for contrast */
-  font-weight: 600;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  transition: all 0.3s ease;
-}
 
-.dark .btn-gold {
-  color: #1a1a2e;
-  /* Original dark text for gold button in dark mode if needed, but lets stick to variables */
-  /* Actually for accessibility, black text on gold is better. Let's use a dark color. */
-  color: #0A0E27;
-}
-
-.btn-gold:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px var(--accent-light);
-}
-
-.btn-gold:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Input Fields */
-.input-dark {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
-  padding-left: 1rem;
-  padding-right: 1rem;
-  color: var(--text-primary);
-  transition: all 0.3s ease;
-}
-
-.dark .input-dark {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-}
-
-.input-dark:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
-}
-
-.input-dark::placeholder {
-  color: var(--text-secondary);
-}
-
-select.input-dark {
-  padding-right: 2.5rem;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a0a0a0' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 0.5rem center;
-  background-repeat: no-repeat;
-  background-size: 1.5em 1.5em;
-}
 
 /* Markdown Content */
 .markdown-content {

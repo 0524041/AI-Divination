@@ -12,7 +12,8 @@
 
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi import status as http_status
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -21,7 +22,7 @@ from app.core.database import get_db
 from app.models.ai_request_log import AIRequestLog
 from app.models.system_ai_endpoint import SystemAIEndpoint
 from app.services.endpoints import ensure_default_seed
-from app.utils.auth import encrypt_api_key, get_admin_user, decrypt_api_key
+from app.utils.auth import decrypt_api_key, encrypt_api_key, get_admin_user
 
 router = APIRouter(prefix="/api/admin", tags=["管理"])
 

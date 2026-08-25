@@ -4,12 +4,12 @@
 
 **Blocked by:** 08
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] 自訂端點 CRUD UI＋測試連線
-- [ ] model picker：/v1/models 拉取＋手填 fallback
-- [ ] 使用中切換：下一筆占卜即用新端點
-- [ ] 帳號密碼區塊新樣式
+- [x] 自訂端點 CRUD UI＋測試連線
+- [x] model picker：/v1/models 拉取＋手填 fallback
+- [x] 使用中切換：下一筆占卜即用新端點
+- [x] 帳號密碼區塊新樣式
 
 ## 測試項目（Seam③）
 1. CRUD 往返：金鑰輸入後不再以明文出現於任何回顯

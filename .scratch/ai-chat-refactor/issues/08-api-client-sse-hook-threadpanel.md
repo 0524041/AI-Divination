@@ -4,12 +4,12 @@
 
 **Blocked by:** 07
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] API client 擴充：SSE 連線工廠＋型別化端點方法；既有 secureApiRequest 行為保留
-- [ ] useThreadStream：狀態機 idle/connecting/streaming/aborted/error/done
-- [ ] ThreadPanel 完整互動＋行動版版面
-- [ ] dev-only demo 頁接假資料可演示
+- [x] API client 擴充：SSE 連線工廠＋型別化端點方法；既有 secureApiRequest 行為保留
+- [x] useThreadStream：狀態機 idle/connecting/streaming/aborted/error/done
+- [x] ThreadPanel 完整互動＋行動版版面
+- [x] dev-only demo 頁接假資料可演示
 
 ## 測試項目（Seam③）
 1. useThreadStream 對 mock SSE：連線→delta 依序累積→done；中途 abort；error 事件；斷線不静默（狀態可見）

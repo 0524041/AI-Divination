@@ -157,6 +157,16 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
         }
         setPhase((p) => (p === 'done' ? 'done' : 'idle'));
       } catch (err) {
+        // 使用者主動中止：保留已收到的部分內容，不視為錯誤
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setMessages((prev) =>
+            prev.filter(
+              (m) => !(m.id === placeholderId && !m.content && !m.think)
+            )
+          );
+          setPhase('idle');
+          return;
+        }
         const message =
           err instanceof Error ? err.message : '未知錯誤，請稍後再試';
         // 移除空佔位訊息

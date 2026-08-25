@@ -63,7 +63,7 @@ AI-Divination/
 ```bash
 # 初次部署
 git clone <repo> && cd AI-Divination
-cp backend/.env.example backend/.env   # 填入 OPENCODE_API_KEY
+cp backend/.env.example backend/.env   # 填入 OPENCODE_API_KEY 與 AGNES_API_KEY（系統預設端點種子）
 ./start.sh
 
 # 更新部署（無變更時秒速重啟，有變更自動 rebuild）
@@ -92,8 +92,16 @@ npx vitest --grep "..." # Run tests matching a pattern
 uvicorn app.main:app --host 0.0.0.0 --port 8000           # Start server
 uvicorn app.main:app --reload                               # With hot-reload
 uv sync                                                     # Install deps (pyproject.toml)
+uv run pytest tests/ -q                                     # Run backend tests
+uv run ruff check app/ tests/                               # Lint
 python app/core/optimize_db.py                              # Database optimization
 ```
+
+### Testing conventions
+
+- Backend: pytest（`backend/tests/`，夾具見 conftest.py：測試 DB、假 OpenAI-compatible 伺服器）
+- Frontend: `npm run test:run`（vitest）於提交前必跑
+- Thread SSE API 契約與佔卜管線請見 `docs/adr/0002`、`.scratch/ai-chat-refactor/spec.md`
 
 ## Key Conventions
 

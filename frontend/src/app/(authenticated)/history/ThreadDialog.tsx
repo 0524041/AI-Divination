@@ -24,6 +24,13 @@ export interface HistoryRecord {
   status: string;
   interpretation: string | null;
   created_at: string;
+  messages?: Array<{
+    id: number;
+    role: string;
+    content: string;
+    think?: string | null;
+    model?: string | null;
+  }>;
 }
 
 const TYPE_NAMES: Record<string, string> = {
@@ -74,7 +81,19 @@ export function ThreadDialog({ recordId, question, onClose, onQuotaExceeded, onE
       .then((data: HistoryRecord) => {
         if (cancelled) return;
         setRecord(data);
-        setInitialMessages(legacyMessages(data.interpretation));
+        // 優先使用完整對話流；無訊息時退回舊制 interpretation
+        const threadMessages = (data.messages ?? []).map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          think: m.think,
+          model: m.model,
+        }));
+        setInitialMessages(
+          threadMessages.length > 0
+            ? threadMessages
+            : legacyMessages(data.interpretation)
+        );
       })
       .catch(() => {
         if (!cancelled) onErrorRef.current?.('無法載入此紀錄');

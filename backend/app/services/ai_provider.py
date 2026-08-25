@@ -22,6 +22,8 @@ import httpx
 REQUEST_TEMPERATURE = 0.9
 THINKING_LEVEL = 0.9
 DEFAULT_TIMEOUT_SECONDS = 300.0
+# 推理型模型會先輸出大量 reasoning_content，預留足夠空間給正文
+MAX_OUTPUT_TOKENS = 16384
 
 
 def effort_label(level: float) -> str:
@@ -74,6 +76,10 @@ class OpenAICompatProvider:
         self.last_usage: StreamUsage | None = None
         self.last_duration_ms: int | None = None
 
+    async def aclose(self) -> None:
+        """關閉底層 HTTP client（管線 finally 呼叫）"""
+        await self._client.aclose()
+
     async def stream_messages(
         self, messages: list[dict[str, str]]
     ) -> AsyncIterator[dict]:
@@ -86,6 +92,7 @@ class OpenAICompatProvider:
             "model": self.model,
             "messages": messages,
             "temperature": REQUEST_TEMPERATURE,
+            "max_tokens": MAX_OUTPUT_TOKENS,
             "reasoning_effort": effort_label(THINKING_LEVEL),
             "stream": True,
         }

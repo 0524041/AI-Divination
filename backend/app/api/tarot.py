@@ -106,12 +106,17 @@ async def create_tarot_divination(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="legacy 模式必須提供 cards",
             )
+        from fastapi import HTTPException as _HTTPException
+
         from app.services.tarot_draw import validate_cards
 
         cards = [card.dict() for card in tarot_request.cards]
-        validate_cards(
-            [{**c, "id": int(c["id"])} for c in cards], tarot_request.spread_type
-        )
+        try:
+            validate_cards(
+                [{**c, "id": int(c["id"])} for c in cards], tarot_request.spread_type
+            )
+        except ValueError as exc:
+            raise _HTTPException(status_code=422, detail=str(exc))
 
     chart_data = {
         "spread": tarot_request.spread_type,

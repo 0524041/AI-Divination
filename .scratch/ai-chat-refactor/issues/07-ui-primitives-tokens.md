@@ -4,13 +4,13 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] Token 層：色彩/字體/間距/圓角/陰影 雙主題 CSS variables＋Tailwind 映射
-- [ ] 上述 11 個 primitives 完成（Radix 行為＋CVA variants）
-- [ ] barrel export 統一出口
-- [ ] framer-motion 加入依賴並提供共用轉場 preset
-- [ ] globals.css 字重 !important hack 與壞掉 animate class 的清退計畫（本票僅 token 層，頁面遷移在後續票）
+- [x] Token 層：色彩/字體/間距/圓角/陰影 雙主題 CSS variables＋Tailwind 映射
+- [x] 上述 11 個 primitives 完成（Radix 行為＋CVA variants）
+- [x] barrel export 統一出口
+- [x] framer-motion 加入依賴並提供共用轉場 preset
+- [x] globals.css 字重 !important hack 與壞掉 animate class 的清退計畫（本票僅 token 層，頁面遷移在後續票）
 
 ## 測試項目（Seam③：vitest + jsdom）
 1. 每個 primitive：variants 渲染快照＋互動 smoke

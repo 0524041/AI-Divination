@@ -12,7 +12,7 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
-from datetime import date, datetime, timedelta
+from datetime import datetime
 
 from app.core.database import SessionLocal
 from app.models.ai_request_log import AIRequestLog
@@ -70,7 +70,8 @@ def _build_first_messages(record: History) -> tuple[str, str]:
         return build_ziwei_messages(
             question=record.question,
             chart_data=chart_data,
-            query_context=record.gender or chart_data.get("query_type"),
+            birth_details=chart_data.get("birth_details"),
+            query_context=chart_data.get("query_type"),
         )
 
     raise NotImplementedError(f"類型 {record.divination_type} 尚未接入新管線")
@@ -78,6 +79,34 @@ def _build_first_messages(record: History) -> tuple[str, str]:
 
 def stream_is_active(record_id: int) -> bool:
     return record_id in _active_streams
+
+
+def acquire_stream_slot(record_id: int) -> bool:
+    """同步佔位（路由層用），避免 lazy-generator 競態"""
+    if record_id in _active_streams:
+        return False
+    _active_streams.add(record_id)
+    return True
+
+
+def release_stream_slot(record_id: int) -> None:
+    _active_streams.discard(record_id)
+
+
+async def stream_interpretation_preclaimed(
+    record_id: int,
+    *,
+    user_id: int,
+    heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
+) -> AsyncIterator[str]:
+    """slot 已由路由層佔用；直接跑內部串流，不再重複檢查"""
+    try:
+        async for event in _stream_inner(
+            record_id, user_id=user_id, heartbeat_interval=heartbeat_interval
+        ):
+            yield event
+    finally:
+        pass  # slot 由 API 層 finally 釋放
 
 
 # ========== 訪客限額（集中單一 enforcement point） ==========
@@ -114,19 +143,18 @@ def enforce_guest_quota(db, user: User) -> None:
 
 
 def guest_quota_status(db, user_id: int) -> dict:
-    """額度餘量資訊（供 API 提示）"""
-    with SessionLocal() as session:
-        user = session.query(User).filter(User.id == user_id).first()
-        if user is None or user.role != "guest":
-            return {"limited": False}
-        used = count_ai_responses_today(session, user_id)
-        remaining = max(GUEST_DAILY_MESSAGE_LIMIT - used, 0)
-        return {
-            "limited": True,
-            "used": used,
-            "remaining": remaining,
-            "limit": GUEST_DAILY_MESSAGE_LIMIT,
-        }
+    """額度餘量資訊（供 API 提示）；db 由呼叫端管理"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None or user.role != "guest":
+        return {"limited": False}
+    used = count_ai_responses_today(db, user_id)
+    remaining = max(GUEST_DAILY_MESSAGE_LIMIT - used, 0)
+    return {
+        "limited": True,
+        "used": used,
+        "remaining": remaining,
+        "limit": GUEST_DAILY_MESSAGE_LIMIT,
+    }
 
 
 # ========== 追問串流 ==========
@@ -138,17 +166,25 @@ async def stream_followup(
     user_id: int,
     question: str,
     heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
+    persist_user: bool = True,
+    preclaimed: bool = False,
 ) -> AsyncIterator[str]:
-    """追問：持久化 user 訊息 → 串流回應 → 持久化 assistant 訊息"""
-    if record_id in _active_streams:
-        raise RuntimeError("此紀錄已有進行中的解盤串流")
-    _active_streams.add(record_id)
+    """追問：持久化 user 訊息 → 串流回應 → 持久化 assistant 訊息
+
+    重試路徑傳 persist_user=False（問題已存在，避免重複）；
+    路由層已預佔 slot 時傳 preclaimed=True（略過內部檢查）。
+    """
+    if not preclaimed:
+        if record_id in _active_streams:
+            raise RuntimeError("此紀錄已有進行中的解盤串流")
+        _active_streams.add(record_id)
     try:
         async for event in _stream_followup_inner(
             record_id,
             user_id=user_id,
             question=question,
             heartbeat_interval=heartbeat_interval,
+            persist_user=persist_user,
         ):
             yield event
     finally:
@@ -161,6 +197,7 @@ async def _stream_followup_inner(
     user_id: int,
     question: str,
     heartbeat_interval: float,
+    persist_user: bool = True,
 ) -> AsyncIterator[str]:
     with SessionLocal() as db:
         record = db.query(History).filter(History.id == record_id).first()
@@ -177,9 +214,10 @@ async def _stream_followup_inner(
             return
 
     # 先落一則 user 訊息（即使後續失敗，問題也不會丟失）
-    with SessionLocal() as db:
-        db.add(ThreadMessage(record_id=record_id, role="user", content=question))
-        db.commit()
+    if persist_user:
+        with SessionLocal() as db:
+            db.add(ThreadMessage(record_id=record_id, role="user", content=question))
+            db.commit()
 
     _, messages = build_followup_messages(record, question)
 
@@ -193,6 +231,14 @@ async def _stream_followup_inner(
     think_parts: list[str] = []
     started = time.monotonic()
     delta_iter = provider.stream_messages(messages).__aiter__()
+    closed = False
+
+    async def _close_iter():
+        nonlocal closed
+        if not closed:
+            closed = True
+            await delta_iter.aclose()
+            await provider.aclose()
 
     try:
         while True:
@@ -222,11 +268,13 @@ async def _stream_followup_inner(
             duration_ms=int((time.monotonic() - started) * 1000),
         )
         yield _sse("error", {"kind": exc.kind, "message": str(exc)})
+        await _close_iter()
         return
 
     content = "".join(content_parts)
     think = "".join(think_parts) or None
     usage = provider.last_usage
+    await _close_iter()
 
     persisted = _persist_assistant_message(
         record_id,
@@ -265,6 +313,7 @@ async def retry_last_response(
     *,
     user_id: int,
     heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
+    preclaimed: bool = False,
 ) -> AsyncIterator[str]:
     """重試：刪除最後一則 assistant 訊息，以其前一則 user 問題重新生成"""
     with SessionLocal() as db:
@@ -274,48 +323,46 @@ async def retry_last_response(
             .order_by(ThreadMessage.id.desc())
             .first()
         )
-        if last is None or last.role != "assistant":
+        if last is None:
             yield _sse("error", {"kind": "invalid_state", "message": "沒有可重試的回應"})
             return
 
-        # 找最後的 user 問題
-        previous_user = (
-            db.query(ThreadMessage)
-            .filter(
-                ThreadMessage.record_id == record_id,
-                ThreadMessage.role == "user",
-                ThreadMessage.id < last.id,
+        if last.role == "assistant":
+            # 找最後的 user 問題，移除助手訊息（替換語意）
+            previous_user = (
+                db.query(ThreadMessage)
+                .filter(
+                    ThreadMessage.record_id == record_id,
+                    ThreadMessage.role == "user",
+                    ThreadMessage.id < last.id,
+                )
+                .order_by(ThreadMessage.id.desc())
+                .first()
             )
-            .order_by(ThreadMessage.id.desc())
-            .first()
-        )
-        question = previous_user.content if previous_user else record_question_of(db, record_id) or ""
+            question = (
+                previous_user.content
+                if previous_user
+                else record_question_of(db, record_id) or ""
+            )
+            db.delete(last)
+            db.commit()
+        else:
+            # 最後一則是 user（上次生成中斷）：直接重新作答，不重複落問題
+            question = last.content
 
-        # 移除最後一則助手訊息（重試語意＝替換）
-        db.delete(last)
-        db.commit()
+    if not question:
+        yield _sse("error", {"kind": "invalid_state", "message": "找不到原問題"})
+        return
 
-    is_first = not (
-        SessionLocal()
-        .query(ThreadMessage)
-        .filter(ThreadMessage.record_id == record_id, ThreadMessage.role == "user")
-        .count()
-    )
-
-    if is_first and question:
-        # 首解重試：走完整首次解盤管線（重建盤面上下文）
-        async for event in stream_interpretation(
-            record_id, user_id=user_id, heartbeat_interval=heartbeat_interval
-        ):
-            yield event
-    else:
-        async for event in stream_followup(
-            record_id,
-            user_id=user_id,
-            question=question,
-            heartbeat_interval=heartbeat_interval,
-        ):
-            yield event
+    async for event in stream_followup(
+        record_id,
+        user_id=user_id,
+        question=question,
+        heartbeat_interval=heartbeat_interval,
+        persist_user=False,
+        preclaimed=preclaimed,
+    ):
+        yield event
 
 
 def record_question_of(db, record_id: int) -> str | None:
@@ -330,27 +377,31 @@ def build_followup_messages(record: History, question: str) -> tuple[str, list[d
     盤面以首次解盤的 user message 摘要形式恆在——確保 AI 任何一輪都看得到盤。
     """
     system_prompt = _first_system_prompt(record)
-    history = (
-        SessionLocal()
-        .query(ThreadMessage)
-        .filter(ThreadMessage.record_id == record.id)
-        .order_by(ThreadMessage.id)
-        .all()
-    )
+    with SessionLocal() as db:
+        history = (
+            db.query(ThreadMessage)
+            .filter(ThreadMessage.record_id == record.id)
+            .order_by(ThreadMessage.id)
+            .all()
+        )
 
     window = history[-FOLLOWUP_HISTORY_WINDOW:]
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
-    for message in window[:-1]:
-        messages.append({"role": message.role, "content": message.content})
-    # 最後一則若為 assistant 解盤，保留完整內容作為盤面錨點
-    if window and window[-1].role == "assistant":
-        anchor = window[-1].content
+    # 盤面恆在：首則 assistant（解盤）作為固定錨點置於對話史前
+    first_assistant = next(
+        (m for m in history if m.role == "assistant" and m.content), None
+    )
+    if first_assistant is not None:
+        anchor = first_assistant.content
         if len(anchor) > 1500:
             anchor = anchor[:1500] + "…（後略）"
-        messages.append(
-            {"role": "assistant", "content": f"【先前的解盤】{anchor}"}
-        )
+        messages.append({"role": "assistant", "content": f"【先前的解盤】{anchor}"})
+
+    for message in window:
+        if first_assistant is not None and message.id == first_assistant.id:
+            continue
+        messages.append({"role": message.role, "content": message.content})
     messages.append({"role": "user", "content": question})
     return record.question, messages
 
@@ -447,6 +498,14 @@ async def _stream_inner(
     think_parts: list[str] = []
     started = time.monotonic()
     delta_iter = provider.stream_messages(messages).__aiter__()
+    closed = False
+
+    async def _close_iter():
+        nonlocal closed
+        if not closed:
+            closed = True
+            await delta_iter.aclose()
+            await provider.aclose()
 
     try:
         while True:
@@ -479,11 +538,13 @@ async def _stream_inner(
             duration_ms=int((time.monotonic() - started) * 1000),
         )
         yield _sse("error", {"kind": exc.kind, "message": str(exc)})
+        await _close_iter()
         return
 
     content = "".join(content_parts)
     think = "".join(think_parts) or None
     usage = provider.last_usage
+    await _close_iter()
 
     persisted = _persist_assistant_message(
         record_id,

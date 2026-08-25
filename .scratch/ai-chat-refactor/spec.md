@@ -128,3 +128,19 @@ Origin: /grill-with-docs session（16 項決策，詳見 docs/adr/0001、0002 �
   - Phase 5 清理（死碼/alert 替換掃尾）＋ a11y ＋全站煙霧
 - 每階段結束跑 `npm run test:run` 與手動煙霧（start.sh --dev）；backend 無測試框架，Phase 1 需先引入 pytest 作為 Seam ①② 的承載。
 - 部署流程（start.sh smart deploy）不受影響；OPENCODE_API_KEY 環境變數轉為種子資料後仍保留向後相容。
+
+---
+
+## 實作結果備忘（2026-08-25 驗收後）
+
+**驗收（真實 Agnes 端點 E2E）**：註冊→六爻 thread 建立→SSE 首解串流（meta/thinking/done，tokens 記帳）→追問→重試（替換語意、user 不重複）→額度查詢→公開分享含訊息流。backend 97 passed／frontend 22 passed／build+lint 全綠。
+
+**Code review 後修復**：首解串流納入訪客限額、併發守衛改同步預佔位（409 不再半途斷線）、provider/pipeline 資源關閉與中止語意（上游取消）、session 洩漏三處、前端 AbortError 不再誤報錯、history/{id} 回傳完整對話流（ThreadDialog 重開可見追問）、.env.example 補 AGNES_*、ziwei query_context 欄位修正、tarot legacy 驗證 422、分享回應剝離 think。
+
+**已知差距（刻意延後，非遺漏）**：
+1. 對話中途切換 provider 的 UI 未做（後端每請求解析端點已支援，缺 ThreadPanel 切換器與 per-message endpoint 參數）
+2. `auth_type` 擴充點欄位未建（OAuth 預留，spec Out of Scope 一致）
+3. `thread_messages` 缺 endpoint_id 欄位（目前以用量紀錄歸因）
+4. Legacy 輪詢管線（ai_tasks/ai.py/google-genai）保留供舊模式回滾；新前端已全面走 thread 模式，收合留待觀察期後
+5. globals.css `.glass-card/.btn-gold/.input-dark` 若 share 頁已不用可刪（本次未掃除）
+6. admin CRUD/統計聚合之自動化測試、流程骨架元件測試待補

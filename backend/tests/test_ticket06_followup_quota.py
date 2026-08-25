@@ -14,7 +14,6 @@ from app.services.thread_pipeline import (
     GUEST_DAILY_MESSAGE_LIMIT,
     QuotaExceeded,
     build_followup_messages,
-    count_ai_responses_today,
     enforce_guest_quota,
 )
 from app.utils.auth import encrypt_api_key
@@ -34,7 +33,6 @@ async def api_client():
 
 
 def _seed_default(fake_ai):
-    from app.models import SystemAIEndpoint
     from app.services.endpoints import ensure_default_seed
 
     with SessionLocal() as db:
