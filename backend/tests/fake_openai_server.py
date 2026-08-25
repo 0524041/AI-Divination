@@ -43,6 +43,10 @@ class FakeOpenAICompatServer:
             "usage": {"prompt_tokens": 10, "completion_tokens": 5},
         }
         self.stream_deltas: list[str] = ["第一句。", "第二句。", "第三句。"]
+        # 結構化串流項目：[("thinking"|"text", str), ...]；設定後覆蓋 stream_deltas 行為
+        self.stream_items: list[tuple[str, str]] = []
+        # 串流結尾附加的 usage（模擬上游回傳 token 統計）
+        self.stream_usage: dict[str, int] | None = None
         self.stream_delay: float = 0.0
         self.error_status: int = 401
         self.error_body: dict[str, Any] = {"error": {"message": "invalid api key"}}
@@ -122,17 +126,27 @@ class FakeOpenAICompatServer:
             return JSONResponse(content=self.models_response)
 
     async def _stream_events(self) -> Any:
-        for text in self.stream_deltas:
+        items = self.stream_items or [("text", t) for t in self.stream_deltas]
+        for kind, text in items:
             if self.stream_delay:
                 time.sleep(self.stream_delay)
+            field = "reasoning_content" if kind == "thinking" else "content"
             chunk = {
                 "id": "chatcmpl-fake-stream",
                 "object": "chat.completion.chunk",
                 "choices": [
-                    {"index": 0, "delta": {"content": text}, "finish_reason": None}
+                    {"index": 0, "delta": {field: text}, "finish_reason": None}
                 ],
             }
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+        if self.stream_usage is not None:
+            usage_chunk = {
+                "id": "chatcmpl-fake-stream",
+                "object": "chat.completion.chunk",
+                "choices": [],
+                "usage": self.stream_usage,
+            }
+            yield f"data: {json.dumps(usage_chunk)}\n\n"
         yield "data: [DONE]\n\n"
 
     # --- 生命週期 ---
@@ -185,9 +199,15 @@ class FakeOpenAICompatServer:
             }
 
     def respond_stream(self, deltas: list[str]) -> None:
-        """逐 delta SSE 串流"""
+        """逐 delta SSE 串流（純文字內容）"""
         self.mode = "stream"
+        self.stream_items = []
         self.stream_deltas = deltas
+
+    def respond_stream_items(self, items: list[tuple[str, str]]) -> None:
+        """逐 delta SSE 串流，含 thinking/text 分流"""
+        self.mode = "stream"
+        self.stream_items = items
 
     def respond_error(self, status_code: int, message: str | None = None) -> None:
         """注入 HTTP 錯誤（401/429/500...）"""

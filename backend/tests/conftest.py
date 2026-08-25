@@ -23,6 +23,9 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DIR}/test.db"
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pytest")
 os.environ.setdefault("ENCRYPTION_KEY", Fernet.generate_key().decode())
 os.environ.setdefault("OPENCODE_API_KEY", "test-opencode-key")
+os.environ.setdefault("AGNES_API_KEY", "test-agnes-key")
+os.environ.setdefault("AGNES_BASE_URL", "https://apihub.agnes-ai.com/v1")
+os.environ.setdefault("AGNES_MODEL_ID", "agnes-2.0-flash")
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402

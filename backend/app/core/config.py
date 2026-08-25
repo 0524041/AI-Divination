@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # 訪客模式 AI 服務
     OPENCODE_API_KEY: str = ""
 
+    # 系統預設 AI 端點（Agnes）— 作為系統預設端點的種子資料
+    AGNES_API_KEY: str = ""
+    AGNES_BASE_URL: str = "https://apihub.agnes-ai.com/v1"
+    AGNES_MODEL_ID: str = "agnes-2.0-flash"
+
     # CORS 設定
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
