@@ -24,6 +24,7 @@ from app.api.websocket import router as websocket_router
 from app.api.ziwei import router as ziwei_router
 from app.core.config import get_settings
 from app.core.database import run_migrations
+from app.core.thread_migrations import run_thread_migrations
 from app.middleware.performance import PerformanceMiddleware
 from app.middleware.security import APISecurityMiddleware
 
@@ -35,6 +36,7 @@ logging.basicConfig(
 settings = get_settings()
 
 run_migrations()
+run_thread_migrations()
 
 # 建立應用程式
 # 生產環境隱藏 API 文件

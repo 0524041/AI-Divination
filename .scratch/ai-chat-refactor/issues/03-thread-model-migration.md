@@ -4,12 +4,12 @@
 
 **Blocked by:** None — can start immediately
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] 訊息表 schema 就位（含 FK、索引、順序欄位）
-- [ ] 遷移脚本：interpretation → 首則 assistant 訊息，think 抽出至獨立欄位
-- [ ] 幂等：重跑不產生重複訊息
-- [ ] 既有 API 行為不變（歷史列表等回歸通過）
+- [x] 訊息表 schema 就位（含 FK、索引、順序欄位）
+- [x] 遷移脚本：interpretation → 首則 assistant 訊息，think 抽出至獨立欄位
+- [x] 幂等：重跑不產生重複訊息
+- [x] 既有 API 行為不變（歷史列表等回歸通過）
 
 ## 測試項目
 1. Schema 限制：FK 約束、必填欄位、role 列舉
@@ -17,3 +17,5 @@
 3. 幂等性：連續執行兩次，訊息數不變
 4. 排序穩定：遷移後同紀錄訊息順序確定且合理
 5. 回歸：既有 history API 對遷移後資料仍回應正確
+
+執行結果：61 passed（全套件）、ruff 全綠。啟動時自動執行冪等遷移；亦可手動 `uv run python -m app.core.thread_migrations`。
