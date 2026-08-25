@@ -12,10 +12,13 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
+from datetime import date, datetime, timedelta
 
 from app.core.database import SessionLocal
+from app.models.ai_request_log import AIRequestLog
 from app.models.history import History
 from app.models.thread_message import ThreadMessage
+from app.models.user import User
 from app.services import endpoints as endpoint_service
 from app.services.ai_provider import AIProviderError
 from app.services.prompts import build_liuyao_messages
@@ -24,6 +27,12 @@ from app.services.prompts import build_liuyao_messages
 _active_streams: set[int] = set()
 
 HEARTBEAT_INTERVAL_SECONDS = 15.0
+
+# 訪客每日 AI 回應上限（含首次解盤與追問；只計 AI 回應）
+GUEST_DAILY_MESSAGE_LIMIT = 10
+
+# 追問時送出的對話史滑窗（則數，不含 system 與盤面摘要）
+FOLLOWUP_HISTORY_WINDOW = 20
 
 
 def _sse(event: str, data: dict) -> str:
@@ -69,6 +78,297 @@ def _build_first_messages(record: History) -> tuple[str, str]:
 
 def stream_is_active(record_id: int) -> bool:
     return record_id in _active_streams
+
+
+# ========== 訪客限額（集中單一 enforcement point） ==========
+
+
+class QuotaExceeded(Exception):
+    def __init__(self, used: int, limit: int):
+        self.used = used
+        self.limit = limit
+        super().__init__(f"訪客每日上限 {limit} 則 AI 回應，今日已使用 {used} 則")
+
+
+def count_ai_responses_today(db, user_id: int) -> int:
+    """今日（UTC 日）已產出的 AI 回應數"""
+    midnight = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    return (
+        db.query(AIRequestLog)
+        .filter(
+            AIRequestLog.user_id == user_id,
+            AIRequestLog.ok.is_(True),
+            AIRequestLog.created_at >= midnight,
+        )
+        .count()
+    )
+
+
+def enforce_guest_quota(db, user: User) -> None:
+    """訪客限額檢查；超出 raise QuotaExceeded。登入使用者不受限。"""
+    if user.role != "guest":
+        return
+    used = count_ai_responses_today(db, user.id)
+    if used >= GUEST_DAILY_MESSAGE_LIMIT:
+        raise QuotaExceeded(used=used, limit=GUEST_DAILY_MESSAGE_LIMIT)
+
+
+def guest_quota_status(db, user_id: int) -> dict:
+    """額度餘量資訊（供 API 提示）"""
+    with SessionLocal() as session:
+        user = session.query(User).filter(User.id == user_id).first()
+        if user is None or user.role != "guest":
+            return {"limited": False}
+        used = count_ai_responses_today(session, user_id)
+        remaining = max(GUEST_DAILY_MESSAGE_LIMIT - used, 0)
+        return {
+            "limited": True,
+            "used": used,
+            "remaining": remaining,
+            "limit": GUEST_DAILY_MESSAGE_LIMIT,
+        }
+
+
+# ========== 追問串流 ==========
+
+
+async def stream_followup(
+    record_id: int,
+    *,
+    user_id: int,
+    question: str,
+    heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
+) -> AsyncIterator[str]:
+    """追問：持久化 user 訊息 → 串流回應 → 持久化 assistant 訊息"""
+    if record_id in _active_streams:
+        raise RuntimeError("此紀錄已有進行中的解盤串流")
+    _active_streams.add(record_id)
+    try:
+        async for event in _stream_followup_inner(
+            record_id,
+            user_id=user_id,
+            question=question,
+            heartbeat_interval=heartbeat_interval,
+        ):
+            yield event
+    finally:
+        _active_streams.discard(record_id)
+
+
+async def _stream_followup_inner(
+    record_id: int,
+    *,
+    user_id: int,
+    question: str,
+    heartbeat_interval: float,
+) -> AsyncIterator[str]:
+    with SessionLocal() as db:
+        record = db.query(History).filter(History.id == record_id).first()
+        if record is None:
+            yield _sse("error", {"kind": "not_found", "message": "紀錄不存在"})
+            return
+
+        try:
+            resolved = endpoint_service.resolve_endpoint(
+                db, user_id=user_id, use_system=(record.ai_provider == "default")
+            )
+        except LookupError as exc:
+            yield _sse("error", {"kind": "no_endpoint", "message": str(exc)})
+            return
+
+    # 先落一則 user 訊息（即使後續失敗，問題也不會丟失）
+    with SessionLocal() as db:
+        db.add(ThreadMessage(record_id=record_id, role="user", content=question))
+        db.commit()
+
+    _, messages = build_followup_messages(record, question)
+
+    yield _sse(
+        "meta",
+        {"record_id": record_id, "endpoint_name": resolved.name, "model": resolved.model},
+    )
+
+    provider = resolved.make_provider()
+    content_parts: list[str] = []
+    think_parts: list[str] = []
+    started = time.monotonic()
+    delta_iter = provider.stream_messages(messages).__aiter__()
+
+    try:
+        while True:
+            try:
+                delta = await asyncio.wait_for(
+                    delta_iter.__anext__(), timeout=heartbeat_interval
+                )
+            except asyncio.TimeoutError:
+                yield _sse_ping()
+                continue
+            except StopAsyncIteration:
+                break
+
+            text = delta.get("text", "")
+            if delta.get("type") == "thinking":
+                think_parts.append(text)
+            else:
+                content_parts.append(text)
+            yield _sse("delta", {"type": delta.get("type"), "text": text})
+
+    except AIProviderError as exc:
+        endpoint_service.log_ai_request(
+            user_id=user_id,
+            resolved=resolved,
+            ok=False,
+            error_kind=exc.kind,
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        yield _sse("error", {"kind": exc.kind, "message": str(exc)})
+        return
+
+    content = "".join(content_parts)
+    think = "".join(think_parts) or None
+    usage = provider.last_usage
+
+    persisted = _persist_assistant_message(
+        record_id,
+        content=content,
+        think=think,
+        model=resolved.model,
+        prompt_tokens=usage.prompt_tokens if usage else None,
+        completion_tokens=usage.completion_tokens if usage else None,
+        legacy_interpretation=None,  # 追問不覆寫首解欄位
+    )
+    endpoint_service.log_ai_request(
+        user_id=user_id,
+        resolved=resolved,
+        ok=True,
+        prompt_tokens=usage.prompt_tokens if usage else None,
+        completion_tokens=usage.completion_tokens if usage else None,
+        duration_ms=int((time.monotonic() - started) * 1000),
+    )
+
+    yield _sse(
+        "done",
+        {
+            "record_id": record_id,
+            "message_id": persisted.id,
+            "content": content,
+            "think": think,
+            "model": resolved.model,
+            "prompt_tokens": usage.prompt_tokens if usage else None,
+            "completion_tokens": usage.completion_tokens if usage else None,
+        },
+    )
+
+
+async def retry_last_response(
+    record_id: int,
+    *,
+    user_id: int,
+    heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
+) -> AsyncIterator[str]:
+    """重試：刪除最後一則 assistant 訊息，以其前一則 user 問題重新生成"""
+    with SessionLocal() as db:
+        last = (
+            db.query(ThreadMessage)
+            .filter(ThreadMessage.record_id == record_id)
+            .order_by(ThreadMessage.id.desc())
+            .first()
+        )
+        if last is None or last.role != "assistant":
+            yield _sse("error", {"kind": "invalid_state", "message": "沒有可重試的回應"})
+            return
+
+        # 找最後的 user 問題
+        previous_user = (
+            db.query(ThreadMessage)
+            .filter(
+                ThreadMessage.record_id == record_id,
+                ThreadMessage.role == "user",
+                ThreadMessage.id < last.id,
+            )
+            .order_by(ThreadMessage.id.desc())
+            .first()
+        )
+        question = previous_user.content if previous_user else record_question_of(db, record_id) or ""
+
+        # 移除最後一則助手訊息（重試語意＝替換）
+        db.delete(last)
+        db.commit()
+
+    is_first = not (
+        SessionLocal()
+        .query(ThreadMessage)
+        .filter(ThreadMessage.record_id == record_id, ThreadMessage.role == "user")
+        .count()
+    )
+
+    if is_first and question:
+        # 首解重試：走完整首次解盤管線（重建盤面上下文）
+        async for event in stream_interpretation(
+            record_id, user_id=user_id, heartbeat_interval=heartbeat_interval
+        ):
+            yield event
+    else:
+        async for event in stream_followup(
+            record_id,
+            user_id=user_id,
+            question=question,
+            heartbeat_interval=heartbeat_interval,
+        ):
+            yield event
+
+
+def record_question_of(db, record_id: int) -> str | None:
+    record = db.query(History).filter(History.id == record_id).first()
+    return record.question if record else None
+
+
+
+def build_followup_messages(record: History, question: str) -> tuple[str, list[dict]]:
+    """追問訊息：system＋首則解盤摘要（盤面恆在）＋滑窗對話史＋新問題
+
+    盤面以首次解盤的 user message 摘要形式恆在——確保 AI 任何一輪都看得到盤。
+    """
+    system_prompt = _first_system_prompt(record)
+    history = (
+        SessionLocal()
+        .query(ThreadMessage)
+        .filter(ThreadMessage.record_id == record.id)
+        .order_by(ThreadMessage.id)
+        .all()
+    )
+
+    window = history[-FOLLOWUP_HISTORY_WINDOW:]
+    messages: list[dict] = [{"role": "system", "content": system_prompt}]
+
+    for message in window[:-1]:
+        messages.append({"role": message.role, "content": message.content})
+    # 最後一則若為 assistant 解盤，保留完整內容作為盤面錨點
+    if window and window[-1].role == "assistant":
+        anchor = window[-1].content
+        if len(anchor) > 1500:
+            anchor = anchor[:1500] + "…（後略）"
+        messages.append(
+            {"role": "assistant", "content": f"【先前的解盤】{anchor}"}
+        )
+    messages.append({"role": "user", "content": question})
+    return record.question, messages
+
+
+def _first_system_prompt(record: History) -> str:
+    from app.services.prompts import CONVERSATION_RULES, load_prompt
+
+    prompt_files = {
+        "liuyao": "liuyao_system.md",
+        "tarot": "tarot_system_prompt_single.md",
+        "ziwei": "ziwei_system.md",
+    }
+    name = prompt_files.get(record.divination_type, "liuyao_system.md")
+    base = load_prompt(name)
+    # ziwei 模板含佔位符殘留時截斷
+    if "{{" in base:
+        base = base.split("{{")[0].strip()
+    return base + "\n" + CONVERSATION_RULES
 
 
 async def stream_interpretation(
@@ -227,9 +527,9 @@ def _persist_assistant_message(
     model: str,
     prompt_tokens: int | None,
     completion_tokens: int | None,
-    legacy_interpretation: str,
+    legacy_interpretation: str | None = None,
 ) -> ThreadMessage:
-    """完成後一次性寫入：ThreadMessage＋History 同步（狀態/interpretation）"""
+    """完成後一次性寫入：ThreadMessage；legacy_interpretation 非 None 時同步 History"""
     with SessionLocal() as db:
         message = ThreadMessage(
             record_id=record_id,
@@ -242,10 +542,11 @@ def _persist_assistant_message(
         )
         db.add(message)
 
-        record = db.query(History).filter(History.id == record_id).first()
-        if record is not None:
-            record.status = "completed"
-            record.interpretation = legacy_interpretation
+        if legacy_interpretation is not None:
+            record = db.query(History).filter(History.id == record_id).first()
+            if record is not None:
+                record.status = "completed"
+                record.interpretation = legacy_interpretation
 
         db.commit()
         db.refresh(message)
