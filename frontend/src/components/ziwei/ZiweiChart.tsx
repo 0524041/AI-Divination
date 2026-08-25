@@ -81,7 +81,7 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
     const flowData = chart.palaces ? null : chart;
 
     if (!baseChart || !baseChart.palaces) {
-        return <div className="p-4 text-center text-red-500">命盤資料錯誤</div>;
+        return <div className="p-4 text-center text-[var(--cinnabar)]">命盤資料錯誤</div>;
     }
 
     const soulPalaceIndex = baseChart.palaces.findIndex((p: any) => p.isSoulPalace);
@@ -141,20 +141,21 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
 
     const getPalaceByBranch = (branch: string) => baseChart.palaces.find((p: any) => p.earthlyBranch === branch);
 
+    // 四化色彩（token 化：祿=玉青、權=朱砂、科=金、忌=朱砂加粗）
     const getMutagenColor = (mutagen?: string) => {
         switch (mutagen) {
-            case '祿': return 'bg-green-100 text-green-700 border-green-200';
-            case '權': return 'bg-red-100 text-red-700 border-red-200';
-            case '科': return 'bg-blue-100 text-blue-700 border-blue-200';
-            case '忌': return 'bg-yellow-100 text-red-600 border-red-200 font-bold';
-            default: return 'text-gray-500 bg-gray-100';
+            case '祿': return 'bg-background-secondary text-[var(--jade)] border-[var(--jade)]';
+            case '權': return 'bg-background-secondary text-[var(--cinnabar)] border-[var(--cinnabar)]';
+            case '科': return 'bg-background-secondary text-accent border-accent';
+            case '忌': return 'bg-background-secondary text-[var(--cinnabar)] border-[var(--cinnabar)] font-bold';
+            default: return 'text-foreground-muted bg-background-secondary';
         }
     };
 
     const getBrightnessColor = (brightness?: string) => {
-        if (brightness === '廟' || brightness === '旺') return 'text-red-700 dark:text-[#ff3333] font-bold';
-        if (brightness === '平' || brightness === '利' || brightness === '得') return 'text-gray-700 dark:text-gray-300';
-        return 'text-gray-500 dark:text-gray-500 opacity-80';
+        if (brightness === '廟' || brightness === '旺') return 'text-[var(--cinnabar)] font-bold';
+        if (brightness === '平' || brightness === '利' || brightness === '得') return 'text-foreground-secondary';
+        return 'text-foreground-muted opacity-80';
     };
 
     const relatedIndices = focusedIndex !== null ? getRelatedIndices(focusedIndex) : [];
@@ -173,103 +174,112 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
         }
     };
 
-    return (
-        <div className="w-full overflow-x-auto rounded-lg shadow-2xl bg-white dark:bg-[#0D1117] border-4 border-double border-amber-600 dark:border-[#d4af37]">
+    // 流層標記色（token 化）
+    const LEVEL_BADGES = {
+        natal: 'bg-accent-light text-accent border-accent',
+        decadal: 'bg-background-secondary text-[var(--jade)] border-[var(--jade)]',
+        yearly: 'bg-background-secondary text-accent border-accent',
+        monthly: 'bg-background-secondary text-foreground-secondary border-border',
+        daily: 'bg-background-secondary text-[var(--cinnabar)] border-[var(--cinnabar)]',
+    };
 
-            <div className="min-w-[800px] md:w-full max-w-[1000px] mx-auto aspect-[4/4] p-1 relative font-serif text-gray-800 dark:text-[#d4af37] select-none">
+    return (
+        <div className="w-full overflow-x-auto rounded-lg shadow-2xl bg-background-card border-4 border-double border-border-accent">
+
+            <div className="min-w-[800px] md:w-full max-w-[1000px] mx-auto aspect-[4/4] p-1 relative font-serif text-foreground-primary select-none">
 
                 <div className="absolute inset-0 opacity-5 pointer-events-none bg-center bg-no-repeat dark:block hidden"
-                    style={{ backgroundImage: 'radial-gradient(circle, #d4af37 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+                    style={{ backgroundImage: 'radial-gradient(circle, var(--gold) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
 
-                <div className="grid grid-cols-4 grid-rows-4 h-full w-full gap-[2px] bg-amber-200 dark:bg-[#161b22]">
+                <div className="grid grid-cols-4 grid-rows-4 h-full w-full gap-[2px] bg-background-secondary">
 
-                    <div className="col-start-2 row-start-2 col-span-2 row-span-2 flex flex-col items-center justify-center p-2 text-center bg-white/95 dark:bg-[#0D1117]/95 z-20 shadow-lg border border-amber-100 overflow-y-auto">
+                    <div className="col-start-2 row-start-2 col-span-2 row-span-2 flex flex-col items-center justify-center p-2 text-center bg-background-card z-20 shadow-lg border border-border-accent overflow-y-auto">
                         {centerInfo ? (
                             <div className="w-full h-full flex flex-col justify-start py-2 text-sm">
                                 <div className="mb-2">
-                                    <h2 className="text-3xl font-bold text-amber-900 dark:text-[#d4af37] tracking-widest">
+                                    <h2 className="text-3xl font-bold text-accent tracking-widest">
                                         {centerInfo.name}
                                     </h2>
-                                    <div className="flex justify-center gap-2 text-sm text-gray-500 mt-1 font-bold">
+                                    <div className="flex justify-center gap-2 text-sm text-foreground-secondary mt-1 font-bold">
                                         <span>{centerInfo.gender === 'male' ? '乾造' : '坤造'}</span>
                                         <span>{centerInfo.fiveElements}</span>
                                     </div>
                                 </div>
 
                                 {viewMode !== 'natal' && (
-                                    <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-2">
+                                    <div className="text-xl font-bold text-accent mb-2">
                                         {viewMode === 'yearly' && `流年：${flowData?.yearly?.heavenlyStem}${flowData?.yearly?.earthlyBranch}年`}
                                         {viewMode === 'monthly' && `流月：${flowData?.monthly?.heavenlyStem}${flowData?.monthly?.earthlyBranch}月`}
                                         {viewMode === 'daily' && `流日：${flowData?.daily?.heavenlyStem}${flowData?.daily?.earthlyBranch}日`}
                                     </div>
                                 )}
 
-                                <div className="flex flex-col gap-1 text-left text-sm px-8 mb-2 bg-gray-50 dark:bg-white/5 py-2 rounded items-center">
-                                    <div className="w-full flex justify-between border-b border-gray-200/50 pb-1">
-                                        <span className="text-gray-400">陽曆</span>
+                                <div className="flex flex-col gap-1 text-left text-sm px-8 mb-2 bg-background-primary py-2 rounded items-center">
+                                    <div className="w-full flex justify-between border-b border-border pb-1">
+                                        <span className="text-foreground-muted">陽曆</span>
                                         <span className="font-medium">{centerInfo.solarDate}</span>
                                     </div>
-                                    <div className="w-full flex justify-between border-b border-gray-200/50 pb-1">
-                                        <span className="text-gray-400">農曆</span>
+                                    <div className="w-full flex justify-between border-b border-border pb-1">
+                                        <span className="text-foreground-muted">農曆</span>
                                         <span className="font-medium">{centerInfo.lunarInfo?.description}</span>
                                     </div>
                                     <div className="w-full flex justify-between pt-1">
-                                        <span className="text-gray-400">干支</span>
+                                        <span className="text-foreground-muted">干支</span>
                                         <span className="font-medium">{centerInfo.bazi}</span>
                                     </div>
                                 </div>
 
                                 <div className="w-full px-2 mt-1">
-                                    <div className="grid grid-cols-5 text-sm border-b border-gray-200 dark:border-gray-700 pb-1 mb-1 font-bold text-gray-500">
+                                    <div className="grid grid-cols-5 text-sm border-b border-border pb-1 mb-1 font-bold text-foreground-muted">
                                         <span>四化</span>
-                                        <span className="text-green-600">祿</span>
-                                        <span className="text-red-600">權</span>
-                                        <span className="text-blue-600">科</span>
-                                        <span className="text-amber-600">忌</span>
+                                        <span className="text-[var(--jade)]">祿</span>
+                                        <span className="text-[var(--cinnabar)]">權</span>
+                                        <span className="text-accent">科</span>
+                                        <span className="text-[var(--cinnabar)] font-bold">忌</span>
                                     </div>
 
                                     <div className="grid grid-cols-5 text-sm items-center mb-1 font-medium">
-                                        <span className="font-bold bg-red-100 dark:bg-red-900/30 px-1 rounded text-red-700">生年</span>
-                                        {getFlowMutagens(baseChart.chineseDate?.charAt(0) || '').map((star, i) => (
-                                            <span key={`mutagen-origin-${i}`}>{star}</span>
+                                        <span className={`font-bold px-1 rounded border ${LEVEL_BADGES.natal}`}>生年</span>
+                                        {getFlowMutagens(baseChart.chineseDate?.charAt(0) || '').map((star) => (
+                                            <span key={`mutagen-origin-${star}`}>{star}</span>
                                         ))}
                                     </div>
 
                                     {decadalStem && (
                                         <div className="grid grid-cols-5 text-sm items-center mb-1 font-medium">
-                                            <span className="font-bold bg-blue-100 dark:bg-blue-900/30 px-1 rounded text-blue-700">大限</span>
-                                            {decadalMutagens.map((star, i) => <span key={`mutagen-decadal-${i}`}>{star}</span>)}
+                                            <span className={`font-bold px-1 rounded border ${LEVEL_BADGES.decadal}`}>大限</span>
+                                            {decadalMutagens.map((star) => <span key={`mutagen-decadal-${star}`}>{star}</span>)}
                                         </div>
                                     )}
 
                                     {yearlyStem && viewMode !== 'natal' && (
                                         <div className="grid grid-cols-5 text-sm items-center mb-1 font-medium">
-                                            <span className="font-bold bg-green-100 dark:bg-green-900/30 px-1 rounded text-green-700">流年</span>
-                                            {yearlyMutagens.map((star, i) => <span key={`mutagen-yearly-${i}`}>{star}</span>)}
+                                            <span className={`font-bold px-1 rounded border ${LEVEL_BADGES.yearly}`}>流年</span>
+                                            {yearlyMutagens.map((star) => <span key={`mutagen-yearly-${star}`}>{star}</span>)}
                                         </div>
                                     )}
 
                                     {monthlyStem && (viewMode === 'monthly' || viewMode === 'daily') && (
                                         <div className="grid grid-cols-5 text-sm items-center mb-1 font-medium">
-                                            <span className="font-bold bg-purple-100 dark:bg-purple-900/30 px-1 rounded text-purple-700">流月</span>
-                                            {monthlyMutagens.map((star, i) => <span key={`mutagen-monthly-${i}`}>{star}</span>)}
+                                            <span className={`font-bold px-1 rounded border ${LEVEL_BADGES.monthly}`}>流月</span>
+                                            {monthlyMutagens.map((star) => <span key={`mutagen-monthly-${star}`}>{star}</span>)}
                                         </div>
                                     )}
 
                                     {dailyStem && viewMode === 'daily' && (
                                         <div className="grid grid-cols-5 text-sm items-center mb-1 font-medium">
-                                            <span className="font-bold bg-orange-100 dark:bg-orange-900/30 px-1 rounded text-orange-700">流日</span>
-                                            {dailyMutagens.map((star, i) => <span key={`mutagen-daily-${i}`}>{star}</span>)}
+                                            <span className={`font-bold px-1 rounded border ${LEVEL_BADGES.daily}`}>流日</span>
+                                            {dailyMutagens.map((star) => <span key={`mutagen-daily-${star}`}>{star}</span>)}
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="mt-auto flex flex-wrap justify-center gap-2 text-xs pt-2 border-t border-gray-100 font-bold">
-                                    <span className="bg-red-600 text-white px-2 py-0.5 rounded">命宮</span>
-                                    <span className="bg-blue-600 text-white px-2 py-0.5 rounded">大限</span>
-                                    <span className="bg-green-600 text-white px-2 py-0.5 rounded">流年</span>
-                                    <span className="bg-purple-600 text-white px-2 py-0.5 rounded">流月</span>
-                                    <span className="bg-orange-600 text-white px-2 py-0.5 rounded">流日</span>
+                                <div className="mt-auto flex flex-wrap justify-center gap-2 text-xs pt-2 border-t border-border font-bold">
+                                    <span className="bg-[var(--cinnabar)] text-white px-2 py-0.5 rounded">命宮</span>
+                                    <span className="bg-background-secondary text-[var(--jade)] border border-[var(--jade)] px-2 py-0.5 rounded">大限</span>
+                                    <span className="bg-background-secondary text-accent border border-accent px-2 py-0.5 rounded">流年</span>
+                                    <span className="bg-background-secondary text-foreground-secondary border border-border px-2 py-0.5 rounded">流月</span>
+                                    <span className="bg-background-secondary text-[var(--cinnabar)] border border-[var(--cinnabar)] px-2 py-0.5 rounded">流日</span>
                                 </div>
                             </div>
                         ) : (
@@ -279,7 +289,7 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
 
                     {Object.entries(GRID_POSITIONS).map(([branch, pos]) => {
                         const palace = getPalaceByBranch(branch);
-                        if (!palace) return <div key={branch} className="bg-gray-100" />;
+                        if (!palace) return <div key={`empty-${branch}`} className="bg-background-secondary" />;
 
                         const isSoul = palace.index === soulPalaceIndex;
                         const isDecadal = palace.index === decadalIndex;
@@ -299,30 +309,30 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                         const isRelated = relatedIndices.includes(palace.index);
 
                         return (
-                            <div
+                            <button
+                                type="button"
                                 key={`palace-${branch}`}
                                 onClick={() => handlePalaceClick(palace.index)}
                                 onKeyDown={(e) => handlePalaceKeyDown(e, palace.index)}
-                                role="button"
-                                tabIndex={0}
+                                aria-pressed={isFocused}
                                 className={`
-                                    relative p-[2px] flex flex-col justify-between overflow-hidden cursor-pointer
+                                    relative p-[2px] flex flex-col justify-between overflow-hidden cursor-pointer text-left
                                     hover:z-30 hover:shadow-2xl transition-all duration-200 border
-                                    ${isCore ? 'bg-orange-200 dark:bg-orange-800/60 border-orange-400' :
-                                        hasPositiveEnergy ? 'bg-green-100 dark:bg-green-800/40 border-green-300' :
-                                            'bg-white dark:bg-[#161b22] border-gray-200 dark:border-white/10'}
-                                    
-                                    ${isRelated ? 'bg-yellow-100 dark:bg-yellow-800/50 !border-yellow-500 ring-2 ring-yellow-500' : ''}
+                                    ${isCore ? 'bg-accent-light border-border-accent' :
+                                        hasPositiveEnergy ? 'bg-background-secondary border-border-accent' :
+                                            'bg-background-card border-border'}
+
+                                    ${isRelated ? 'bg-accent-light ring-2 ring-[var(--gold)]' : ''}
                                     ${isFocused ? 'ring-4 ring-accent z-20 shadow-xl scale-[1.02]' : ''}
-                                    ${isSoul ? 'ring-2 ring-inset ring-red-500' : ''}
+                                    ${isSoul ? 'ring-2 ring-inset ring-[var(--cinnabar)]' : ''}
                                 `}
                                 style={{
                                     gridRow: pos.row + 1,
                                     gridColumn: pos.col + 1
                                 }}
                             >
-                                <div className="flex justify-between items-start px-1 pt-0.5 border-b border-gray-100 dark:border-white/5 pb-0.5">
-                                    <div className="flex flex-col leading-none text-xs font-mono text-gray-500 font-bold">
+                                <div className="flex justify-between items-start px-1 pt-0.5 border-b border-border pb-0.5">
+                                    <div className="flex flex-col leading-none text-xs font-mono text-foreground-muted font-bold">
                                         <span>{palace.heavenlyStem}</span>
                                         <span>{palace.earthlyBranch}</span>
                                     </div>
@@ -330,24 +340,24 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                     <div className="flex flex-col items-center flex-1 mx-1">
                                         <div className={`
                                             text-base font-bold px-1 rounded shadow-sm w-full text-center
-                                            ${isSoul ? 'bg-red-600 text-white' : 'bg-amber-50 text-amber-900'}
+                                            ${isSoul ? 'bg-[var(--cinnabar)] text-white' : 'bg-accent-light text-foreground-primary'}
                                         `}>
                                             {palace.name}
                                         </div>
 
                                         <div className="flex flex-wrap justify-center gap-[1px] w-full mt-[1px]">
-                                            {isDecadal && <span className="text-[10px] bg-blue-600 text-white px-1 rounded-sm leading-tight font-bold">大{palace.name}</span>}
-                                            {isYearly && <span className="text-[10px] bg-green-600 text-white px-1 rounded-sm leading-tight font-bold">年{palace.name}</span>}
-                                            {isMonthly && <span className="text-[10px] bg-purple-600 text-white px-1 rounded-sm leading-tight font-bold">月{palace.name}</span>}
-                                            {isDaily && <span className="text-[10px] bg-orange-600 text-white px-1 rounded-sm leading-tight font-bold">日{palace.name}</span>}
+                                            {isDecadal && <span className={`text-[10px] px-1 rounded-sm leading-tight font-bold border ${LEVEL_BADGES.decadal}`}>大{palace.name}</span>}
+                                            {isYearly && <span className={`text-[10px] px-1 rounded-sm leading-tight font-bold border ${LEVEL_BADGES.yearly}`}>年{palace.name}</span>}
+                                            {isMonthly && <span className={`text-[10px] px-1 rounded-sm leading-tight font-bold border ${LEVEL_BADGES.monthly}`}>月{palace.name}</span>}
+                                            {isDaily && <span className={`text-[10px] px-1 rounded-sm leading-tight font-bold border ${LEVEL_BADGES.daily}`}>日{palace.name}</span>}
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col items-end text-[10px] text-gray-500 leading-none font-medium">
+                                    <div className="flex flex-col items-end text-[10px] text-foreground-muted leading-none font-medium">
                                         <span>{palace.changsheng12}</span>
                                         <span>{palace.boshi12}</span>
-                                        {isYearly && <span className="text-green-600">{palace.jiangqian12}</span>}
-                                        {isYearly && <span className="text-green-600">{palace.suiqian12}</span>}
+                                        {isYearly && <span className="text-[var(--jade)]">{palace.jiangqian12}</span>}
+                                        {isYearly && <span className="text-[var(--jade)]">{palace.suiqian12}</span>}
                                     </div>
                                 </div>
 
@@ -356,18 +366,18 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                     <div className="flex flex-col content-start gap-[1px] text-[11px] leading-tight overflow-hidden">
                                         {palace.minorStars?.map((star: Star) => (
                                             <div key={`${star.name}-minor`} className="flex items-center flex-wrap">
-                                                <span className={`${star.brightness === '陷' ? 'text-gray-400' : 'text-gray-600 dark:text-gray-300'}`}>
+                                                <span className={star.brightness === '陷' ? 'text-foreground-muted' : 'text-foreground-secondary'}>
                                                     {star.name}
                                                 </span>
                                                 {star.mutagen && (
-                                                    <span className={`ml-[1px] text-[9px] px-[1px] rounded ${getMutagenColor(star.mutagen)}`}>
+                                                    <span className={`ml-[1px] text-[9px] px-[1px] rounded border ${getMutagenColor(star.mutagen)}`}>
                                                         {star.mutagen}
                                                     </span>
                                                 )}
-                                                {renderMutagenBadge(star.name, '大', decadalMutagens, 'text-blue-600 border-blue-200')}
-                                                {renderMutagenBadge(star.name, '年', yearlyMutagens, 'text-green-600 border-green-200')}
-                                                {renderMutagenBadge(star.name, '月', monthlyMutagens, 'text-purple-600 border-purple-200')}
-                                                {renderMutagenBadge(star.name, '日', dailyMutagens, 'text-orange-600 border-orange-200')}
+                                                {renderMutagenBadge(star.name, '大', decadalMutagens, 'text-[var(--jade)] border-[var(--jade)]')}
+                                                {renderMutagenBadge(star.name, '年', yearlyMutagens, 'text-accent border-accent')}
+                                                {renderMutagenBadge(star.name, '月', monthlyMutagens, 'text-foreground-secondary border-border')}
+                                                {renderMutagenBadge(star.name, '日', dailyMutagens, 'text-[var(--cinnabar)] border-[var(--cinnabar)]')}
                                             </div>
                                         ))}
                                         <div className="flex flex-wrap gap-x-1 opacity-70 text-[10px] mt-1">
@@ -384,16 +394,16 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                                     <span className="text-lg font-bold tracking-widest">{star.name}</span>
 
                                                     {star.mutagen && (
-                                                        <span className={`text-[10px] w-3 h-3 flex items-center justify-center rounded font-bold ${getMutagenColor(star.mutagen)}`}>
+                                                        <span className={`text-[10px] w-3 h-3 flex items-center justify-center rounded font-bold border ${getMutagenColor(star.mutagen)}`}>
                                                             {star.mutagen}
                                                         </span>
                                                     )}
 
                                                     <div className="flex flex-col gap-[1px] items-end">
-                                                        {renderMutagenBadge(star.name, '大', decadalMutagens, 'text-blue-600 bg-blue-50 border-blue-200')}
-                                                        {renderMutagenBadge(star.name, '年', yearlyMutagens, 'text-green-600 bg-green-50 border-green-200')}
-                                                        {renderMutagenBadge(star.name, '月', monthlyMutagens, 'text-purple-600 bg-purple-50 border-purple-200')}
-                                                        {renderMutagenBadge(star.name, '日', dailyMutagens, 'text-orange-600 bg-orange-50 border-orange-200')}
+                                                        {renderMutagenBadge(star.name, '大', decadalMutagens, 'text-[var(--jade)] bg-background-secondary border-[var(--jade)]')}
+                                                        {renderMutagenBadge(star.name, '年', yearlyMutagens, 'text-accent bg-background-secondary border-accent')}
+                                                        {renderMutagenBadge(star.name, '月', monthlyMutagens, 'text-foreground-secondary bg-background-secondary border-border')}
+                                                        {renderMutagenBadge(star.name, '日', dailyMutagens, 'text-[var(--cinnabar)] bg-background-secondary border-[var(--cinnabar)]')}
                                                     </div>
                                                 </div>
                                                 {star.brightness && <span className="text-[9px] opacity-70 scale-90 origin-right font-medium">({star.brightness})</span>}
@@ -402,30 +412,30 @@ export const ZiweiChart: React.FC<ZiweiChartProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="border-t border-gray-100 dark:border-white/5 pt-0.5 px-1 flex justify-between items-end bg-gray-50/50 dark:bg-black/10">
+                                <div className="border-t border-border pt-0.5 px-1 flex justify-between items-end bg-background-primary">
                                     {palace.decadal && (
                                         <div className="flex flex-col">
-                                            <span className="text-xl font-bold text-blue-500 font-sans leading-none">
+                                            <span className="text-xl font-bold text-accent font-sans leading-none">
                                                 {palace.decadal.range[0]}-{palace.decadal.range[1]}
                                             </span>
                                         </div>
                                     )}
 
-                                    <div className="flex flex-wrap justify-end gap-x-1 text-[10px] text-gray-400 max-w-[60%] leading-none pb-0.5 font-medium">
+                                    <div className="flex flex-wrap justify-end gap-x-1 text-[10px] text-foreground-muted max-w-[60%] leading-none pb-0.5 font-medium">
                                         {palace.ages?.filter((a: number) => a <= 90).map((age: number) => (
-                                            <span key={age} className={age === flowData?.age?.nominalAge ? 'text-red-500 font-bold underline text-xs' : ''}>
+                                            <span key={`age-${age}`} className={age === flowData?.age?.nominalAge ? 'text-[var(--cinnabar)] font-bold underline text-xs' : ''}>
                                                 {age}
                                             </span>
                                         ))}
-                                    </div>
-                                </div>
-                            </div>
-                        );
+                                     </div>
+                                 </div>
+                             </button>
+                         );
                     })}
                 </div>
             </div>
 
-            <div className="md:hidden text-center text-xs text-gray-400 py-2">
+            <div className="md:hidden text-center text-xs text-foreground-muted py-2">
                 ← 左右滑動查看完整命盤 →
             </div>
         </div>

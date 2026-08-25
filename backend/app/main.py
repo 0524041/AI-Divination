@@ -18,6 +18,7 @@ from app.api import (
     share_router,
     tarot_router,
 )
+from app.api.admin_endpoints import router as admin_endpoints_router
 from app.api.birth_data import router as birth_data_router
 from app.api.debug import router as debug_router
 from app.api.threads import router as threads_router
@@ -94,6 +95,7 @@ app.include_router(birth_data_router)
 app.include_router(history_router)
 app.include_router(threads_router)
 app.include_router(admin_router)
+app.include_router(admin_endpoints_router)
 app.include_router(tarot_router)
 app.include_router(share_router)  # 公開分享 API
 app.include_router(debug_router)  # 除錯 API

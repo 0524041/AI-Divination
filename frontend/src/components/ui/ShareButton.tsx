@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Share2, Check, Loader2 } from 'lucide-react';
 import { Button, ButtonProps } from './Button';
+import { apiPost } from '@/lib/api-client';
+import { useToast } from './Toast';
 
 export interface ShareButtonProps extends Omit<ButtonProps, 'onClick' | 'onError'> {
   historyId: number;
@@ -22,6 +24,7 @@ export function ShareButton({
   ...props
 }: ShareButtonProps) {
   const [state, setState] = useState<'idle' | 'loading' | 'success'>('idle');
+  const { toast } = useToast();
 
   const handleShare = async () => {
     const token = localStorage.getItem('token');
@@ -31,19 +34,7 @@ export function ShareButton({
 
     // Create async function for getting share URL
     const getShareUrl = async (): Promise<string> => {
-      const res = await fetch('/api/share/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ history_id: historyId }),
-      });
-
-      if (!res.ok) {
-        throw new Error('建立分享連結失敗');
-      }
-
+      const res = await apiPost('/api/share/create', { history_id: historyId });
       const data = await res.json();
       return `${window.location.origin}${data.share_url}`;
     };
@@ -56,7 +47,7 @@ export function ShareButton({
         await navigator.clipboard.write([clipboardItem]);
 
         const shareUrl = await getShareUrl(); // Get URL for callback
-        alert('連結已複製到剪貼簿');
+        toast('連結已複製到剪貼簿', { kind: 'success' });
         onSuccess?.(shareUrl);
         setState('success');
         setTimeout(() => setState('idle'), 3000);
@@ -69,7 +60,7 @@ export function ShareButton({
       if (navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(shareUrl);
-          alert('連結已複製到剪貼簿');
+          toast('連結已複製到剪貼簿', { kind: 'success' });
           onSuccess?.(shareUrl);
           setState('success');
           setTimeout(() => setState('idle'), 3000);
@@ -80,11 +71,11 @@ export function ShareButton({
       }
 
       // Last resort
-      prompt('連結已建立，請手動複製：', shareUrl);
+      toast('分享連結已建立，請手動複製', { kind: 'info' });
       setState('idle');
     } catch (err) {
       console.error('Share error:', err);
-      alert('建立分享連結失敗');
+      toast('建立分享連結失敗，請稍後再試', { kind: 'error' });
       onShareError?.(err instanceof Error ? err : new Error(String(err)));
       setState('idle');
     }

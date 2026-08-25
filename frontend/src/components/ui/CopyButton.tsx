@@ -51,8 +51,9 @@ export function CopyButton({
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
             console.error('Copy failed:', err);
-            // Show prompt as last resort
-            prompt('請手動複製:', text);
+            // 最後手段：選取文字讓使用者手動 Ctrl+C（不使用瀏覽器 prompt）
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
         }
     };
 

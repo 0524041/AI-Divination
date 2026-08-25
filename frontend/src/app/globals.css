@@ -41,33 +41,40 @@
 }
 
 .dark {
-  /* Digital Zen - Dark Theme */
-  --bg-primary: #0D1117;
-  --bg-secondary: #161B22;
-  --bg-card: rgba(22, 27, 34, 0.7);
-  --bg-card-hover: rgba(30, 36, 46, 0.9);
+  /* 墨與金 — Ink & Gold (精緻化：近墨深底、金主 accent、朱砂副 accent) */
+  --bg-primary: #0A0A0F;
+  --bg-secondary: #12121A;
+  --bg-card: rgba(18, 18, 26, 0.82);
+  --bg-card-hover: rgba(28, 28, 38, 0.95);
 
-  --text-primary: #F0F6FC;
-  /* Brighter white */
-  --text-secondary: #C9D1D9;
-  /* Lighter grey */
-  --text-muted: #8B949E;
-  --text-accent: #D2A8FF;
+  --text-primary: #EDEBE4;
+  --text-secondary: #B8B5AC;
+  --text-muted: #7E7C74;
+  --text-accent: #D4AF37;
 
   --accent: #D4AF37;
   --accent-hover: #EBC556;
-  --accent-light: rgba(212, 175, 55, 0.15);
+  --accent-light: rgba(212, 175, 55, 0.14);
 
-  --accent-secondary: #7C3AED;
+  --accent-secondary: #C0392B;
+  /* 朱砂 */
 
-  --border: rgba(240, 246, 252, 0.15);
-  --border-accent: rgba(212, 175, 55, 0.4);
+  --cinnabar: #C0392B;
+  --jade: #6FA287;
 
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.6);
+  --border: rgba(237, 235, 228, 0.12);
+  --border-accent: rgba(212, 175, 55, 0.35);
+
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 56px rgba(0, 0, 0, 0.6);
 
   --gold: #d4af37;
   --gold-dark: #b8962e;
+}
+
+:root {
+  --cinnabar: #B03A2E;
+  --jade: #4E8D6E;
 }
 
 html {

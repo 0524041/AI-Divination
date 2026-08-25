@@ -1,17 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { Compass, History, Settings } from 'lucide-react';
+import { Compass, History, Settings, Shield, type LucideIcon } from 'lucide-react';
 import { NavbarClient } from './NavbarClient';
 import type { NavItem } from './NavbarClient';
-
-const navItems: NavItem[] = [
-  { href: '/', label: '首頁', icon: Compass },
-  { href: '/history', label: '歷史', icon: History },
-  { href: '/settings', label: '設定', icon: Settings },
-];
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Navbar() {
+  const { user, isGuest } = useAuth();
+  const navItems: NavItem[] = [
+    { href: '/', label: '首頁', icon: Compass },
+    { href: '/history', label: '歷史', icon: History },
+    { href: '/settings', label: '設定', icon: Settings },
+    ...(!isGuest && user?.role === 'admin'
+      ? [{ href: '/admin', label: '管理', icon: Shield }]
+      : []),
+  ];
+
   return (
     <header className="sticky top-0 z-50 transition-all duration-300">
       {/* Glassmorphism Background with subtle flow */}

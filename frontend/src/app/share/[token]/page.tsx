@@ -1,291 +1,300 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
-import { parseMarkdown } from '@/lib/markdown';
+/**
+ * 公開分享頁（Ticket 15）
+ *
+ * GET /api/share/{token}（免登入）。相容兩種後端回應：
+ * - 含 messages[]（新制 thread）→ 渲染訊息時間軸
+ * - 僅 interpretation（舊制）→ 直接以 Markdown 渲染
+ *
+ * 盤面摘要依占卜類型：六爻→卦名/干支；塔羅→牌陣與卡牌；
+ * 紫微→五行局/命宮主星。
+ */
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-    Compass,
-    Share2,
-    AlertCircle,
-    Clock,
-} from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { AlertCircle, Clock, Compass, Share2 } from 'lucide-react';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
 import { getAIProviderDisplayName } from '@/components/features/AISelector';
+import { secureApiRequest } from '@/lib/api-client';
+
+interface SharedCard {
+  name: string;
+  name_cn: string;
+  reversed: boolean;
+  position: string;
+}
 
 interface SharedData {
-    divination_type: string;
-    question: string;
-    gender: string | null;
-    target: string | null;
-    chart_data: {
-        benguaming?: string;
-        bianguaming?: string;
-        formatted?: string;
-        spread?: string;
-        spread_name?: string;
-        cards?: Array<{
-            id: number;
-            name: string;
-            name_cn: string;
-            image: string;
-            reversed: boolean;
-            position: string;
-        }>;
-    };
-    chart_data_display: string | null;
-    interpretation: string | null;
-    ai_provider: string | null;
-    ai_model: string | null;
+  divination_type: string;
+  question: string;
+  gender: string | null;
+  target: string | null;
+  chart_data: {
+    benguaming?: string;
+    bianguaming?: string;
+    bazi?: string;
+    spread?: string;
+    spread_name?: string;
+    cards?: SharedCard[];
+    fiveElementsClass?: string;
+    palaces?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+  };
+  chart_data_display: string | null;
+  interpretation: string | null;
+  ai_provider: string | null;
+  ai_model: string | null;
+  messages?: Array<{ role: 'user' | 'assistant'; content: string; think?: string | null }> | null;
+}
+
+const TYPE_NAMES: Record<string, string> = {
+  liuyao: '六爻占卜',
+  ziwei: '紫微斗數',
+  bazi: '八字命盤',
+  tarot: '塔羅占卜',
+};
+
+const SPREAD_NAMES: Record<string, string> = {
+  three_card: '三牌陣（過去-現在-未來）',
+  single: '單抽牌',
+  celtic_cross: '凱爾特十字',
+};
+
+function positionLabel(position: string): string {
+  if (position === 'past') return '過去';
+  if (position === 'present') return '現在';
+  if (position === 'future') return '未來';
+  return position;
+}
+
+/** 從紫微命盤資料中取出命宮主星名稱 */
+function extractMingGongStars(palaces?: Array<Record<string, unknown>>): string[] {
+  if (!Array.isArray(palaces)) return [];
+  const ming = palaces.find((p) => typeof p.name === 'string' && String(p.name).includes('命宮'));
+  if (!ming) return [];
+  const stars: string[] = [];
+  for (const key of ['MajorStars', 'stars', 'SoftStars']) {
+    const list = ming[key];
+    if (!Array.isArray(list)) continue;
+    for (const star of list) {
+      const name = typeof star === 'string' ? star : (star as { name?: string })?.name;
+      if (typeof name === 'string' && name && !stars.includes(name)) stars.push(name);
+    }
+  }
+  return stars;
 }
 
 export default function SharePage() {
-    const params = useParams();
-    const token = params.token as string;
+  const params = useParams();
+  const token = params.token as string;
 
-    const [data, setData] = useState<SharedData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [htmlContent, setHtmlContent] = useState<{ mainHtml: string; thinkContent: string } | null>(null);
+  const [data, setData] = useState<SharedData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (token) {
-            fetchSharedData();
-        }
-    }, [token]);
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
 
-    const fetchSharedData = async () => {
-        try {
-            const res = await fetch(`/api/share/${token}`);
+    secureApiRequest(`/api/share/${token}`, { skipAuth: true })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.status === 404) throw new Error('分享連結不存在');
+        if (res.status === 410) throw new Error('分享連結已過期（連結有效期為 7 天）');
+        if (!res.ok) throw new Error('無法載入分享內容');
+        setData(await res.json());
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message || '載入失敗，請稍後再試');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-            if (res.status === 404) {
-                setError('分享連結不存在');
-                return;
-            }
-
-            if (res.status === 410) {
-                setError('分享連結已過期（連結有效期為 7 天）');
-                return;
-            }
-
-            if (!res.ok) {
-                setError('無法載入分享內容');
-                return;
-            }
-
-            const result = await res.json();
-            setData(result);
-
-            // 解析 Markdown
-            if (result.interpretation) {
-                const parsed = await parseMarkdown(result.interpretation);
-                setHtmlContent(parsed);
-            }
-        } catch (err) {
-            console.error('Fetch error:', err);
-            setError('載入失敗，請稍後再試');
-        } finally {
-            setLoading(false);
-        }
+    return () => {
+      cancelled = true;
     };
+  }, [token]);
 
-    const getDivinationTypeName = (type: string) => {
-        const types: Record<string, string> = {
-            liuyao: '六爻占卜',
-            ziwei: '紫微斗數',
-            bazi: '八字命盤',
-            tarot: '塔羅占卜',
-        };
-        return types[type] || type;
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="text-6xl mb-4 animate-spin-slow">☯</div>
-                    <p className="text-gray-400">載入分享內容...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="min-h-screen flex items-center justify-center px-4">
-                <div className="glass-card p-8 text-center max-w-md">
-                    <AlertCircle className="mx-auto mb-4 text-red-400" size={48} />
-                    <h1 className="text-xl font-bold text-gray-200 mb-2">無法載入</h1>
-                    <p className="text-gray-400 mb-6">{error}</p>
-                    <Link
-                        href="/"
-                        className="btn-gold inline-flex items-center gap-2"
-                    >
-                        <Compass size={18} />
-                        前往首頁
-                    </Link>
-                </div>
-            </div>
-        );
-    }
-
-    if (!data) {
-        return null;
-    }
-
+  if (loading) {
     return (
-        <div className="min-h-screen">
-            {/* 導航欄 */}
-            <nav className="glass-card mx-4 mt-4 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Share2 className="text-[var(--gold)]" size={24} />
-                    <h1 className="text-xl font-bold text-[var(--gold)]">分享結果</h1>
-                </div>
-                <Link
-                    href="/"
-                    className="flex items-center gap-2 text-gray-300 hover:text-[var(--gold)] transition"
-                >
-                    <Compass size={20} />
-                    <span className="hidden sm:inline">自己也想算一卦</span>
-                </Link>
-            </nav>
-
-            {/* 主內容 */}
-            <main className="w-full max-w-4xl mx-auto px-4 py-6">
-                {/* 問題卡片 */}
-                <div className="glass-card p-6 mb-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="text-xs bg-[var(--gold)]/20 text-[var(--gold)] px-2 py-1 rounded">
-                            {getDivinationTypeName(data.divination_type)}
-                        </span>
-                    </div>
-
-                    <h2 className="text-lg font-bold text-gray-200 mb-2">問題</h2>
-                    <p className="text-gray-300 whitespace-pre-wrap">{data.question}</p>
-
-                    {/* 額外資訊 */}
-                    {(data.target || data.gender || (data.divination_type === 'tarot' && data.chart_data.spread_name)) && (
-                        <div className="flex flex-wrap gap-3 mt-4 text-sm text-gray-400">
-                            {data.divination_type === 'tarot' && data.chart_data.spread_name && (
-                                <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
-                                    牌陣：<span className="text-gray-300">{data.chart_data.spread_name}</span>
-                                </span>
-                            )}
-                            {data.target && (
-                                <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
-                                    對象：<span className="text-gray-300">{data.target}</span>
-                                </span>
-                            )}
-                            {data.gender && (
-                                <span className="bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
-                                    性別：<span className="text-gray-300">{data.gender}</span>
-                                </span>
-                            )}
-                        </div>
-                    )}
-
-                    {/* 卦象資訊 */}
-                    {data.divination_type !== 'tarot' && data.chart_data.benguaming && (
-                        <p className="text-sm text-gray-500 mt-3">
-                            {data.chart_data.benguaming} → {data.chart_data.bianguaming || '無變卦'}
-                        </p>
-                    )}
-                </div>
-
-                {/* 解盤內容 */}
-                <div className="glass-card p-6 space-y-4">
-                    {/* AI 資訊 */}
-                    {data.ai_provider && (
-                        <div className="text-sm text-gray-500 flex items-center gap-2">
-                            <Clock size={14} />
-                            AI: {getAIProviderDisplayName(data.ai_provider, data.ai_model)}
-                        </div>
-                    )}
-
-                    {/* 思考過程（可摺疊） */}
-                    {htmlContent?.thinkContent && (
-                        <details className="bg-gray-800/50 rounded-lg border border-gray-700">
-                            <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
-                                <span className="text-lg">🧠</span>
-                                <span>AI 思考過程（點擊展開）</span>
-                            </summary>
-                            <div className="px-4 pb-4 text-gray-400 text-sm whitespace-pre-wrap border-t border-gray-700 pt-3">
-                                {htmlContent.thinkContent}
-                            </div>
-                        </details>
-                    )}
-
-                    {/* 卦象盤面（使用簡化版） */}
-                    {data.divination_type === 'liuyao' && data.chart_data_display && (
-                        <details className="bg-gray-800/50 rounded-lg border border-gray-700">
-                            <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
-                                <span className="text-lg">☯</span>
-                                <span>完整卦象盤面（點擊展開）</span>
-                            </summary>
-                            <div className="px-4 pb-4 text-gray-300 text-sm border-t border-gray-700 pt-3 leading-relaxed whitespace-pre-wrap font-mono">
-                                {data.chart_data_display}
-                            </div>
-                        </details>
-                    )}
-
-                    {/* 塔羅牌陣 */}
-                    {data.divination_type === 'tarot' && data.chart_data.cards && (
-                        <details className="bg-gray-800/50 rounded-lg border border-gray-700">
-                            <summary className="px-4 py-3 cursor-pointer text-gray-400 hover:text-[var(--gold)] flex items-center gap-2">
-                                <span className="text-lg">🎴</span>
-                                <span>牌陣詳情（點擊展開）</span>
-                            </summary>
-                            <div className="px-4 pb-4 text-gray-300 text-sm border-t border-gray-700 pt-3 leading-relaxed">
-                                <div className="font-bold text-[var(--gold)] mb-3">
-                                    {data.chart_data.spread === 'three_card' ? '三牌陣（過去-現在-未來）' :
-                                        data.chart_data.spread === 'single' ? '單抽牌' :
-                                            data.chart_data.spread === 'celtic_cross' ? '凱爾特十字' : '未知牌陣'}
-                                </div>
-                                {data.chart_data.cards.map((card, idx) => (
-                                    <div key={idx} className="flex items-start gap-3 py-2 border-b border-gray-800 last:border-0">
-                                        <span className="text-[var(--gold)] font-bold min-w-[60px]">
-                                            {card.position === 'past' ? '過去' :
-                                                card.position === 'present' ? '現在' :
-                                                    card.position === 'future' ? '未來' : card.position}:
-                                        </span>
-                                        <span className="flex-1">
-                                            {card.name_cn} ({card.name}){card.reversed ? ' (逆位)' : ''}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </details>
-                    )}
-
-                    {/* 主要解盤內容 */}
-                    {htmlContent?.mainHtml ? (
-                        <div
-                            className="markdown-content bg-gray-800/30 rounded-xl p-4"
-                            dangerouslySetInnerHTML={{ __html: htmlContent.mainHtml }}
-                        />
-                    ) : (
-                        <p className="text-gray-500">暫無解盤結果</p>
-                    )}
-                </div>
-
-                {/* 底部 CTA */}
-                <div className="mt-8 text-center">
-                    <Link
-                        href="/"
-                        className="btn-gold inline-flex items-center gap-2 text-lg px-8 py-3"
-                    >
-                        <Compass size={20} />
-                        自己也想算一卦
-                    </Link>
-                    <p className="text-gray-500 text-sm mt-4">
-                        點擊上方按鈕，開始你的占卜之旅
-                    </p>
-                </div>
-            </main>
-
-            {/* 頁尾 */}
-            <footer className="text-center py-8 text-gray-600 text-sm">
-                <p>AI 占卜結果僅供參考，請理性看待</p>
-            </footer>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 animate-spin-slow text-6xl" aria-hidden>☯</div>
+          <p className="text-foreground-muted">載入分享內容…</p>
         </div>
+      </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <Card variant="glass" padding="lg" className="max-w-md text-center">
+          <AlertCircle className="mx-auto mb-4 text-[var(--cinnabar)]" size={48} aria-hidden />
+          <h1 className="font-heading mb-2 text-xl font-semibold text-foreground-primary">無法載入</h1>
+          <p className="mb-6 text-foreground-secondary">{error}</p>
+          <Link href="/">
+            <Button type="button" variant="gold" leftIcon={<Compass size={18} />}>前往首頁</Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const chart = data.chart_data ?? {};
+  const threadMessages = Array.isArray(data.messages) ? data.messages : [];
+  const messageKeys = threadMessages.map((m, i) => `${m.role}-${i}-${m.content.length}`);
+  const mingGongStars = extractMingGongStars(chart.palaces);
+
+  return (
+    <div className="min-h-screen">
+      {/* 導航 */}
+      <nav className="glass-card mx-4 mt-4 flex items-center justify-between rounded-2xl px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Share2 className="text-accent" size={22} aria-hidden />
+          <h1 className="font-heading text-lg font-semibold text-accent">分享結果</h1>
+        </div>
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-foreground-secondary transition hover:text-accent"
+        >
+          <Compass size={20} aria-hidden />
+          <span className="hidden sm:inline">自己也想算一卦</span>
+        </Link>
+      </nav>
+
+      <main className="w-full max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {/* 問題與摘要 */}
+        <Card variant="glass" padding="md">
+          <Badge variant="accent" size="sm" className="mb-3">
+            {TYPE_NAMES[data.divination_type] ?? data.divination_type}
+          </Badge>
+
+          <h2 className="font-heading text-base font-semibold text-foreground-secondary">問題</h2>
+          <p className="mt-1 whitespace-pre-wrap text-lg text-foreground-primary">{data.question}</p>
+
+          {(data.target || data.gender) && (
+            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+              {data.target && (
+                <span className="rounded border border-border bg-background-secondary px-2 py-0.5">
+                  對象：<span className="text-foreground-secondary">{data.target}</span>
+                </span>
+              )}
+              {data.gender && (
+                <span className="rounded border border-border bg-background-secondary px-2 py-0.5">
+                  性別：<span className="text-foreground-secondary">{data.gender === 'male' || data.gender === '男' ? '男' : '女'}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* 盤面摘要 */}
+          {data.divination_type === 'liuyao' && (
+            <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              <div className="rounded-lg border border-border bg-background-secondary/60 p-3">
+                <dt className="text-xs text-foreground-muted">卦名</dt>
+                <dd className="mt-0.5 font-heading text-accent">
+                  {chart.benguaming || '—'}
+                  {chart.bianguaming ? ` → ${chart.bianguaming}` : ''}
+                </dd>
+              </div>
+              <div className="rounded-lg border border-border bg-background-secondary/60 p-3">
+                <dt className="text-xs text-foreground-muted">干支</dt>
+                <dd className="mt-0.5 text-foreground-secondary">{chart.bazi || '—'}</dd>
+              </div>
+            </dl>
+          )}
+
+          {data.divination_type === 'ziwei' && (
+            <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              <div className="rounded-lg border border-border bg-background-secondary/60 p-3">
+                <dt className="text-xs text-foreground-muted">五行局</dt>
+                <dd className="mt-0.5 font-heading text-accent">{chart.fiveElementsClass || '—'}</dd>
+              </div>
+              <div className="rounded-lg border border-border bg-background-secondary/60 p-3">
+                <dt className="text-xs text-foreground-muted">命宮主星</dt>
+                <dd className="mt-0.5 text-foreground-secondary">
+                  {mingGongStars.length > 0 ? mingGongStars.join('、') : '—'}
+                </dd>
+              </div>
+            </dl>
+          )}
+
+          {data.divination_type === 'tarot' && (
+            <div className="mt-4 rounded-lg border border-border bg-background-secondary/60 p-3 text-sm">
+              <p className="text-xs text-foreground-muted">
+                牌陣：{chart.spread_name || SPREAD_NAMES[chart.spread ?? ''] || '—'}
+              </p>
+              <ul className="mt-2 divide-y divide-border/60 list-none p-0">
+                {(chart.cards ?? []).map((card) => (
+                  <li key={`${card.position}-${card.name}`} className="flex items-start gap-2 py-2 last:border-0">
+                    <span className="min-w-[48px] font-medium text-accent">{positionLabel(card.position)}</span>
+                    <span className="text-foreground-primary">
+                      {card.name_cn}（{card.name}）{card.reversed ? '・逆位' : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+
+        {/* 解讀內容 */}
+        <Card variant="glass" padding="md">
+          {data.ai_provider && (
+            <p className="mb-4 flex items-center gap-2 text-sm text-foreground-muted">
+              <Clock size={14} aria-hidden />
+              AI：{getAIProviderDisplayName(data.ai_provider, data.ai_model)}
+            </p>
+          )}
+
+          {threadMessages.length > 0 ? (
+            /* 新制：thread 訊息時間軸 */
+            <div className="space-y-4" role="log" aria-label="對話記錄">
+              {threadMessages.map((message, index) => (
+                <div key={messageKeys[index]}>
+                  {message.role === 'user' ? (
+                    <p className="ml-auto w-fit max-w-[90%] rounded-xl rounded-br-sm bg-accent px-4 py-2.5 text-sm text-background-primary">
+                      {message.content}
+                    </p>
+                  ) : (
+                    <div className="mr-auto max-w-full rounded-xl rounded-bl-sm border border-border bg-background-secondary/70 p-4">
+                      <MarkdownRenderer content={message.content} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : data.interpretation ? (
+            /* 舊制：直接渲染解盤 Markdown */
+            <MarkdownRenderer content={data.interpretation} />
+          ) : (
+            <p className="py-4 text-sm text-foreground-muted">暫無解盤結果</p>
+          )}
+        </Card>
+
+        {/* CTA */}
+        <div className="mt-8 text-center">
+          <Link href="/">
+            <Button type="button" variant="gold" size="lg" leftIcon={<Compass size={20} />}>
+              自己也想算一卦
+            </Button>
+          </Link>
+          <p className="mt-4 text-sm text-foreground-muted">點擊上方按鈕，開始你的占卜之旅</p>
+        </div>
+      </main>
+
+      <footer className="py-8 text-center text-sm text-foreground-muted">
+        <p>AI 占卜結果僅供參考，請理性看待</p>
+      </footer>
+    </div>
+  );
 }

@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ToastProvider } from '@/components/ui/Toast';
 import dynamic from 'next/dynamic';
 
 const BackgroundCanvas = dynamic(() => import('@/components/ui/BackgroundCanvas'), {
@@ -28,10 +29,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased bg-background-primary text-foreground-primary transition-colors duration-300 relative min-h-screen">
         <ThemeProvider>
           <AuthProvider>
-            <BackgroundCanvas />
-            <div className="relative z-10">
-              {children}
-            </div>
+            <ToastProvider>
+              <BackgroundCanvas />
+              <div className="relative z-10">
+                {children}
+              </div>
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

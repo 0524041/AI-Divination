@@ -1,28 +1,35 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+/**
+ * 設定頁（Ticket 14）
+ *
+ * - AI 設定（BYOK）：/api/settings/ai CRUD＋連線測試，行為與原版完全一致
+ * - 用戶設定：修改密碼＋登出
+ * （用戶管理已遷至 /admin）
+ */
+
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  Eye,
+  EyeOff,
+  Key,
+  LogOut,
+  Plus,
+  RefreshCw,
+  Server,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import {
-  Settings as SettingsIcon,
-  Key,
-  Server,
-  User,
-  Users,
-  X,
-  Trash2,
-  Plus,
-  Eye,
-  EyeOff,
-  RefreshCw,
-  Shield,
-  Edit2,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { Dialog, DialogClose, DialogContent } from '@/components/ui/Dialog';
+import { useToast } from '@/components/ui/Toast';
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api-client';
 
 interface AIConfig {
   id: number;
@@ -34,464 +41,222 @@ interface AIConfig {
   is_active: boolean;
 }
 
-interface UserItem {
-  id: number;
-  username: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-}
+type Provider = 'gemini' | 'openai' | 'local';
 
-type SettingsTab = 'ai' | 'user' | 'admin';
+const PROVIDER_OPTIONS = [
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'local', label: '其他 AI（自訂 URL）' },
+];
+
+const EMPTY_FORM = {
+  provider: 'gemini' as Provider,
+  name: '',
+  apiKey: '',
+  localUrl: '',
+  localModel: '',
+};
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<{ id: number; username: string; role: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<SettingsTab>('ai');
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   // AI 設定
   const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
-  const [showAddAI, setShowAddAI] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<AIConfig | null>(null);
-  const [newAIProvider, setNewAIProvider] = useState<'gemini' | 'openai' | 'local'>('gemini');
-  const [newAIName, setNewAIName] = useState('');
-  const [newAPIKey, setNewAPIKey] = useState('');
-  const [newLocalURL, setNewLocalURL] = useState('');
-  const [newLocalModel, setNewLocalModel] = useState('');
+  const [form, setForm] = useState(EMPTY_FORM);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [testingConnection, setTestingConnection] = useState(false);
   const [showAPIKey, setShowAPIKey] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AIConfig | null>(null);
 
-  // 用戶設定
+  // 修改密碼
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  // 用戶管理 (Admin)
-  const [users, setUsers] = useState<UserItem[]>([]);
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [newUsername, setNewUsername] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'user' | 'admin'>('user');
-
-  // 用戶分頁
-  const USERS_PER_PAGE = 20;
-  const [userPage, setUserPage] = useState(1);
-  const paginatedUsers = useMemo(() => {
-    const start = (userPage - 1) * USERS_PER_PAGE;
-    return users.slice(start, start + USERS_PER_PAGE);
-  }, [users, userPage]);
-  const totalUserPages = Math.ceil(users.length / USERS_PER_PAGE);
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
-    if (currentUser) {
-      // 並行請求，減少等待時間
-      const loadData = async () => {
-        const promises = [fetchAIConfigs()];
-        if (currentUser.role === 'admin') {
-          promises.push(fetchUsers());
-        }
-        await Promise.all(promises);
-      };
-      loadData();
-    }
-  }, [currentUser]);
-
-  const checkAuth = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
+  const fetchAIConfigs = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setCurrentUser(await res.json());
-      } else {
-        router.push('/login');
-      }
-    } catch {
-      router.push('/login');
+      const res = await apiGet('/api/settings/ai');
+      if (res.ok) setAiConfigs(await res.json());
+    } catch (err) {
+      console.error('Fetch AI configs error:', err);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchAIConfigs();
+  }, [fetchAIConfigs]);
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setAvailableModels([]);
+    setShowAPIKey(false);
+    setEditingConfig(null);
   };
 
-  const fetchAIConfigs = async () => {
-    const token = localStorage.getItem('token');
+  /** 測試自訂服務連線並取得模型列表（新增與編輯共用） */
+  const testConnection = async (url: string): Promise<{ success: boolean; models?: string[]; error?: string }> => {
+    if (!url) return { success: false };
+    setTestingConnection(true);
     try {
-      const res = await fetch('/api/settings/ai', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setAiConfigs(await res.json());
-      }
-    } catch (err) {
-      console.error('Fetch AI configs error:', err);
-    }
-  };
-
-  const fetchUsers = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch('/api/admin/users', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setUsers(await res.json());
-      }
-    } catch (err) {
-      console.error('Fetch users error:', err);
+      const res = await apiPost('/api/settings/ai/test', { url });
+      return await res.json();
+    } catch {
+      return { success: false, error: '連線測試失敗' };
+    } finally {
+      setTestingConnection(false);
     }
   };
 
   const handleTestConnection = async () => {
-    if (!newLocalURL) return;
-    setTestingConnection(true);
-    setAvailableModels([]);
-
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/settings/ai/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ url: newLocalURL }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        setAvailableModels(data.models || []);
-        // 如果目前沒有選模型，或是選的模型不在新的列表內，就預設選第一個
-        if (data.models?.length > 0) {
-          if (!newLocalModel || !data.models.includes(newLocalModel)) {
-            setNewLocalModel(data.models[0]);
-          }
-        }
-      } else {
-        alert(`連線失敗: ${data.error}`);
+    const result = await testConnection(form.localUrl);
+    if (result.success) {
+      setAvailableModels(result.models || []);
+      if ((result.models?.length ?? 0) > 0 && !result.models?.includes(form.localModel)) {
+        setForm((f) => ({ ...f, localModel: result.models![0] }));
       }
-    } catch (err) {
-      alert('連線測試失敗');
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
-  const handleAddAIConfig = async () => {
-    const token = localStorage.getItem('token');
-    const body: Record<string, string> = { provider: newAIProvider };
-
-    // 添加用戶自訂名稱
-    if (newAIName.trim()) {
-      body.name = newAIName.trim();
-    }
-
-    if (newAIProvider === 'gemini' || newAIProvider === 'openai') {
-      if (!newAPIKey) {
-        alert('請輸入 API Key');
-        return;
-      }
-      body.api_key = newAPIKey;
-      if (newAIProvider === 'openai') {
-        body.local_model = newLocalModel || "gpt-5.1";
-      }
+      toast(`連線成功，取得 ${result.models?.length ?? 0} 個模型`, { kind: 'success' });
     } else {
-      if (!newLocalURL || !newLocalModel) {
-        alert('請填寫 URL 和模型名稱');
-        return;
-      }
-      body.local_url = newLocalURL;
-      body.local_model = newLocalModel;
-      if (newAPIKey) {
-        body.api_key = newAPIKey;
-      }
-    }
-
-    try {
-      const res = await fetch('/api/settings/ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        await fetchAIConfigs();
-        setShowAddAI(false);
-        resetAIForm();
-      } else {
-        const data = await res.json();
-        alert(data.detail || '新增失敗');
-      }
-    } catch {
-      alert('新增失敗');
+      toast(`連線失敗：${result.error || '未知錯誤'}`, { kind: 'error' });
     }
   };
 
-  const handleEditAIConfig = (config: AIConfig) => {
+  const openCreate = () => {
+    resetForm();
+    setFormOpen(true);
+  };
+
+  const openEdit = async (config: AIConfig) => {
+    resetForm();
     setEditingConfig(config);
-    setNewAIProvider(config.provider as 'gemini' | 'openai' | 'local');
-    setNewAIName(config.name || '');
-    setNewAPIKey('');
-    setNewLocalURL(config.local_url || '');
-    setNewLocalModel(config.local_model || '');
-    if (config.local_url && config.provider === 'local') {
-      // 自動測試連線以取得可用模型 (僅限 Custom AI)
-      handleTestConnectionForEdit(config.local_url);
+    setForm({
+      provider: config.provider as Provider,
+      name: config.name || '',
+      apiKey: '',
+      localUrl: config.local_url || '',
+      localModel: config.local_model || '',
+    });
+    setFormOpen(true);
+    if (config.provider === 'local' && config.local_url) {
+      // 編輯自訂服務時自動取得可用模型列表
+      const result = await testConnection(config.local_url);
+      if (result.success) setAvailableModels(result.models || []);
     }
   };
 
-  const handleTestConnectionForEdit = async (url: string) => {
-    setTestingConnection(true);
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/settings/ai/test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ url }),
-      });
+  const handleSave = async () => {
+    const body: Record<string, string> = { provider: form.provider };
+    if (form.name.trim()) body.name = form.name.trim();
 
-      const data = await res.json();
-      if (data.success) {
-        setAvailableModels(data.models || []);
-      }
-    } catch (err) {
-      console.error('Test connection error:', err);
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
-  const handleUpdateAIConfig = async () => {
-    if (!editingConfig) return;
-
-    const token = localStorage.getItem('token');
-    const body: Record<string, string> = { provider: newAIProvider };
-
-    // 添加用戶自訂名稱
-    if (newAIName.trim()) {
-      body.name = newAIName.trim();
-    }
-
-    if (newAIProvider === 'gemini' || newAIProvider === 'openai') {
-      if (newAPIKey) {
-        body.api_key = newAPIKey;
-      }
-      if (newAIProvider === 'openai' && newLocalModel) {
-        body.local_model = newLocalModel;
-      }
-    } else {
-      if (!newLocalURL || !newLocalModel) {
-        alert('請填寫 URL 和模型名稱');
+    if (form.provider === 'gemini' || form.provider === 'openai') {
+      if (!editingConfig && !form.apiKey) {
+        toast('請輸入 API Key', { kind: 'error' });
         return;
       }
-      body.local_url = newLocalURL;
-      body.local_model = newLocalModel;
-      if (newAPIKey) {
-        body.api_key = newAPIKey;
+      if (form.apiKey) body.api_key = form.apiKey;
+      if (form.provider === 'openai') {
+        body.local_model = form.localModel || 'gpt-5.1';
       }
+    } else {
+      if (!form.localUrl || !form.localModel) {
+        toast('請填寫 URL 和模型名稱', { kind: 'error' });
+        return;
+      }
+      body.local_url = form.localUrl;
+      body.local_model = form.localModel;
+      if (form.apiKey) body.api_key = form.apiKey;
     }
 
+    setSaving(true);
     try {
-      const res = await fetch(`/api/settings/ai/${editingConfig.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const res = editingConfig
+        ? await apiPut(`/api/settings/ai/${editingConfig.id}`, body)
+        : await apiPost('/api/settings/ai', body);
 
       if (res.ok) {
         await fetchAIConfigs();
-        setEditingConfig(null);
-        resetAIForm();
+        setFormOpen(false);
+        resetForm();
+        toast(editingConfig ? '設定已更新' : '設定已新增', { kind: 'success' });
       } else {
-        const data = await res.json();
-        alert(data.detail || '更新失敗');
+        const data = await res.json().catch(() => null);
+        toast(data?.detail || '儲存失敗', { kind: 'error' });
       }
     } catch {
-      alert('更新失敗');
+      toast('儲存失敗', { kind: 'error' });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleActivateAI = async (configId: number) => {
-    const token = localStorage.getItem('token');
+  const handleActivate = async (configId: number) => {
     try {
-      await fetch(`/api/settings/ai/${configId}/activate`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetchAIConfigs();
+      const res = await apiPut(`/api/settings/ai/${configId}/activate`);
+      if (res.ok) {
+        await fetchAIConfigs();
+      } else {
+        toast('啟用失敗', { kind: 'error' });
+      }
     } catch (err) {
       console.error('Activate error:', err);
     }
   };
 
-  const handleDeleteAI = async (configId: number) => {
-    if (!confirm('確定要刪除此設定？')) return;
-    const token = localStorage.getItem('token');
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await fetch(`/api/settings/ai/${configId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetchAIConfigs();
+      const res = await apiDelete(`/api/settings/ai/${deleteTarget.id}`);
+      if (res.ok) {
+        await fetchAIConfigs();
+        toast('設定已刪除', { kind: 'success' });
+        setDeleteTarget(null);
+      } else {
+        toast('刪除失敗', { kind: 'error' });
+      }
     } catch (err) {
       console.error('Delete error:', err);
+      toast('刪除失敗', { kind: 'error' });
     }
   };
 
-  const resetAIForm = () => {
-    setNewAIProvider('gemini');
-    setNewAIName('');
-    setNewAPIKey('');
-    setNewLocalURL('');
-    setNewLocalModel('');
-    setAvailableModels([]);
-    setShowAPIKey(false);
-  };
-
-  // Validation Helpers
-  const validateLength = (str: string, min: number, max: number, name: string) => {
-    if (str.length < min || str.length > max) return `${name}長度需為 ${min}-${max} 字`;
-    return null;
-  };
-  const validateUsername = (name: string) => {
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) return "用戶名只能包含英數字、底線或連字號";
-    return validateLength(name, 3, 20, "用戶名");
-  }
-  const validatePassword = (pwd: string) => validateLength(pwd, 6, 20, "密碼");
-
+  // ===== 修改密碼 =====
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError('');
-    setPasswordSuccess(false);
 
-    const pwdError = validatePassword(newPassword);
-    if (pwdError) {
-      setPasswordError(pwdError);
+    if (newPassword.length < 6 || newPassword.length > 20) {
+      setPasswordError('密碼長度需為 6-20 字');
       return;
     }
-
     if (newPassword !== confirmPassword) {
       setPasswordError('新密碼與確認密碼不符');
       return;
     }
 
-    const token = localStorage.getItem('token');
     try {
-      const res = await fetch('/api/auth/password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          old_password: oldPassword,
-          new_password: newPassword,
-          confirm_password: confirmPassword,
-        }),
+      const res = await apiPut('/api/auth/password', {
+        old_password: oldPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
       });
-
       if (res.ok) {
-        setPasswordSuccess(true);
+        toast('密碼已更新', { kind: 'success' });
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        const data = await res.json();
-        setPasswordError(data.detail || '修改失敗');
+        const data = await res.json().catch(() => null);
+        setPasswordError(data?.detail || '修改失敗');
       }
     } catch {
       setPasswordError('修改失敗');
-    }
-  };
-
-  const handleAddUser = async () => {
-    if (!newUsername || !newUserPassword) {
-      alert('請填寫完整資訊');
-      return;
-    }
-
-    const userError = validateUsername(newUsername);
-    if (userError) { alert(userError); return; }
-
-    const pwdError = validatePassword(newUserPassword);
-    if (pwdError) { alert(pwdError); return; }
-
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          username: newUsername,
-          password: newUserPassword,
-          role: newUserRole,
-        }),
-      });
-
-      if (res.ok) {
-        await fetchUsers();
-        setShowAddUser(false);
-        setNewUsername('');
-        setNewUserPassword('');
-        setNewUserRole('user');
-      } else {
-        const data = await res.json();
-        alert(data.detail || '新增失敗');
-      }
-    } catch {
-      alert('新增失敗');
-    }
-  };
-
-  const handleToggleUserActive = async (userId: number) => {
-    const token = localStorage.getItem('token');
-    try {
-      await fetch(`/api/admin/users/${userId}/toggle-active`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetchUsers();
-    } catch (err) {
-      console.error('Toggle active error:', err);
-    }
-  };
-
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm('確定要刪除此用戶？')) return;
-    const token = localStorage.getItem('token');
-    try {
-      await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetchUsers();
-    } catch (err) {
-      console.error('Delete user error:', err);
     }
   };
 
@@ -500,549 +265,347 @@ export default function SettingsPage() {
     router.push('/login');
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-spin-slow">☯</div>
-          <p className="text-foreground-secondary">載入中...</p>
-        </div>
-      </div>
-    );
-  }
+  const isLocal = form.provider === 'local';
 
   return (
-    <>
+    <main className="w-full max-w-3xl mx-auto px-4 py-6">
+      <header className="mb-6">
+        <h1 className="font-heading text-2xl font-semibold text-foreground-primary">設定</h1>
+        <p className="text-sm text-foreground-muted mt-1">管理您的 AI 金鑰與帳戶</p>
+      </header>
 
-      {/* 主內容 */}
-      <main className="w-full max-w-4xl mx-auto px-4 py-6">
-        {/* 分頁選項 */}
-        <div className="flex gap-2 border-b border-border pb-2 mb-6 overflow-x-auto">
-          <button
-            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'ai' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
-              }`}
-            onClick={() => setActiveTab('ai')}
-          >
-            <Server size={18} className="inline mr-2" />
-            AI 設定
-          </button>
-          <button
-            className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'user' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
-              }`}
-            onClick={() => setActiveTab('user')}
-          >
-            <User size={18} className="inline mr-2" />
-            用戶設定
-          </button>
-          {currentUser?.role === 'admin' && (
-            <button
-              className={`px-4 py-2 rounded-t-lg transition whitespace-nowrap ${activeTab === 'admin' ? 'bg-accent/20 text-accent' : 'text-foreground-secondary hover:text-foreground-primary'
-                }`}
-              onClick={() => setActiveTab('admin')}
-            >
-              <Users size={18} className="inline mr-2" />
-              用戶管理
-            </button>
-          )}
-        </div>
+      <Tabs defaultValue="ai">
+        <TabsList>
+          <TabsTrigger value="ai">AI 設定</TabsTrigger>
+          <TabsTrigger value="user">用戶設定</TabsTrigger>
+        </TabsList>
 
-        {/* AI 設定頁面 */}
-        {activeTab === 'ai' && (
-          <div className="space-y-6">
-            {/* 現有設定 */}
-            <Card variant="glass" padding="md">
-              <div className="flex items-center justify-between mb-4">
-                <CardTitle>AI 服務設定</CardTitle>
-                <Button
-                  onClick={() => { setShowAddAI(true); setEditingConfig(null); resetAIForm(); }}
-                  variant="gold"
-                  size="sm"
-                  leftIcon={<Plus size={16} />}
-                >
-                  新增
-                </Button>
+        {/* ===== AI 設定（BYOK）===== */}
+        <TabsContent value="ai">
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>我的 AI 服務</CardTitle>
+                <p className="text-sm text-foreground-muted mt-1">
+                  使用自己的金鑰解盤；未設定時將由系統端點服務
+                </p>
               </div>
+              <Button type="button" variant="gold" size="sm" leftIcon={<Plus size={16} />} onClick={openCreate}>
+                新增
+              </Button>
+            </CardHeader>
 
-              {aiConfigs.length === 0 ? (
-                <p className="text-foreground-muted text-center py-8">尚未設定任何 AI 服務</p>
+            <CardContent className="space-y-3">
+              {loading ? (
+                <p className="text-center text-foreground-muted py-8">載入中…</p>
+              ) : aiConfigs.length === 0 ? (
+                <p className="text-center text-foreground-muted py-8">尚未設定任何 AI 服務</p>
               ) : (
-                <div className="space-y-3">
-                  {aiConfigs.map((config) => (
-                    <div
-                      key={config.id}
-                      className={`p-4 rounded-lg border transition ${config.is_active
-                        ? 'border-accent bg-accent/10'
-                        : 'border-border bg-background-card/50'
-                        }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {config.provider === 'gemini' ? (
-                            <Key className="text-blue-400" size={20} />
-                          ) : config.provider === 'openai' ? (
-                            <Server className="text-purple-400" size={20} />
-                          ) : (
-                            <Server className="text-green-400" size={20} />
-                          )}
-                          <div>
-                            <p className="font-medium">
-                              {config.name || (
-                                config.provider === 'gemini' ? 'Google Gemini' :
-                                config.provider === 'openai' ? 'OpenAI' : '其他 AI 服務'
-                              )}
-                            </p>
-                            {config.provider === 'local' && (
-                              <p className="text-sm text-foreground-muted">
-                                {config.local_url} - {config.local_model}
-                              </p>
-                            )}
-                            {config.provider === 'openai' && (
-                              <p className="text-sm text-foreground-muted">
-                                Model: {config.local_model}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {config.is_active ? (
-                            <Badge variant="success">使用中</Badge>
-                          ) : (
-                            <Button
-                              onClick={() => handleActivateAI(config.id)}
-                              variant="ghost"
-                              size="sm"
-                              className="text-foreground-muted hover:text-accent"
-                            >
-                              啟用
-                            </Button>
-                          )}
-                          <Button
-                            onClick={() => handleEditAIConfig(config)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-foreground-muted hover:text-accent"
-                          >
-                            <Edit2 size={16} />
-                          </Button>
-                          <Button
-                            onClick={() => handleDeleteAI(config.id)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-foreground-muted hover:text-red-400"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* 新增 / 編輯 AI 設定表單 */}
-            {(showAddAI || editingConfig) && (
-              <Card variant="glass" padding="md">
-                <div className="flex items-center justify-between mb-4">
-                  <CardTitle>
-                    {editingConfig ? '編輯 AI 設定' : '新增 AI 設定'}
-                  </CardTitle>
-                  <Button
-                    onClick={() => { setShowAddAI(false); setEditingConfig(null); resetAIForm(); }}
-                    variant="ghost"
-                    size="sm"
-                    className="text-foreground-secondary"
+                aiConfigs.map((config) => (
+                  <div
+                    key={config.id}
+                    className={`flex items-center justify-between gap-3 rounded-xl border p-4 flex-wrap ${
+                      config.is_active ? 'border-accent bg-accent-light' : 'border-border bg-background-secondary/50'
+                    }`}
                   >
-                    <X size={20} />
-                  </Button>
-                </div>
-
-                {/* Provider 選擇 */}
-                <div className="mb-4">
-                  <label className="block text-sm text-foreground-secondary mb-2">類型</label>
-                  <div className="flex gap-2">
-                    <Button
-                      className={`flex-1 ${newAIProvider === 'gemini' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
-                      variant={newAIProvider === 'gemini' ? 'outline' : 'outline'}
-                      onClick={() => setNewAIProvider('gemini')}
-                      disabled={!!editingConfig}
-                    >
-                      <Key className="inline mr-1" size={16} />
-                      Gemini
-                    </Button>
-                    <Button
-                      className={`flex-1 ${newAIProvider === 'openai' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
-                      variant={newAIProvider === 'openai' ? 'outline' : 'outline'}
-                      onClick={() => setNewAIProvider('openai')}
-                      disabled={!!editingConfig}
-                    >
-                      <Server className="inline mr-1" size={16} />
-                      OpenAI
-                    </Button>
-                    <Button
-                      className={`flex-1 ${newAIProvider === 'local' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
-                      variant={newAIProvider === 'local' ? 'outline' : 'outline'}
-                      onClick={() => setNewAIProvider('local')}
-                      disabled={!!editingConfig}
-                    >
-                      <Server className="inline mr-1" size={16} />
-                      其他 AI
-                    </Button>
-                  </div>
-                </div>
-
-                {/* 自訂名稱輸入框 */}
-                <div className="mb-4">
-                  <label className="block text-sm text-foreground-secondary mb-2">
-                    服務名稱 (選填)
-                  </label>
-                  <input
-                    type="text"
-                    value={newAIName}
-                    onChange={(e) => setNewAIName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    placeholder={`例如: 我的${newAIProvider === 'gemini' ? 'Gemini' : newAIProvider === 'openai' ? 'OpenAI' : '本地 AI'}`}
-                    maxLength={50}
-                  />
-                  <p className="text-xs text-foreground-muted mt-1">
-                    可自訂名稱方便識別，留空則使用預設名稱
-                  </p>
-                </div>
-
-                {newAIProvider === 'gemini' || newAIProvider === 'openai' ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm text-foreground-secondary mb-2">
-                        API Key {editingConfig && '(留空保持原設定)'}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showAPIKey ? 'text' : 'password'}
-                          value={newAPIKey}
-                          onChange={(e) => setNewAPIKey(e.target.value)}
-                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent pr-10"
-                          placeholder={editingConfig ? '輸入新 API Key 或留空' : `輸入 ${newAIProvider === 'gemini' ? 'Gemini' : 'OpenAI'} API Key`}
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted"
-                          onClick={() => setShowAPIKey(!showAPIKey)}
-                        >
-                          {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`p-2.5 rounded-lg shrink-0 ${config.is_active ? 'bg-accent/15 text-accent' : 'bg-foreground-muted/10 text-foreground-secondary'}`}>
+                        {config.provider === 'gemini' ? <Key size={18} aria-hidden /> : <Server size={18} aria-hidden />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground-primary truncate">
+                            {config.name ||
+                              (config.provider === 'gemini'
+                                ? 'Google Gemini'
+                                : config.provider === 'openai'
+                                  ? 'OpenAI'
+                                  : '其他 AI 服務')}
+                          </p>
+                          {config.is_active && <Badge variant="accent" size="sm">使用中</Badge>}
+                        </div>
+                        {(config.provider === 'local' || config.provider === 'openai') && (
+                          <p className="text-sm text-foreground-muted truncate">
+                            {[config.local_url, config.local_model].filter(Boolean).join(' ・ ') || '\u00A0'}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    {newAIProvider === 'openai' && (
-                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-yellow-500 text-sm mb-2">
-                        <p>⚠️ OpenAI 沒有提供免費AI Token 次數，請謹慎使用，使用需付費。</p>
-                      </div>
-                    )}
-                    {newAIProvider === 'openai' && (
-                      <div>
-                        <label className="block text-sm text-foreground-secondary mb-2">模型 (預設 gpt-5.1)</label>
-                        <input
-                          type="text"
-                          value={newLocalModel}
-                          onChange={(e) => setNewLocalModel(e.target.value)}
-                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="gpt-5.1"
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm text-foreground-secondary mb-2">API URL</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newLocalURL}
-                          onChange={(e) => setNewLocalURL(e.target.value)}
-                          className="flex-1 px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="請填寫服務商URL"
-                        />
-                        <Button
-                          onClick={handleTestConnection}
-                          disabled={testingConnection || !newLocalURL}
-                          variant="gold"
-                          className="whitespace-nowrap"
-                        >
-                          {testingConnection ? (
-                            <RefreshCw className="animate-spin" size={16} />
-                          ) : (
-                            <RefreshCw size={16} />
-                          )}
-                          測試
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!config.is_active && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => handleActivate(config.id)}>
+                          啟用
                         </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-foreground-secondary mb-2">
-                        API Key (選填)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showAPIKey ? 'text' : 'password'}
-                          value={newAPIKey}
-                          onChange={(e) => setNewAPIKey(e.target.value)}
-                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent pr-10"
-                          placeholder="若服務需要驗證請填寫"
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted"
-                          onClick={() => setShowAPIKey(!showAPIKey)}
-                        >
-                          {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="relative z-50">
-                      <label className="block text-sm text-foreground-secondary mb-2">模型名稱</label>
-                      {availableModels.length > 0 ? (
-                        <select
-                          value={newLocalModel}
-                          onChange={(e) => setNewLocalModel(e.target.value)}
-                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                        >
-                          <option value="">請選擇模型</option>
-                          {availableModels.map((model) => (
-                            <option key={model} value={model}>{model}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={newLocalModel}
-                          onChange={(e) => setNewLocalModel(e.target.value)}
-                          className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="例如: llama3, qwen2.5:14b"
-                        />
                       )}
-                      <p className="text-xs text-foreground-muted mt-1">可點擊上方「測試」按鈕自動取得模型列表，或直接手動輸入。</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEdit(config)}
+                        aria-label={`編輯 ${config.name || config.provider}`}
+                      >
+                        編輯
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteTarget(config)}
+                        aria-label={`刪除 ${config.name || config.provider}`}
+                      >
+                        <Trash2 size={15} />
+                      </Button>
                     </div>
                   </div>
-                )}
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                <Button
-                  onClick={editingConfig ? handleUpdateAIConfig : handleAddAIConfig}
-                  variant="gold"
-                  fullWidth
-                  className="mt-6"
-                >
-                  {editingConfig ? '更新設定' : '儲存設定'}
-                </Button>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* 用戶設定頁面 */}
-        {activeTab === 'user' && (
-          <div className="space-y-6">
-            {/* 修改密碼 */}
-            <Card variant="glass" padding="md">
-              <CardTitle className="mb-4">修改密碼</CardTitle>
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div>
-                  <label className="block text-sm text-foreground-secondary mb-2">舊密碼</label>
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-foreground-secondary mb-2">新密碼</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-foreground-secondary mb-2">確認新密碼</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                    required
-                    minLength={6}
-                  />
-                </div>
+        {/* ===== 用戶設定 ===== */}
+        <TabsContent value="user">
+          <Card>
+            <CardHeader>
+              <CardTitle>修改密碼</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+                <Input
+                  label="舊密碼"
+                  type="password"
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+                <Input
+                  label="新密碼"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={6}
+                  maxLength={20}
+                  required
+                />
+                <Input
+                  label="確認新密碼"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                />
 
                 {passwordError && (
-                  <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm">
+                  <p className="rounded-lg border border-[var(--cinnabar)]/40 bg-[var(--cinnabar)]/10 px-3 py-2 text-sm text-[var(--cinnabar)]">
                     {passwordError}
-                  </div>
-                )}
-                {passwordSuccess && (
-                  <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-3 text-green-400 text-sm">
-                    密碼已更新
-                  </div>
+                  </p>
                 )}
 
-                <Button type="submit" variant="gold" fullWidth>
-                  更新密碼
-                </Button>
+                <Button type="submit" variant="gold" fullWidth>更新密碼</Button>
               </form>
-            </Card>
+            </CardContent>
+          </Card>
 
-            {/* 登出 */}
-            <Card variant="glass" padding="md">
-              <CardTitle className="mb-4">登出</CardTitle>
-              <Button onClick={handleLogout} variant="danger" fullWidth className="flex items-center justify-center gap-2">
-                <LogOut size={18} />
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>登出</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button type="button" variant="danger" fullWidth leftIcon={<LogOut size={18} />} onClick={handleLogout}>
                 登出帳號
               </Button>
-            </Card>
-          </div>
-        )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-        {/* 用戶管理頁面 (Admin) */}
-        {activeTab === 'admin' && currentUser?.role === 'admin' && (
-          <div className="space-y-6">
-            <Card variant="glass" padding="md">
-              <div className="flex items-center justify-between mb-4">
-                <CardTitle>用戶管理</CardTitle>
-                <Button onClick={() => setShowAddUser(true)} variant="gold" size="sm" leftIcon={<Plus size={16} />}>
-                  新增用戶
-                </Button>
-              </div>
+      {/* 新增 / 編輯 AI 設定 Dialog */}
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!open) { setFormOpen(false); resetForm(); } }}>
+        <DialogContent title={editingConfig ? '編輯 AI 設定' : '新增 AI 設定'}>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSave();
+            }}
+          >
+            <Select
+              label="類型"
+              options={PROVIDER_OPTIONS}
+              value={form.provider}
+              onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value as Provider }))}
+              disabled={!!editingConfig}
+            />
 
-              <div className="space-y-3">
-                {paginatedUsers.map((user) => (
-                  <div key={user.id} className="p-4 rounded-lg border border-border bg-background-card/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.role === 'admin' ? 'bg-accent/20' : 'bg-background-card'
-                          }`}>
-                          {user.role === 'admin' ? <Shield size={18} className="text-accent" /> : <User size={18} />}
-                        </div>
-                        <div>
-                          <p className="font-medium">{user.username}</p>
-                          <p className="text-sm text-foreground-muted">
-                            {user.role === 'admin' ? '管理員' : '一般用戶'}
-                          </p>
-                        </div>
-                      </div>
-                      {user.id !== currentUser.id && (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            onClick={() => handleToggleUserActive(user.id)}
-                            variant={user.is_active ? "ghost" : "danger"}
-                            size="sm"
-                            className={user.is_active ? "text-green-400 bg-green-500/20" : ""}
-                          >
-                            {user.is_active ? '啟用' : '停用'}
-                          </Button>
-                          <Button onClick={() => handleDeleteUser(user.id)} variant="ghost" size="sm" className="text-foreground-muted hover:text-red-400">
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <Input
+              label="服務名稱（選填）"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder={`例如：我的${isLocal ? '本地 AI' : form.provider === 'gemini' ? 'Gemini' : 'OpenAI'}`}
+              maxLength={50}
+            />
 
-              {/* 分頁控制 */}
-              {totalUserPages > 1 && (
-                <div className="mt-4 flex items-center justify-between pt-4 border-t border-border">
-                  <span className="text-sm text-foreground-muted">
-                    共 {users.length} 位用戶，第 {userPage} / {totalUserPages} 頁
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => setUserPage(p => Math.max(1, p - 1))}
-                      disabled={userPage === 1}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      <ChevronLeft size={18} />
-                    </Button>
-                    <Button
-                      onClick={() => setUserPage(p => Math.min(totalUserPages, p + 1))}
-                      disabled={userPage === totalUserPages}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      <ChevronRight size={18} />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            {/* 新增用戶表單 */}
-            {showAddUser && (
-              <Card variant="glass" padding="md">
-                <div className="flex items-center justify-between mb-4">
-                  <CardTitle>新增用戶</CardTitle>
-                  <Button onClick={() => setShowAddUser(false)} variant="ghost" size="sm" className="text-foreground-secondary">
-                    <X size={20} />
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-foreground-secondary mb-2">用戶名</label>
+            {isLocal ? (
+              <>
+                <div>
+                  <label htmlFor="byok-url" className="mb-2 block text-sm font-medium text-foreground-secondary">
+                    API URL
+                  </label>
+                  <div className="flex gap-2">
                     <input
+                      id="byok-url"
                       type="text"
-                      value={newUsername}
-                      onChange={(e) => setNewUsername(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                      placeholder="輸入用戶名"
+                      value={form.localUrl}
+                      onChange={(e) => setForm((f) => ({ ...f, localUrl: e.target.value }))}
+                      placeholder="例如：http://localhost:11434/v1"
+                      className="flex-1 rounded-xl border border-border/50 bg-white/80 px-4 py-3 text-foreground-primary placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:bg-black/40"
                     />
+                    <Button
+                      type="button"
+                      variant="gold"
+                      onClick={handleTestConnection}
+                      disabled={testingConnection || !form.localUrl}
+                      loading={testingConnection}
+                      leftIcon={!testingConnection ? <RefreshCw size={16} /> : undefined}
+                    >
+                      測試
+                    </Button>
                   </div>
-                  <div>
-                    <label className="block text-sm text-foreground-secondary mb-2">密碼</label>
-                    <input
-                      type="password"
-                      value={newUserPassword}
-                      onChange={(e) => setNewUserPassword(e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg bg-background-card border border-border text-foreground-primary placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-                      placeholder="輸入密碼"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-foreground-secondary mb-2">角色</label>
-                    <div className="flex gap-4">
-                      <Button
-                        className={`flex-1 ${newUserRole === 'user' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
-                        variant={newUserRole === 'user' ? 'outline' : 'outline'}
-                        onClick={() => setNewUserRole('user')}
-                      >
-                        一般用戶
-                      </Button>
-                      <Button
-                        className={`flex-1 ${newUserRole === 'admin' ? 'bg-accent/20 border-accent text-accent' : 'text-foreground-secondary'}`}
-                        variant={newUserRole === 'admin' ? 'outline' : 'outline'}
-                        onClick={() => setNewUserRole('admin')}
-                      >
-                        管理員
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Button onClick={handleAddUser} variant="gold" fullWidth>
-                    建立用戶
-                  </Button>
                 </div>
-              </Card>
+
+                <div>
+                  <label htmlFor="byok-key" className="mb-2 block text-sm font-medium text-foreground-secondary">
+                    API Key（選填）
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="byok-key"
+                      type={showAPIKey ? 'text' : 'password'}
+                      value={form.apiKey}
+                      onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
+                      placeholder="若服務需要驗證請填寫"
+                      autoComplete="new-password"
+                      className="w-full rounded-xl border border-border/50 bg-white/80 px-4 py-3 pr-12 text-foreground-primary placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:bg-black/40"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showAPIKey ? '隱藏 API Key' : '顯示 API Key'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary"
+                      onClick={() => setShowAPIKey(!showAPIKey)}
+                    >
+                      {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="byok-model" className="mb-2 block text-sm font-medium text-foreground-secondary">
+                    模型名稱
+                  </label>
+                  {availableModels.length > 0 ? (
+                    <Select
+                      id="byok-model"
+                      value={form.localModel}
+                      onChange={(e) => setForm((f) => ({ ...f, localModel: e.target.value }))}
+                      options={[
+                        { value: '', label: '請選擇模型' },
+                        ...availableModels.map((model) => ({ value: model, label: model })),
+                      ]}
+                    />
+                  ) : (
+                    <input
+                      id="byok-model"
+                      type="text"
+                      value={form.localModel}
+                      onChange={(e) => setForm((f) => ({ ...f, localModel: e.target.value }))}
+                      placeholder="例如：llama3、qwen2.5:14b"
+                      className="w-full rounded-xl border border-border/50 bg-white/80 px-4 py-3 text-foreground-primary placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:bg-black/40"
+                    />
+                  )}
+                  <p className="mt-1 text-xs text-foreground-muted">
+                    可點擊「測試」自動取得模型列表，或直接手動輸入。
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="byok-cloud-key" className="mb-2 block text-sm font-medium text-foreground-secondary">
+                    API Key{editingConfig ? '（留空保持原設定）' : ''}
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="byok-cloud-key"
+                      type={showAPIKey ? 'text' : 'password'}
+                      value={form.apiKey}
+                      onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
+                      placeholder={
+                        editingConfig
+                          ? '輸入新 API Key 或留空'
+                          : `輸入 ${form.provider === 'gemini' ? 'Gemini' : 'OpenAI'} API Key`
+                      }
+                      autoComplete="new-password"
+                      className="w-full rounded-xl border border-border/50 bg-white/80 px-4 py-3 pr-12 text-foreground-primary placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:bg-black/40"
+                    />
+                    <button
+                      type="button"
+                      aria-label={showAPIKey ? '隱藏 API Key' : '顯示 API Key'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground-primary"
+                      onClick={() => setShowAPIKey(!showAPIKey)}
+                    >
+                      {showAPIKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {form.provider === 'openai' && (
+                  <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm text-foreground-secondary">
+                    ⚠️ OpenAI 沒有提供免費 AI Token 次數，請謹慎使用，使用需付費。
+                  </p>
+                )}
+
+                {form.provider === 'openai' && (
+                  <Input
+                    label="模型（預設 gpt-5.1）"
+                    value={form.localModel}
+                    onChange={(e) => setForm((f) => ({ ...f, localModel: e.target.value }))}
+                    placeholder="gpt-5.1"
+                  />
+                )}
+              </>
             )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">取消</Button>
+              </DialogClose>
+              <Button type="submit" variant="gold" loading={saving}>
+                {editingConfig ? '更新設定' : '儲存設定'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 刪除確認 Dialog */}
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent title="刪除 AI 設定" className="w-[min(92vw,420px)]">
+          <p className="text-sm text-foreground-secondary mb-6">
+            確定要刪除「{deleteTarget?.name || deleteTarget?.provider}」這組設定嗎？
+          </p>
+          <div className="flex justify-end gap-3">
+            <DialogClose asChild>
+              <Button type="button" variant="secondary">取消</Button>
+            </DialogClose>
+            <Button type="button" variant="danger" onClick={handleDelete}>確定刪除</Button>
           </div>
-        )}
-      </main>
-      </>
+        </DialogContent>
+      </Dialog>
+    </main>
   );
 }

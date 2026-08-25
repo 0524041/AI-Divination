@@ -23,3 +23,8 @@ const localStorageMock = {
     clear: vi.fn(),
 };
 Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+
+// jsdom 未實作 scrollIntoView
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}

@@ -129,15 +129,3 @@ export function useAuth(): AuthContextType {
  * Hook that enforces authentication
  * Redirects to login if not authenticated
  */
-export function useRequireAuth(): AuthContextType {
-    const auth = useAuth();
-    const router = useRouter();
-
-    useEffect(() => {
-        if (!auth.loading && !auth.isAuthenticated) {
-            router.push('/login');
-        }
-    }, [auth.loading, auth.isAuthenticated, router]);
-
-    return auth;
-}
