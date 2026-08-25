@@ -112,3 +112,17 @@ python app/core/optimize_db.py                              # Database optimizat
 2. Run `npm run test:run` before committing frontend changes.
 3. Follow existing code patterns for consistency.
 4. When modifying AI prompts, verify both frontend and backend still agree on the response format.
+
+## Agent skills
+
+### Issue tracker
+
+Issues 以 local markdown 檔案存在 `.scratch/<feature>/`。See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+使用五個預設角色標籤：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context：root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
