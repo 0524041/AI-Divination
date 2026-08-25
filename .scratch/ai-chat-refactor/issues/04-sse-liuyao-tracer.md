@@ -4,13 +4,13 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done（2026-08-25）
 
-- [ ] 六爻建立端點改為立即返回（含完整盤面資料），不再觸發背景任務
-- [ ] per-record SSE 端點：meta → delta* → done／error 事件序列、心跳保活
-- [ ] Prompt 組裝：system 片段組裝器最小版＋六爻緊湊結構化盤面格式（繁中）
-- [ ] 完成後首則 assistant 訊息持久化（含 tokens）；用量紀錄記帳
-- [ ] 失敗路徑：error 事件語意化＋紀錄狀態標記；上游取消接線
+- [x] 六爻建立端點改為立即返回（含完整盤面資料），不再觸發背景任務
+- [x] per-record SSE 端點：meta → delta* → done／error 事件序列、心跳保活
+- [x] Prompt 組裝：system 片段組裝器最小版＋六爻緊湊結構化盤面格式（繁中）
+- [x] 完成後首則 assistant 訊息持久化（含 tokens）；用量紀錄記帳
+- [x] 失敗路徑：error 事件語意化＋紀錄狀態標記；上游取消接線
 - [ ] 舊六爻輪詢交付路徑移除；塔羅/紫微舊路徑回歸通過
 
 ## 測試項目（Seam①：HTTP API）
@@ -22,3 +22,5 @@
 6. 上游錯誤→error 事件→紀錄標記，客戶端可辨識原因
 7. 同紀錄並發第二條解盤串流的行為符合設計（拒絕或序列化）
 8. 回歸：塔羅/紫微舊路徑在夾具下完成
+
+執行結果：69 passed、ruff 全綠。SSE 事件契約：meta/delta{type:text|thinking}/done/error + `: ping` 心跳；token 走 query param（EventSource 相容）。

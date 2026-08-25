@@ -20,6 +20,7 @@ from app.api import (
 )
 from app.api.birth_data import router as birth_data_router
 from app.api.debug import router as debug_router
+from app.api.threads import router as threads_router
 from app.api.websocket import router as websocket_router
 from app.api.ziwei import router as ziwei_router
 from app.core.config import get_settings
@@ -91,6 +92,7 @@ app.include_router(ziwei_router)
 app.include_router(websocket_router)
 app.include_router(birth_data_router)
 app.include_router(history_router)
+app.include_router(threads_router)
 app.include_router(admin_router)
 app.include_router(tarot_router)
 app.include_router(share_router)  # 公開分享 API

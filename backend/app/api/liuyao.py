@@ -35,6 +35,10 @@ class LiuYaoRequest(BaseModel):
     use_default_ai: bool = Field(
         default=False, description="使用者明確選擇使用預設 AI 服務"
     )
+    mode: str = Field(
+        default="legacy",
+        description="'legacy'（背景任務+輪詢）| 'thread'（立即返回+SSE 串流）",
+    )
 
 
 class DivinationResponse(BaseModel):
@@ -86,6 +90,16 @@ async def create_liuyao_divination(
         db.add(history)
         db.commit()
         db.refresh(history)
+
+        if liuyao_request.mode == "thread":
+            # 新管線（ADR-0002）：不排背景任務，前端接 SSE 串流
+            return DivinationResponse(
+                id=history.id,
+                status=history.status,
+                coins=result["yaogua"],
+                chart_data=result,
+                message="盤面已生成，請開啟串流取得解盤。",
+            )
 
         background_tasks.add_task(
             process_liuyao_task, history.id, settings.DATABASE_URL
