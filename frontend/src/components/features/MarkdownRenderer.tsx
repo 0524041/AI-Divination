@@ -53,10 +53,12 @@ function preprocessContent(raw: string): { thinkContent: string; body: string } 
 
     const thinkMatch = raw.match(/<think>([\s\S]*?)<\/think>/i);
     const thinkContent = thinkMatch ? thinkMatch[1].trim() : '';
-    let body = thinkMatch ? raw.replace(/<think>[\s\S]*?<\/think>/gi, '') : raw;
+    // 先 trim 再剝殼——AI 輸出常帶前導換行，^``` 錨點才能命中
+    let body = (thinkMatch ? raw.replace(/<think>[\s\S]*?<\/think>/gi, '') : raw).trim();
 
-    body = body.replace(/^```(?:markdown|md)?\s*\n?/i, '');
-    body = body.replace(/\n?```\s*$/i, '');
+    // 語言標記容忍未收完的串流中間態（如「```m」）
+    body = body.replace(/^(```|~~~)[a-zA-Z0-9]*[ \t]*\n?/, '');
+    body = body.replace(/\n?(```|~~~)[ \t]*$/, '');
     return { thinkContent, body: applyHardBreaks(body.trim()) };
 }
 

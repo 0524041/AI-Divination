@@ -567,27 +567,33 @@ export default function SettingsPage() {
                 )}
 
                 {form.provider === 'gemini' && (
-                  <div>
-                    <label htmlFor="byok-gemini-model" className="mb-2 block text-sm font-medium text-foreground-secondary">
-                      模型
-                    </label>
-                    <input
+                  <div className="space-y-3">
+                    <Select
+                      label="模型"
                       id="byok-gemini-model"
-                      type="text"
-                      list="gemini-model-options"
-                      value={form.model}
-                      onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                      placeholder={GEMINI_DEFAULT_MODEL}
-                      className="w-full rounded-xl border border-border/50 bg-white/80 px-4 py-3 text-foreground-primary placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:bg-black/40"
+                      value={
+                        GEMINI_MODEL_OPTIONS.includes(form.model) ? form.model : '__custom__'
+                      }
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          model: e.target.value === '__custom__' ? '' : e.target.value,
+                        }))
+                      }
+                      options={[
+                        ...GEMINI_MODEL_OPTIONS.map((m) => ({ value: m, label: m })),
+                        { value: '__custom__', label: '自訂模型 id…' },
+                      ]}
                     />
-                    <datalist id="gemini-model-options">
-                      {GEMINI_MODEL_OPTIONS.map((model) => (
-                        <option key={model} value={model} />
-                      ))}
-                    </datalist>
-                    <p className="mt-1 text-xs text-foreground-muted">
-                      可從選單選擇，或直接輸入其他 Gemini 模型 id。
-                    </p>
+                    {!GEMINI_MODEL_OPTIONS.includes(form.model) && (
+                      <Input
+                        label="自訂模型 id"
+                        value={form.model}
+                        onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                        placeholder="例如：gemini-3.5-flash-lite"
+                        maxLength={100}
+                      />
+                    )}
                   </div>
                 )}
 

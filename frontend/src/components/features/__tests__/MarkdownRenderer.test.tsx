@@ -60,6 +60,20 @@ describe('MarkdownRenderer（streamdown-render spec）', () => {
     expect(container.querySelector('.markdown-content')?.textContent).not.toContain('```');
   });
 
+  it('回歸：帶前導換行的整份 fence 也要剝殼（首解被 AI 包進 ```markdown）', () => {
+    // 真實案例：首解開頭有兩個換行，舊版 ^``` 錨點失配 → 整份變成單一 code block
+    const wrapped = '\n\n```markdown\n## 卦象總覽\n\n**核心結論**：吉中帶阻。\n```\n';
+    const { container } = render(<MarkdownRenderer content={wrapped} />);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('卦象總覽');
+    expect(container.querySelector('.markdown-content pre')).toBeNull();
+  });
+
+  it('串流中間態：語言標記未收完也能剝殼（如「```m」）', () => {
+    render(<MarkdownRenderer content={'```m\n## 標題'} />);
+    expect(screen.getByRole('heading', { level: 2 })).toBeTruthy();
+  });
+
   it('sanitize：script 與事件屬性被清除', async () => {
     const malicious = '安全文字\n\n<script>window.hacked = 1</script>\n\n<img src=x onerror="alert(1)">';
 
