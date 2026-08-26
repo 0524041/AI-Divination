@@ -92,7 +92,7 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
             解盤尚未開始，送出問題或等待串流…
           </p>
         )}
-        {stream.messages.map((message) => (
+        {stream.messages.map((message, index) => (
           <div
             key={message.id}
             className={cn(
@@ -107,7 +107,10 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
             )}
             {message.role === 'assistant' ? (
               message.content ? (
-                <MarkdownRenderer content={message.content} />
+                <MarkdownRenderer
+                  content={message.content}
+                  streaming={streaming && index === stream.messages.length - 1}
+                />
               ) : message.think ? (
                 <span className="inline-flex items-center gap-2 text-foreground-muted">
                   <Brain size={14} className="animate-pulse" /> 正在思考…

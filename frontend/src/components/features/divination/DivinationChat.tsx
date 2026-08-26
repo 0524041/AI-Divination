@@ -121,7 +121,10 @@ export function DivinationChat({ recordId, question, onQuotaExceeded, onError }:
         {lastAssistant && (lastAssistant.content || lastAssistant.think) ? (
           <div className="max-w-full md:max-w-[85%] mr-auto rounded-xl border border-border bg-background-card rounded-bl-sm">
             {lastAssistant.content ? (
-              <MarkdownRenderer content={lastAssistant.content} />
+              <MarkdownRenderer
+                content={lastAssistant.content}
+                streaming={streaming}
+              />
             ) : (
               <span className="inline-flex items-center gap-2 p-4 text-sm text-foreground-muted">
                 <Loader2 size={14} className="animate-spin" /> 大師正在思考…
