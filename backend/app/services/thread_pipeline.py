@@ -10,6 +10,7 @@ Thread 解盤串流管線（ADR-0002，Ticket 04 tracer bullet）
 
 import asyncio
 import json
+import logging
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime
@@ -22,6 +23,9 @@ from app.models.user import User
 from app.services import endpoints as endpoint_service
 from app.services.ai_provider import AIProviderError
 from app.services.prompts import build_liuyao_messages
+from app.services.tokens import CONTEXT_TOKEN_BUDGET, estimate_messages_tokens
+
+logger = logging.getLogger(__name__)
 
 # 同一紀錄同時僅允許一條活躍解盤串流
 _active_streams: set[int] = set()
@@ -31,8 +35,8 @@ HEARTBEAT_INTERVAL_SECONDS = 15.0
 # 訪客每日 AI 回應上限（含首次解盤與追問；只計 AI 回應）
 GUEST_DAILY_MESSAGE_LIMIT = 10
 
-# 追問時送出的對話史滑窗（則數，不含 system 與盤面摘要）
-FOLLOWUP_HISTORY_WINDOW = 20
+# 追問時送出的追問對話滑窗（則數；不含 system、盤面與解盤錨點）
+FOLLOWUP_HISTORY_WINDOW = 12
 
 
 def _sse(event: str, data: dict) -> str:
@@ -220,10 +224,24 @@ async def _stream_followup_inner(
             db.commit()
 
     _, messages = build_followup_messages(record, question)
+    context_tokens_estimate = estimate_messages_tokens(messages)
+    logger.info(
+        "followup context assembled: record_id=%s messages=%d estimated_tokens≈%d / %d",
+        record_id,
+        len(messages),
+        context_tokens_estimate,
+        CONTEXT_TOKEN_BUDGET,
+    )
 
     yield _sse(
         "meta",
-        {"record_id": record_id, "endpoint_name": resolved.name, "model": resolved.model},
+        {
+            "record_id": record_id,
+            "endpoint_name": resolved.name,
+            "model": resolved.model,
+            # 組裝後的整體上下文估算（含 system＋盤面＋錨點），供前端預算條顯示
+            "context_tokens": context_tokens_estimate,
+        },
     )
 
     provider = resolved.make_provider()
@@ -371,12 +389,52 @@ def record_question_of(db, record_id: int) -> str | None:
 
 
 
-def build_followup_messages(record: History, question: str) -> tuple[str, list[dict]]:
-    """追問訊息：system＋首則解盤摘要（盤面恆在）＋滑窗對話史＋新問題
+def _compact_chart_block(record: History) -> str:
+    """依占卜類型重組緊湊盤面區塊（追問上下文用，恆在）"""
+    from app.services.prompts import (
+        format_liuyao_chart_compact,
+        format_tarot_cards_compact,
+        format_ziwei_chart_compact,
+        ziwei_birth_summary,
+    )
 
-    盤面以首次解盤的 user message 摘要形式恆在——確保 AI 任何一輪都看得到盤。
+    try:
+        chart_data = json.loads(record.chart_data) if record.chart_data else {}
+    except (TypeError, ValueError):
+        return ""
+
+    if record.divination_type == "liuyao":
+        return format_liuyao_chart_compact(chart_data)
+    if record.divination_type == "tarot":
+        cards = chart_data.get("cards", [])
+        return format_tarot_cards_compact(cards) if cards else ""
+    if record.divination_type == "ziwei":
+        return format_ziwei_chart_compact(
+            chart_data, ziwei_birth_summary(chart_data.get("birth_details"))
+        )
+    return ""
+
+
+def build_followup_messages(record: History, question: str) -> tuple[str, list[dict]]:
+    """追問訊息組裝（chat-polish spec）
+
+    組成＝常駐 system（不含輸出格式模板）＋【盤面】緊湊區塊
+      ＋【先前的解盤】首則 assistant 全文（固定錨點）
+      ＋最近 FOLLOWUP_HISTORY_WINDOW 則追問對話＋新問題。
+
+    整體預算 CONTEXT_TOKEN_BUDGET tokens：盤面與錨點永不因超額被丟棄，
+    超額時自最舊的追問對話開始捨棄。
     """
-    system_prompt = _first_system_prompt(record)
+    from app.services.prompts import build_system_prompt, prompt_file_for
+
+    try:
+        chart_data = json.loads(record.chart_data) if record.chart_data else {}
+    except (TypeError, ValueError):
+        chart_data = {}
+    system_prompt = build_system_prompt(
+        prompt_file_for(record.divination_type, chart_data), include_format=False
+    )
+
     with SessionLocal() as db:
         history = (
             db.query(ThreadMessage)
@@ -388,38 +446,36 @@ def build_followup_messages(record: History, question: str) -> tuple[str, list[d
     window = history[-FOLLOWUP_HISTORY_WINDOW:]
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
-    # 盤面恆在：首則 assistant（解盤）作為固定錨點置於對話史前
+    chart_block = _compact_chart_block(record)
+    if chart_block:
+        messages.append({"role": "user", "content": chart_block})
+
+    # 固定錨點：首則解盤全文置於對話史前，不截斷、不丟棄
     first_assistant = next(
         (m for m in history if m.role == "assistant" and m.content), None
     )
+    anchor_id = first_assistant.id if first_assistant is not None else None
     if first_assistant is not None:
-        anchor = first_assistant.content
-        if len(anchor) > 1500:
-            anchor = anchor[:1500] + "…（後略）"
-        messages.append({"role": "assistant", "content": f"【先前的解盤】{anchor}"})
+        messages.append(
+            {"role": "assistant", "content": f"【先前的解盤】{first_assistant.content}"}
+        )
 
-    for message in window:
-        if first_assistant is not None and message.id == first_assistant.id:
-            continue
-        messages.append({"role": message.role, "content": message.content})
-    messages.append({"role": "user", "content": question})
+    followups = [
+        {"role": message.role, "content": message.content}
+        for message in window
+        if message.id != anchor_id and message.content
+    ]
+    question_message = {"role": "user", "content": question}
+
+    while followups:
+        candidate = estimate_messages_tokens(messages + followups + [question_message])
+        if candidate <= CONTEXT_TOKEN_BUDGET:
+            break
+        followups.pop(0)
+
+    messages.extend(followups)
+    messages.append(question_message)
     return record.question, messages
-
-
-def _first_system_prompt(record: History) -> str:
-    from app.services.prompts import CONVERSATION_RULES, load_prompt
-
-    prompt_files = {
-        "liuyao": "liuyao_system.md",
-        "tarot": "tarot_system_prompt_single.md",
-        "ziwei": "ziwei_system.md",
-    }
-    name = prompt_files.get(record.divination_type, "liuyao_system.md")
-    base = load_prompt(name)
-    # ziwei 模板含佔位符殘留時截斷
-    if "{{" in base:
-        base = base.split("{{")[0].strip()
-    return base + "\n" + CONVERSATION_RULES
 
 
 async def stream_interpretation(
@@ -491,6 +547,8 @@ async def _stream_inner(
             "record_id": record_id,
             "endpoint_name": resolved.name,
             "model": resolved.model,
+            # 首解組裝後的整體上下文估算，供前端預算條顯示
+            "context_tokens": estimate_messages_tokens(messages),
         },
     )
 

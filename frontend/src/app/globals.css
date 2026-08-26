@@ -356,6 +356,31 @@ body {
   color: var(--accent-hover);
 }
 
+/* Markdown 表格：區塊化＋橫向捲動，避免寬表撐破氣泡 */
+.markdown-content table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95em;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-accent);
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.markdown-content th {
+  background: var(--bg-secondary);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .markdown-content>*:first-child {
   margin-top: 0;
 }

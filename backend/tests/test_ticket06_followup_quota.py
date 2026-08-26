@@ -135,9 +135,10 @@ async def test_followup_window_truncates_old_messages(fake_ai, make_user):
         record = db.query(History).filter(History.id == rid).first()
         _, messages = build_followup_messages(record, "最新追問")
 
-    # system + 滑窗 + 錨點 + 新問題
-    assert len(messages) <= FOLLOWUP_HISTORY_WINDOW + 3
+    # system + 盤面 + 錨點 + 滑窗 + 新問題
+    assert len(messages) <= FOLLOWUP_HISTORY_WINDOW + 4
     assert "舊問題0" not in str(messages)
+    assert "【盤面】" in str(messages)  # 盤面恆在
 
 
 # --- 追問 E2E ---

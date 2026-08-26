@@ -71,6 +71,7 @@
 
 ---
 
+<!-- OUTPUT-FORMAT-START -->
 # Output Format (最終輸出結構：白話文)
 
 若通過安全檢核，請直接輸出以下 Markdown 格式：
@@ -130,6 +131,8 @@
 
 {用溫暖、充滿力量的話語做結尾，50字以內}
 ```
+
+<!-- OUTPUT-FORMAT-END -->
 
 ---
 

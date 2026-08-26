@@ -38,6 +38,8 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [phase, setPhase] = useState<StreamPhase>('idle');
   const [errorKind, setErrorKind] = useState<string | null>(null);
+  /** 後端 meta 事件回報的整體上下文估算（含 system＋盤面＋錨點） */
+  const [contextTokens, setContextTokens] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const cbRef = useRef(callbacks);
   cbRef.current = callbacks;
@@ -151,6 +153,8 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
               setPhase('done');
             } else if (eventName === 'error') {
               throw new Error(data.message ?? data.kind);
+            } else if (eventName === 'meta' && typeof data.context_tokens === 'number') {
+              setContextTokens(data.context_tokens);
             }
             eventName = eventName === 'meta' ? eventName : eventName;
           }
@@ -239,6 +243,7 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
     messages,
     phase,
     errorKind,
+    contextTokens,
     isStreaming: phase === 'streaming' || phase === 'connecting',
     openThread,
     sendFollowup,

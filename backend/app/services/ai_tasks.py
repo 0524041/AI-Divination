@@ -377,12 +377,11 @@ async def process_ziwei_task(history_id: int, db_url: str):
             db.commit()
             return
 
-        prompt_path = Path(BASE_DIR) / "prompts" / "ziwei_system.md"
-        system_prompt_template = ""
-        if prompt_path.exists():
-            system_prompt_template = prompt_path.read_text(encoding="utf-8")
-        else:
-            system_prompt_template = "你是一位紫微斗數專家。請根據提供的信息回答問題。\n\n{{使用者資訊}}\n\n{{完整命盤}}\n\n{{補充說明}}"
+        # 模板已片段化（無佔位符）；資料改以附加區塊注入，語義同前
+        from app.services.prompts import load_prompt_parts
+
+        base, output_format = load_prompt_parts("ziwei_system.md")
+        system_prompt_template = "\n\n".join(p for p in (base, output_format) if p)
 
         chart_data_json = json.loads(history.chart_data)
 
@@ -421,12 +420,11 @@ async def process_ziwei_task(history_id: int, db_url: str):
         prompt_data = ziwei_service.process_chart(process_request)
 
         final_system_prompt = (
-            system_prompt_template.replace(
-                "{{使用者資訊}}", prompt_data["user_info_json"]
-            )
-            .replace("{{完整命盤}}", prompt_data["chart_info_json"])
-            .replace("{{補充說明}}", prompt_data["supplementary_info_json"])
-            .replace("{{使用者提問問題}}", prompt_data["question"])
+            system_prompt_template
+            + f"\n\n## 使用者資訊\n{prompt_data['user_info_json']}"
+            + f"\n\n## 完整命盤\n{prompt_data['chart_info_json']}"
+            + f"\n\n## 補充說明\n{prompt_data['supplementary_info_json']}"
+            + f"\n\n## 使用者提問問題\n{prompt_data['question']}"
         )
 
         user_prompt = f"請解答我的問題：{history.question}"

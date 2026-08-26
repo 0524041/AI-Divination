@@ -7,12 +7,16 @@
  * Markdown 渲染統一經 MarkdownRenderer（唯一 sanitise 出口）。
  */
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Brain, Loader2, RotateCcw, Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
 import { ChatMessage, useThreadStream } from '@/hooks/useThreadStream';
+import { CONTEXT_TOKEN_BUDGET, estimateTokens } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
+
+/** 估算超過預算此比例時轉朱砂警示 */
+const BUDGET_WARN_RATIO = 0.8;
 
 function ThinkBlock({ think }: { think: string }) {
   const [open, setOpen] = useState(false);
@@ -92,7 +96,7 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
           <div
             key={message.id}
             className={cn(
-              'max-w-[92%] md:max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed',
+              'max-w-full md:max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed',
               message.role === 'user'
                 ? 'ml-auto bg-accent text-background-primary rounded-br-sm'
                 : 'mr-auto border border-border bg-background-card rounded-bl-sm'
@@ -126,6 +130,9 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
           回應失敗，請重試或更換 AI 設定。
         </div>
       )}
+
+      {/* 上下文預算條 */}
+      <ContextBudgetBar messages={stream.messages} contextTokens={stream.contextTokens} />
 
       {/* 訪客額度提示 */}
       <GuestQuotaNotice />
@@ -167,6 +174,56 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
           </>
         )}
       </form>
+    </div>
+  );
+}
+
+/** 上下文預算條：>80% 轉朱砂警示
+ *
+ * 顯示值取「後端組裝回報」與「本地可見訊息估算」的較大者——
+ * 後端值涵蓋 system＋盤面＋錨點（本地清單看不到），
+ * 本地值反映後端回報後新增的訊息。
+ */
+function ContextBudgetBar({
+  messages,
+  contextTokens,
+}: {
+  messages: ChatMessage[];
+  contextTokens: number;
+}) {
+  const localEstimate = useMemo(
+    () => messages.reduce((sum, m) => sum + estimateTokens(m.content), 0),
+    [messages]
+  );
+  const estimated = Math.max(contextTokens, localEstimate);
+  const ratio = Math.min(estimated / CONTEXT_TOKEN_BUDGET, 1);
+  const warn = estimated > CONTEXT_TOKEN_BUDGET * BUDGET_WARN_RATIO;
+  return (
+    <div className="mx-4 mb-2" data-testid="context-budget">
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={CONTEXT_TOKEN_BUDGET}
+        aria-valuenow={estimated}
+        aria-label="上下文用量"
+        className={cn(
+          'h-1.5 rounded-full overflow-hidden border',
+          warn ? 'border-[var(--cinnabar)]/50' : 'border-border'
+        )}
+      >
+        <div
+          className={cn('h-full transition-all', warn ? 'bg-[var(--cinnabar)]' : 'bg-accent')}
+          style={{ width: `${Math.max(ratio * 100, 2)}%` }}
+        />
+      </div>
+      <p
+        className={cn(
+          'mt-1 text-right text-[11px]',
+          warn ? 'text-[var(--cinnabar)]' : 'text-foreground-muted'
+        )}
+      >
+        上下文約 {(estimated / 1000).toFixed(1)}k / {CONTEXT_TOKEN_BUDGET / 1000}k
+      </p>
     </div>
   );
 }

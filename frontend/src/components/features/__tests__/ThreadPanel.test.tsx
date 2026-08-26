@@ -91,6 +91,64 @@ describe('ThreadPanel（Ticket 08）', () => {
     expect(screen.getByRole('button', { name: /重試|重新生成/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /中止/ })).toBeNull();
   });
+
+  it('顯示上下文預算條：低用量為一般色', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ limited: false }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <ThreadPanel
+        recordId={4}
+        initialMessages={[{ id: 1, role: 'assistant', content: '世爻旺相' }]}
+      />
+    );
+
+    const budget = screen.getByTestId('context-budget');
+    expect(budget.textContent).toMatch(/上下文約 0\.0k \/ 48k/);
+    expect((budget.querySelector('p') as HTMLElement).className).not.toContain('cinnabar');
+  });
+
+  it('預算超過 80% 時轉朱砂警示色', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ limited: false }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // 40000 個 CJK 字 ≈ 40k tokens > 48k × 80%
+    render(
+      <ThreadPanel
+        recordId={5}
+        initialMessages={[
+          { id: 1, role: 'assistant', content: '卦'.repeat(40000) },
+        ]}
+      />
+    );
+
+    const budget = screen.getByTestId('context-budget');
+    expect(budget.textContent).toMatch(/上下文約 40\.0k \/ 48k/);
+    expect((budget.querySelector('p') as HTMLElement).className).toContain('cinnabar');
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('40000');
+  });
+
+  it('預算條採用後端 meta 回報的 context_tokens（涵蓋 system＋盤面＋錨點）', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ json: async () => ({ limited: false }) })
+      .mockResolvedValueOnce(
+        sseResponse([
+          { event: 'meta', data: { record_id: 1, context_tokens: 20000 } },
+          { event: 'done', data: { message_id: 9, content: '回應', think: null, model: 'm' } },
+        ])
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<ThreadPanel recordId={6} />);
+    await userEvent.type(screen.getByLabelText('追問輸入'), '短問題');
+    await userEvent.click(screen.getByRole('button', { name: /送出/ }));
+
+    // 本地可見訊息僅數十 token；顯示值應為後端回報的 20000
+    await waitFor(() =>
+      expect(screen.getByTestId('context-budget').textContent).toMatch(/上下文約 20\.0k \/ 48k/)
+    );
+  });
 });
 
 describe('ui primitives（Ticket 07）', () => {

@@ -1,10 +1,12 @@
 """
 Prompt 組裝器（Ticket 04 起逐步取代單體模板）
 
-設計（spec：模組化片段）：
-- system prompt 由「角色/知識庫/規則/安全檢核」片段組成；現階段六爻沿用
-  既有 liuyao_system.md 作為角色+知識+規則基底，輸出模板指令改由
-  對話式規則附加（不再要求一次性完整報告骨架）。
+設計（spec：模組化片段 + chat-polish 片段組裝）：
+- 各類型 system prompt 拆為兩層片段：
+  1) 常駐基底：角色＋知識庫＋安全檢核（＋關鍵紅線）
+  2) 首次解盤限定：最終輸出結構模板（md 檔內以 OUTPUT-FORMAT 標記圈選）
+- 「首次解盤」組合＝基底＋格式模板；「追問」只帶基底，絕不帶格式模板，
+  追問時對話模式規則（CONVERSATION_RULES）引導 AI 直接回答而非重吐報告骨架。
 - 盤面以繁中緊湊結構化文字注入 user message 首段；
   只附卦辭＋象傳精簡參考（移除諸事/愛情/事業/財運/詳解預烤段落），
   解讀完全交給 AI。
@@ -16,6 +18,33 @@ from app.core.config import BASE_DIR
 from app.utils.hexagram_db import get_hexagram_by_name
 
 _PROMPTS_DIR = Path(BASE_DIR) / "prompts"
+
+# 輸出格式片段邊界標記：標記之間的內容只在首次解盤拼接
+_OUTPUT_FORMAT_START = "<!-- OUTPUT-FORMAT-START -->"
+_OUTPUT_FORMAT_END = "<!-- OUTPUT-FORMAT-END -->"
+
+# 各占卜類型的 system prompt 檔名（tarot 依牌陣再細分，見 tarot_prompt_file()）
+PROMPT_FILES = {
+    "liuyao": "liuyao_system.md",
+    "ziwei": "ziwei_system.md",
+}
+
+TAROT_PROMPT_FILES = {
+    "single": "tarot_system_prompt_single.md",
+    "three_card": "tarot_system_prompt_three_card.md",
+    "celtic_cross": "tarot_system_prompt_celtic_cross.md",
+}
+
+
+def tarot_prompt_file(spread_type: str | None) -> str:
+    return TAROT_PROMPT_FILES.get(spread_type or "", TAROT_PROMPT_FILES["single"])
+
+
+def prompt_file_for(divination_type: str, chart_data: dict | None = None) -> str:
+    """依占卜類型（與牌陣）決定 system prompt 檔名"""
+    if divination_type == "tarot":
+        return tarot_prompt_file((chart_data or {}).get("spread_type"))
+    return PROMPT_FILES.get(divination_type, PROMPT_FILES["liuyao"])
 
 # 追問對話的系統級附加規則（續聊模式）
 CONVERSATION_RULES = """
@@ -30,6 +59,34 @@ CONVERSATION_RULES = """
 def load_prompt(name: str) -> str:
     """讀取 prompts/ 下指定檔案內容"""
     return (_PROMPTS_DIR / name).read_text(encoding="utf-8")
+
+
+def load_prompt_parts(name: str) -> tuple[str, str]:
+    """拆分 prompt 檔為（常駐基底, 首次解盤限定輸出格式）
+
+    以 OUTPUT-FORMAT 標記切分；無標記時視為整份皆基底。
+    """
+    text = load_prompt(name)
+    start = text.find(_OUTPUT_FORMAT_START)
+    end = text.find(_OUTPUT_FORMAT_END)
+    if start == -1 or end == -1 or end < start:
+        return text.strip(), ""
+    base = (text[:start] + text[end + len(_OUTPUT_FORMAT_END):]).strip()
+    output_format = text[start + len(_OUTPUT_FORMAT_START):end].strip()
+    return base, output_format
+
+
+def build_system_prompt(name: str, *, include_format: bool) -> str:
+    """組裝 system prompt：常駐基底＋（首次解盤限定）格式模板＋對話模式規則
+
+    追問（include_format=False）絕不帶輸出結構模板。
+    """
+    base, output_format = load_prompt_parts(name)
+    parts = [base]
+    if include_format and output_format:
+        parts.append(output_format)
+    parts.append(CONVERSATION_RULES.strip())
+    return "\n\n".join(parts)
 
 
 def _yao_line(label: str, yao: dict) -> str:
@@ -133,8 +190,8 @@ def build_liuyao_messages(
     target: str | None,
     chart_data: dict,
 ) -> tuple[str, str]:
-    """回傳 (system_prompt, user_message)"""
-    system = load_prompt("liuyao_system.md") + "\n" + CONVERSATION_RULES
+    """回傳 (system_prompt, user_message)——首次解盤組合（含格式模板）"""
+    system = build_system_prompt(PROMPT_FILES["liuyao"], include_format=True)
     return system, build_liuyao_context(question, gender, target, chart_data)
 
 
@@ -173,13 +230,7 @@ def build_tarot_messages(
     question: str, spread_type: str, cards: list[dict]
 ) -> tuple[str, str]:
     spread_names = {"single": "單張牌陣", "three_card": "三牌陣（時間流）", "celtic_cross": "凱爾特十字十牌陣"}
-    prompt_name = {
-        "single": "tarot_system_prompt_single.md",
-        "three_card": "tarot_system_prompt_three_card.md",
-        "celtic_cross": "tarot_system_prompt_celtic_cross.md",
-    }.get(spread_type, "tarot_system_prompt_single.md")
-
-    system = load_prompt(prompt_name) + "\n" + CONVERSATION_RULES
+    system = build_system_prompt(tarot_prompt_file(spread_type), include_format=True)
     user = (
         f"所問之事：{question}\n"
         f"使用牌陣：{spread_names.get(spread_type, spread_type)}\n\n"
@@ -252,21 +303,26 @@ def format_ziwei_chart_compact(chart_data: dict, birth_summary: dict | None = No
     return "\n".join(lines)
 
 
+def ziwei_birth_summary(birth_details: dict | None) -> dict:
+    """紫微出生資料 → 緊湊區塊用的摘要字典"""
+    if not birth_details:
+        return {}
+    return {
+        "姓名": birth_details.get("name"),
+        "性別": "男" if birth_details.get("gender") == "male" else "女",
+        "出生日期": birth_details.get("birth_date"),
+        "出生地": birth_details.get("birth_location"),
+    }
+
+
 def build_ziwei_messages(
     question: str,
     chart_data: dict,
     birth_details: dict | None = None,
     query_context: str | None = None,
 ) -> tuple[str, str]:
-    system = load_prompt("ziwei_system.md").split("{{")[0].strip() + "\n" + CONVERSATION_RULES
-    birth_summary = {}
-    if birth_details:
-        birth_summary = {
-            "姓名": birth_details.get("name"),
-            "性別": "男" if birth_details.get("gender") == "male" else "女",
-            "出生日期": birth_details.get("birth_date"),
-            "出生地": birth_details.get("birth_location"),
-        }
+    system = build_system_prompt(PROMPT_FILES["ziwei"], include_format=True)
+    birth_summary = ziwei_birth_summary(birth_details)
 
     parts = [f"所問之事：{question}"]
     if query_context:

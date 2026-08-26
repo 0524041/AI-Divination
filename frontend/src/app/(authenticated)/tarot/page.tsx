@@ -217,7 +217,7 @@ export default function TarotPage() {
   ) : null;
 
   const chatSlot = result ? (
-    <div className="flex-1 flex flex-col w-full max-w-3xl mx-auto h-[calc(100dvh-120px)] px-2 py-4">
+    <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto h-[calc(100dvh-120px)] px-3 py-4">
       <DivinationChat
         recordId={result.id}
         question={question.trim()}

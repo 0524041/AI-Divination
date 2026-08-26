@@ -92,7 +92,7 @@ export function DivinationChat({ recordId, question, onQuotaExceeded, onError }:
 
   if (!streaming && stream.phase === 'error' && fallbackDone) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center max-w-3xl w-full mx-auto">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center max-w-4xl w-full mx-auto">
         <p className="text-sm text-[var(--cinnabar)]">解盤連線失敗或內容暫時無法取得。</p>
         <Button
           type="button"
@@ -111,15 +111,15 @@ export function DivinationChat({ recordId, question, onQuotaExceeded, onError }:
 
   // 首解進行中：輕量串流視圖
   return (
-    <div className="flex-1 flex flex-col max-w-3xl w-full mx-auto" data-testid="divination-chat">
+    <div className="flex-1 flex flex-col max-w-4xl w-full mx-auto" data-testid="divination-chat">
       <div className="flex-1 overflow-y-auto space-y-4 p-4 min-h-[300px]" role="log" aria-live="polite">
         {question && (
-          <div className="max-w-[92%] md:max-w-[80%] ml-auto rounded-xl px-4 py-3 text-sm leading-relaxed bg-accent text-background-primary rounded-br-sm">
+          <div className="max-w-full md:max-w-[85%] ml-auto rounded-xl px-4 py-3 text-sm leading-relaxed bg-accent text-background-primary rounded-br-sm">
             {question}
           </div>
         )}
         {lastAssistant && lastAssistant.content ? (
-          <div className="max-w-[92%] md:max-w-[80%] mr-auto rounded-xl border border-border bg-background-card rounded-bl-sm">
+          <div className="max-w-full md:max-w-[85%] mr-auto rounded-xl border border-border bg-background-card rounded-bl-sm">
             <MarkdownRenderer content={lastAssistant.content} />
           </div>
         ) : (
