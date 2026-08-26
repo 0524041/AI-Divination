@@ -207,7 +207,7 @@ export function EndpointsPanel() {
               label="名稱"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="例如：DeepSeek 主力"
+              placeholder="例如：Agnes 主力"
               maxLength={50}
               required
             />

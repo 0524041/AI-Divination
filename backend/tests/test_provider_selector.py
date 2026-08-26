@@ -103,7 +103,60 @@ def test_resolve_without_user_config_falls_back_to_system_default(make_user, fak
     assert resolved.source == "system"
 
 
+def test_use_default_deactivates_configs_and_falls_back(client, auth_headers, make_user, fake_ai):
+    """「使用系統預設」：停用全部自訂設定後，解析真正回到 Agnes"""
+    from app.services.endpoints import ensure_default_seed, resolve_endpoint
+    from app.utils.auth import encrypt_api_key
+
+    with SessionLocal() as db:
+        endpoint = ensure_default_seed(db)
+        endpoint.base_url = fake_ai.base_url
+        endpoint.model = "fake-model"
+        endpoint.api_key_encrypted = encrypt_api_key("sk-test")
+        db.commit()
+
+    make_user(username="use-default-user")
+    headers = auth_headers("use-default-user")
+
+    created = client.post(
+        "/api/settings/ai",
+        json={"provider": "gemini", "api_key": "g-key", "model": "gemini-3.5-flash"},
+        headers=headers,
+    )
+    assert created.status_code == 200
+    # 新增不自動選用：先經選擇器語義（activate）選它
+    activated = client.put(f"/api/settings/ai/{created.json()['id']}/activate", headers=headers)
+    assert activated.status_code == 200
+
+    with SessionLocal() as db:
+        user_id = db.query(AIConfig).first().user_id
+        assert resolve_endpoint(SessionLocal(), user_id=user_id).source == "user"
+
+    response = client.put("/api/settings/ai/use-default", headers=headers)
+    assert response.status_code == 200
+
+    with SessionLocal() as db:
+        actives = db.query(AIConfig).filter(AIConfig.user_id == user_id, AIConfig.is_active).count()
+        assert actives == 0
+        resolved = resolve_endpoint(SessionLocal(), user_id=user_id)
+        assert resolved.source == "system"
+
+
 # --- default-info：訪客可讀的系統預設資訊 ---
+
+
+def test_create_does_not_auto_activate(client, auth_headers, make_user):
+    """新增設定只是加進清單，不自動選用（選用一律經選擇器）"""
+    make_user(username="no-auto-user")
+    headers = auth_headers("no-auto-user")
+
+    created = client.post(
+        "/api/settings/ai",
+        json={"provider": "gemini", "api_key": "g-key", "model": "gemini-3.5-flash"},
+        headers=headers,
+    )
+    assert created.status_code == 200
+    assert created.json()["is_active"] is False
 
 
 def test_default_info_accessible(client, auth_headers, make_user):

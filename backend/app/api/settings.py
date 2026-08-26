@@ -157,10 +157,20 @@ def create_ai_config(
                 )
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    # 停用其他同類型設定
-    db.query(AIConfig).filter(
-        AIConfig.user_id == current_user.id, AIConfig.provider == request.provider
-    ).update({"is_active": False})
+    # URL 安全清理與驗證
+    # 管理員可以使用 localhost/私有 IP
+    is_admin = current_user.role == "admin"
+
+    if request.provider == "local":
+        try:
+            request.local_url = sanitize_url(request.local_url, allow_private=is_admin)
+        except ValueError as e:
+            if not is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="禁止連線到私有網路。只有管理員可以使用 localhost。",
+                )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     # 設定模型名稱
     model_name = request.model
@@ -175,7 +185,7 @@ def create_ai_config(
         # Local 優先使用 model，若無則使用 local_model (向後相容)
         model_name = request.model or request.local_model
 
-    # 建立新設定
+    # 建立新設定：僅加入清單，不自動選用（選用一律經選擇器）
     config = AIConfig(
         user_id=current_user.id,
         provider=request.provider,
@@ -184,7 +194,7 @@ def create_ai_config(
         api_key_encrypted=encrypt_api_key(request.api_key) if request.api_key else None,
         local_url=request.local_url,
         local_model=request.local_model,  # 保留向後相容
-        is_active=True,
+        is_active=False,
     )
     db.add(config)
     db.commit()
@@ -200,6 +210,19 @@ def create_ai_config(
         local_model=config.local_model,
         is_active=config.is_active,
     )
+
+
+@router.put("/ai/use-default")
+def use_system_default(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """停用使用者所有自訂設定 → 解析回落到系統預設（Agnes）"""
+    db.query(AIConfig).filter(AIConfig.user_id == current_user.id).update(
+        {"is_active": False}
+    )
+    db.commit()
+    return {"message": "已切換回系統預設"}
 
 
 @router.put("/ai/{config_id}", response_model=AIConfigResponse)

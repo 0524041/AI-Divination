@@ -207,19 +207,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleActivate = async (configId: number) => {
-    try {
-      const res = await apiPut(`/api/settings/ai/${configId}/activate`);
-      if (res.ok) {
-        await fetchAIConfigs();
-      } else {
-        toast('啟用失敗', { kind: 'error' });
-      }
-    } catch (err) {
-      console.error('Activate error:', err);
-    }
-  };
-
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -298,7 +285,7 @@ export default function SettingsPage() {
               <div>
                 <CardTitle>我的 AI 服務</CardTitle>
                 <p className="text-sm text-foreground-muted mt-1">
-                  使用自己的金鑰解盤；未設定時將由系統端點服務
+                  加入的模型會出現在占卜流程與對話窗的 AI 清單，於該處點選即切換
                 </p>
               </div>
               <Button type="button" variant="gold" size="sm" leftIcon={<Plus size={16} />} onClick={openCreate}>
@@ -335,7 +322,11 @@ export default function SettingsPage() {
                           </p>
                           {config.is_active && <Badge variant="accent" size="sm">使用中</Badge>}
                         </div>
-                        {(config.provider === 'local' || config.provider === 'openai') && (
+                        {config.provider === 'gemini' ? (
+                          <p className="text-sm text-foreground-muted truncate">
+                            {config.model || '\u00A0'}
+                          </p>
+                        ) : (config.provider === 'local' || config.provider === 'openai') && (
                           <p className="text-sm text-foreground-muted truncate">
                             {[config.local_url, config.local_model].filter(Boolean).join(' ・ ') || '\u00A0'}
                           </p>
@@ -344,11 +335,6 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      {!config.is_active && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => handleActivate(config.id)}>
-                          啟用
-                        </Button>
-                      )}
                       <Button
                         type="button"
                         variant="ghost"
