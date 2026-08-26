@@ -22,6 +22,7 @@ import { ZiweiRevealRitual } from '@/components/features/divination/ZiweiRevealR
 import { BirthDataPanel } from '@/components/features/divination/BirthDataPanel';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
 import { DivinationChat } from '@/components/features/divination/DivinationChat';
+import { AISelector } from '@/components/features/AISelector';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
 import { TAIWAN_CITIES, TaiwanCity } from '@/lib/taiwan-cities';
 import {
@@ -335,6 +336,7 @@ export default function ZiweiPage() {
 
   const inputSlot = (
     <div className="w-full max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <AISelector variant="card" />
       <BirthDataPanel profiles={savedList} selectedId={selectedId} currentName={birthData.name} onDelete={deleteSaved}
         onSelect={(id) => (id ? applySaved(id) : (setSelectedId(null), setBirthData({ ...EMPTY_BIRTH })))} />
 
@@ -449,7 +451,7 @@ export default function ZiweiPage() {
       <div className="overflow-x-auto">{renderChart()}</div>
 
       <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
-        <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>進入論命對話</Button>
+        <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>請大師論命</Button>
         <Button type="button" variant="outline" size="lg" onClick={restart}>修改資料重新排盤</Button>
       </div>
     </div>

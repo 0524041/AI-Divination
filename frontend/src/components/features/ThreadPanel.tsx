@@ -108,6 +108,10 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
             {message.role === 'assistant' ? (
               message.content ? (
                 <MarkdownRenderer content={message.content} />
+              ) : message.think ? (
+                <span className="inline-flex items-center gap-2 text-foreground-muted">
+                  <Brain size={14} className="animate-pulse" /> 正在思考…
+                </span>
               ) : (
                 <span className="inline-flex items-center gap-2 text-foreground-muted">
                   <Loader2 size={14} className="animate-spin" /> 正在解讀…

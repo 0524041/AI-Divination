@@ -15,6 +15,7 @@ import { DivinationFlow, DivinationStep } from '@/components/features/divination
 import { CoinTossRitual } from '@/components/features/divination/CoinTossRitual';
 import { LiuyaoChartCompact, LiuyaoChartData } from '@/components/features/divination/LiuyaoChartCompact';
 import { DivinationChat } from '@/components/features/divination/DivinationChat';
+import { AISelector } from '@/components/features/AISelector';
 import { useToast } from '@/components/ui/Toast';
 import { apiPost } from '@/lib/api-client';
 
@@ -109,7 +110,8 @@ export default function LiuYaoPage() {
   );
 
   const inputSlot = (
-    <div className="w-full max-w-2xl mx-auto px-4 py-8">
+    <div className="w-full max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <AISelector variant="card" />
       <Card variant="glass" className="p-6">
         <form onSubmit={startDivination} className="space-y-6">
           <div>
@@ -191,7 +193,7 @@ export default function LiuYaoPage() {
       <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
         <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>
           <MessageCircle size={20} />
-          進入解卦對話
+          請大師解盤
         </Button>
         <Button type="button" variant="outline" size="lg" onClick={restart}>
           <RotateCcw size={18} />

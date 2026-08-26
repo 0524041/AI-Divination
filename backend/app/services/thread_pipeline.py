@@ -47,6 +47,57 @@ def _sse_ping() -> str:
     return ": ping\n\n"
 
 
+async def _pump_deltas(
+    provider,
+    messages: list[dict],
+    *,
+    heartbeat_interval: float,
+) -> AsyncIterator[tuple[str, dict | None]]:
+    """以背景任務消費上游串流；閒置逾時僅回報心跳，不取消上游。
+
+    舊作法以 wait_for 包 __anext__()，逾時的 CancelledError 會直接殺死
+    provider 的 async generator——上游首 token 慢於心跳間隔即靜默斷流，
+    產出空回覆。改為 producer task + Queue：逾時只讓消費端發心跳，
+    上游連線與已收到的內容完整保留。
+
+    產出 ("delta", delta) 或 ("ping", None)；上游失敗時 raise AIProviderError。
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def _produce() -> None:
+        try:
+            async for delta in provider.stream_messages(messages):
+                queue.put_nowait(("delta", delta))
+        except AIProviderError as exc:
+            queue.put_nowait(("error", exc))
+        except Exception as exc:  # 防禦：非分類例外同樣轉為 error 事件而非靜默結束
+            queue.put_nowait(("error", AIProviderError("upstream", f"串流異常：{exc}")))
+        finally:
+            queue.put_nowait(("done", None))
+
+    producer = asyncio.create_task(_produce())
+    try:
+        while True:
+            try:
+                kind, payload = await asyncio.wait_for(
+                    queue.get(), timeout=heartbeat_interval
+                )
+            except asyncio.TimeoutError:
+                yield ("ping", None)
+                continue
+            if kind == "done":
+                return
+            if kind == "error":
+                raise payload
+            yield (kind, payload)
+    finally:
+        producer.cancel()
+        try:
+            await producer
+        except asyncio.CancelledError:
+            pass
+
+
 def _build_first_messages(record: History) -> tuple[str, str]:
     """依占卜類型組出首次解盤訊息"""
     chart_data = json.loads(record.chart_data)
@@ -248,34 +299,20 @@ async def _stream_followup_inner(
     content_parts: list[str] = []
     think_parts: list[str] = []
     started = time.monotonic()
-    delta_iter = provider.stream_messages(messages).__aiter__()
-    closed = False
-
-    async def _close_iter():
-        nonlocal closed
-        if not closed:
-            closed = True
-            await delta_iter.aclose()
-            await provider.aclose()
 
     try:
-        while True:
-            try:
-                delta = await asyncio.wait_for(
-                    delta_iter.__anext__(), timeout=heartbeat_interval
-                )
-            except asyncio.TimeoutError:
+        async for kind, delta in _pump_deltas(
+            provider, messages, heartbeat_interval=heartbeat_interval
+        ):
+            if kind == "ping":
                 yield _sse_ping()
                 continue
-            except StopAsyncIteration:
-                break
-
-            text = delta.get("text", "")
-            if delta.get("type") == "thinking":
+            text = (delta or {}).get("text", "")
+            if (delta or {}).get("type") == "thinking":
                 think_parts.append(text)
             else:
                 content_parts.append(text)
-            yield _sse("delta", {"type": delta.get("type"), "text": text})
+            yield _sse("delta", {"type": (delta or {}).get("type"), "text": text})
 
     except AIProviderError as exc:
         endpoint_service.log_ai_request(
@@ -286,13 +323,34 @@ async def _stream_followup_inner(
             duration_ms=int((time.monotonic() - started) * 1000),
         )
         yield _sse("error", {"kind": exc.kind, "message": str(exc)})
-        await _close_iter()
+        await provider.aclose()
         return
 
     content = "".join(content_parts)
     think = "".join(think_parts) or None
     usage = provider.last_usage
-    await _close_iter()
+    await provider.aclose()
+
+    # 空回覆防護：上游正常結束但零內容時，回 error 而非持久化空的 assistant 訊息
+    if not content.strip() and not (think or "").strip():
+        logger.warning(
+            "followup empty response: record_id=%s model=%s duration_ms=%d",
+            record_id,
+            resolved.model,
+            int((time.monotonic() - started) * 1000),
+        )
+        endpoint_service.log_ai_request(
+            user_id=user_id,
+            resolved=resolved,
+            ok=False,
+            error_kind="upstream",
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        yield _sse(
+            "error",
+            {"kind": "upstream", "message": "AI 未回傳內容，請重試或更換模型。"},
+        )
+        return
 
     persisted = _persist_assistant_message(
         record_id,
@@ -555,34 +613,20 @@ async def _stream_inner(
     content_parts: list[str] = []
     think_parts: list[str] = []
     started = time.monotonic()
-    delta_iter = provider.stream_messages(messages).__aiter__()
-    closed = False
-
-    async def _close_iter():
-        nonlocal closed
-        if not closed:
-            closed = True
-            await delta_iter.aclose()
-            await provider.aclose()
 
     try:
-        while True:
-            try:
-                delta = await asyncio.wait_for(
-                    delta_iter.__anext__(), timeout=heartbeat_interval
-                )
-            except asyncio.TimeoutError:
+        async for kind, delta in _pump_deltas(
+            provider, messages, heartbeat_interval=heartbeat_interval
+        ):
+            if kind == "ping":
                 yield _sse_ping()
                 continue
-            except StopAsyncIteration:
-                break
-
-            text = delta.get("text", "")
-            if delta.get("type") == "thinking":
+            text = (delta or {}).get("text", "")
+            if (delta or {}).get("type") == "thinking":
                 think_parts.append(text)
             else:
                 content_parts.append(text)
-            yield _sse("delta", {"type": delta.get("type"), "text": text})
+            yield _sse("delta", {"type": (delta or {}).get("type"), "text": text})
 
     except AIProviderError as exc:
         _finalize_record(
@@ -596,13 +640,36 @@ async def _stream_inner(
             duration_ms=int((time.monotonic() - started) * 1000),
         )
         yield _sse("error", {"kind": exc.kind, "message": str(exc)})
-        await _close_iter()
+        await provider.aclose()
         return
 
     content = "".join(content_parts)
     think = "".join(think_parts) or None
     usage = provider.last_usage
-    await _close_iter()
+    await provider.aclose()
+
+    # 空回覆防護：不持久化、標記紀錄失敗，讓前端顯示可重試的錯誤
+    if not content.strip() and not (think or "").strip():
+        logger.warning(
+            "first interpretation empty response: record_id=%s model=%s",
+            record_id,
+            resolved.model,
+        )
+        _finalize_record(
+            record_id, status="error", interpretation=None, model=resolved.model
+        )
+        endpoint_service.log_ai_request(
+            user_id=user_id,
+            resolved=resolved,
+            ok=False,
+            error_kind="upstream",
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        yield _sse(
+            "error",
+            {"kind": "upstream", "message": "AI 未回傳內容，請重試或更換模型。"},
+        )
+        return
 
     persisted = _persist_assistant_message(
         record_id,

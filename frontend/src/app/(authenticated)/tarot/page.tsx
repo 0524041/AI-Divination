@@ -15,6 +15,7 @@ import { DivinationFlow, DivinationStep } from '@/components/features/divination
 import { TarotShuffleRitual } from '@/components/features/divination/TarotShuffleRitual';
 import { DivinedTarotCard, TarotCardFace } from '@/components/features/divination/TarotCardFace';
 import { DivinationChat } from '@/components/features/divination/DivinationChat';
+import { AISelector } from '@/components/features/AISelector';
 import { useToast } from '@/components/ui/Toast';
 import { apiPost } from '@/lib/api-client';
 
@@ -132,6 +133,7 @@ export default function TarotPage() {
 
   const inputSlot = (
     <div className="w-full max-w-4xl mx-auto px-4 py-8 space-y-8">
+      <AISelector variant="card" />
       <div className="text-center space-y-2">
         <h2 className="font-heading text-2xl text-accent">選擇牌陣，默念您的問題</h2>
         <p className="text-foreground-secondary text-sm">不同的牌陣適合不同深度的問題探索</p>
@@ -206,7 +208,7 @@ export default function TarotPage() {
       <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
         <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>
           <MessageCircle size={20} />
-          進入解牌對話
+          請大師解牌
         </Button>
         <Button type="button" variant="outline" size="lg" onClick={restart}>
           <RotateCcw size={18} />

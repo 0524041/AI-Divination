@@ -185,13 +185,11 @@ async def test_followup_budget_drops_oldest_followups_first(make_user):
     assert estimate_messages_tokens(messages) <= CONTEXT_TOKEN_BUDGET
 
 
-# --- meta 事件帶上下文估算 ---
+# --- 串流心跳不得殺死上游串流（慢思考模型） ---
 
 
-async def test_followup_meta_reports_context_tokens(make_user, fake_ai):
-    """meta 事件帶組裝後整體上下文估算（含 system＋盤面＋錨點）"""
+def _seed_default_endpoint(fake_ai) -> None:
     from app.services.endpoints import ensure_default_seed
-    from app.services.thread_pipeline import stream_followup
     from app.utils.auth import encrypt_api_key
 
     with SessionLocal() as db:
@@ -201,24 +199,90 @@ async def test_followup_meta_reports_context_tokens(make_user, fake_ai):
         endpoint.api_key_encrypted = encrypt_api_key("sk-test")
         db.commit()
 
+
+async def _collect_sse(agen) -> list[tuple[str, dict]]:
+    events: list[tuple[str, dict]] = []
+    async for raw in agen:
+        if raw.startswith(": ping"):
+            events.append(("ping", {}))
+            continue
+        name = None
+        for line in raw.splitlines():
+            if line.startswith("event: "):
+                name = line.removeprefix("event: ").strip()
+            elif line.startswith("data: ") and name:
+                events.append((name, json.loads(line.removeprefix("data: "))))
+                name = None
+    return events
+
+
+async def test_slow_first_chunk_survives_heartbeat(make_user, fake_ai):
+    """上游首 token 慢於心跳間隔時：發 ping 保活，內容仍完整送達（不得靜默空回覆）"""
+    from app.services.thread_pipeline import stream_followup
+
+    _seed_default_endpoint(fake_ai)
+    user = make_user(username="slow-first-chunk")
+    rid = _make_record(user.id)
+    fake_ai.respond_stream_items([("thinking", "長推理"), ("text", "完整答案")])
+    fake_ai.stream_delay = 2.0  # 首個 delta 前 2 秒 > 心跳 0.5s
+
+    events = await _collect_sse(
+        stream_followup(rid, user_id=user.id, question="追問", heartbeat_interval=0.5)
+    )
+
+    names = [n for n, _ in events]
+    assert "ping" in names, f"應有心跳事件，實際：{names}"
+    done = dict(events)["done"]
+    assert done["content"] == "完整答案"
+    assert done["think"] == "長推理"
+
+
+async def test_empty_response_reports_error_instead_of_done(make_user, fake_ai):
+    """上游連 content 也沒給時：回 error 事件，不持久化也不送空 done"""
+    from app.services.thread_pipeline import stream_followup
+
+    _seed_default_endpoint(fake_ai)
+    user = make_user(username="empty-response")
+    rid = _make_record(user.id)
+    fake_ai.respond_stream([])  # 上游正常結束但零 delta
+
+    events = await _collect_sse(
+        stream_followup(rid, user_id=user.id, question="追問", heartbeat_interval=0.5)
+    )
+
+    assert events[-1][0] == "error"
+    with SessionLocal() as db:
+        msgs = (
+            db.query(ThreadMessage)
+            .filter(ThreadMessage.record_id == rid)
+            .order_by(ThreadMessage.id)
+            .all()
+        )
+        # 錨點＋user 問題照常持久化；不得新增空的 assistant 訊息
+        assert [m.role for m in msgs] == ["assistant", "user"]
+
+
+# --- meta 事件帶上下文估算 ---
+
+
+async def test_followup_meta_reports_context_tokens(make_user, fake_ai):
+    """meta 事件帶組裝後整體上下文估算（含 system＋盤面＋錨點）"""
+    from app.services.thread_pipeline import stream_followup
+
+    _seed_default_endpoint(fake_ai)
+
     user = make_user(username="ctx-meta-user")
     rid = _make_record(user.id)
     fake_ai.respond_stream(["好"])
 
-    events = [event async for event in stream_followup(rid, user_id=user.id, question="追問")]
+    events = await _collect_sse(
+        stream_followup(rid, user_id=user.id, question="追問")
+    )
 
-    def data_of(name: str) -> dict:
-        for raw in events:
-            if raw.startswith(f"event: {name}\n"):
-                for line in raw.splitlines():
-                    if line.startswith("data: "):
-                        return json.loads(line.removeprefix("data: "))
-        return {}
-
-    meta = data_of("meta")
+    meta = dict(events)["meta"]
     # 六爻常駐基底（角色＋知識庫）本身即數千 token
     assert meta["context_tokens"] > 1000
-    assert data_of("done")["content"] == "好"
+    assert dict(events)["done"]["content"] == "好"
 
 
 # --- 資料邊界：48k 內容讀寫等長 ---

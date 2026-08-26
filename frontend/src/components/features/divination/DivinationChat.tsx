@@ -118,9 +118,15 @@ export function DivinationChat({ recordId, question, onQuotaExceeded, onError }:
             {question}
           </div>
         )}
-        {lastAssistant && lastAssistant.content ? (
+        {lastAssistant && (lastAssistant.content || lastAssistant.think) ? (
           <div className="max-w-full md:max-w-[85%] mr-auto rounded-xl border border-border bg-background-card rounded-bl-sm">
-            <MarkdownRenderer content={lastAssistant.content} />
+            {lastAssistant.content ? (
+              <MarkdownRenderer content={lastAssistant.content} />
+            ) : (
+              <span className="inline-flex items-center gap-2 p-4 text-sm text-foreground-muted">
+                <Loader2 size={14} className="animate-spin" /> 大師正在思考…
+              </span>
+            )}
           </div>
         ) : (
           <p className="text-center text-sm text-foreground-muted py-8 flex items-center justify-center gap-2">

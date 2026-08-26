@@ -11,6 +11,7 @@
 使 httpx/openai SDK 等任何客戶端都能對它發請求，不觸網。
 """
 
+import asyncio
 import json
 import threading
 import time
@@ -129,7 +130,8 @@ class FakeOpenAICompatServer:
         items = self.stream_items or [("text", t) for t in self.stream_deltas]
         for kind, text in items:
             if self.stream_delay:
-                time.sleep(self.stream_delay)
+                # 非阻塞延遲：模擬上游首 token 前的長思考，不卡死 event loop
+                await asyncio.sleep(self.stream_delay)
             field = "reasoning_content" if kind == "thinking" else "content"
             chunk = {
                 "id": "chatcmpl-fake-stream",
