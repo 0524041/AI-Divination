@@ -16,11 +16,13 @@ export interface AIConfig {
     is_active: boolean;
 }
 
-export const DEFAULT_AI_DISPLAY_NAME = 'DeepSeek V4 Flash（預設）';
+export const DEFAULT_AI_DISPLAY_NAME = 'Agnes（系統預設）';
 
 export function getAIProviderDisplayName(provider: string | null, model: string | null): string {
-    if (provider === 'opencode') return DEFAULT_AI_DISPLAY_NAME;
-    return `${provider || 'unknown'}${model ? ` (${model})` : ''}`;
+    if (provider === 'opencode' || provider === 'default' || provider === null) {
+        return DEFAULT_AI_DISPLAY_NAME;
+    }
+    return `${provider}${model ? ` (${model})` : ''}`;
 }
 
 export interface AISelectorProps {
@@ -180,6 +182,7 @@ export function AISelector({
                         {configs.map((config) => (
                             <button
                                 key={config.id}
+                                type="button"
                                 onClick={() => handleSwitch(config.id)}
                                 className={cn(
                                     'w-full text-left px-4 py-3 hover:bg-background-secondary transition-colors flex items-center justify-between',
@@ -349,6 +352,7 @@ export function AISelector({
                     {configs.map((config) => (
                         <button
                             key={config.id}
+                            type="button"
                             onClick={() => handleSwitch(config.id)}
                             className={cn(
                                 'w-full text-left px-3 py-2 text-sm hover:bg-background-secondary transition-colors flex items-center justify-between',

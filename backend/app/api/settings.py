@@ -21,8 +21,14 @@ from app.utils.security import RateLimitDep, sanitize_url
 
 router = APIRouter(prefix="/api/settings", tags=["設定"])
 
-
-# ========== Schemas ==========
+# Gemini 可選模型（官方 model codes）；使用者亦可自填其他 id
+GEMINI_MODEL_OPTIONS = [
+    "gemini-3-flash-preview",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+]
+# 未指定時的 Gemini 預設（最新穩定版）
+GEMINI_DEFAULT_MODEL = "gemini-3.6-flash"
 
 
 class AIConfigRequest(BaseModel):
@@ -32,7 +38,10 @@ class AIConfigRequest(BaseModel):
     name: Optional[str] = Field(
         None, description="用戶自訂的 AI 服務名稱", max_length=50
     )
-    model: Optional[str] = Field(None, description="AI 模型名稱（OpenAI/Local 必填）")
+    model: Optional[str] = Field(
+        None, description="AI 模型名稱（OpenAI 必填；Gemini 選填，未填用最新穩定版）",
+        max_length=100,
+    )
     api_key: Optional[str] = Field(None, description="Gemini/OpenAI API Key")
     local_url: Optional[str] = Field(None, description="Local AI URL")
     local_model: Optional[str] = Field(None, description="Local AI Model (向後相容)")
@@ -66,6 +75,20 @@ class TestConnectionResponse(BaseModel):
 
 
 # ========== Endpoints ==========
+
+
+@router.get("/ai/default-info")
+def get_system_default_info(
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """系統預設端點資訊（訪客與使用者共用；供 AI 選擇器統一顯示）"""
+    from app.services.endpoints import ensure_default_seed, get_system_default
+
+    endpoint = get_system_default(db) or ensure_default_seed(db)
+    if endpoint is None:
+        return {"name": "系統預設", "model": None}
+    return {"name": endpoint.name, "model": endpoint.model}
 
 
 @router.get("/ai", response_model=List[AIConfigResponse])
@@ -143,8 +166,8 @@ def create_ai_config(
     model_name = request.model
 
     if request.provider == "gemini":
-        # Gemini 強制使用 gemini-3-flash-preview
-        model_name = "gemini-3-flash-preview"
+        # Gemini：使用者可自選或自填模型 id；未填用最新穩定版
+        model_name = request.model or GEMINI_DEFAULT_MODEL
     elif request.provider == "openai":
         # OpenAI 使用用戶輸入，若無則預設 gpt-4o
         model_name = request.model or "gpt-4o"
@@ -201,7 +224,7 @@ def update_ai_config(
 
     # 更新模型名稱
     if request.provider == "gemini":
-        config.model = "gemini-3-flash-preview"
+        config.model = request.model or GEMINI_DEFAULT_MODEL
     elif request.provider == "openai":
         config.model = request.model or "gpt-4o"
     elif request.provider == "local":

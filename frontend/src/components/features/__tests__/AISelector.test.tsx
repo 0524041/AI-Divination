@@ -23,7 +23,7 @@ describe('AISelector', () => {
 
         render(<AISelector variant="card" />);
         await waitFor(() => {
-            expect(screen.getByText('DeepSeek V4 Flash（預設）')).toBeInTheDocument();
+            expect(screen.getByText('Agnes（系統預設）')).toBeInTheDocument();
         });
     });
 
@@ -53,7 +53,7 @@ describe('AISelector', () => {
         authMock.isGuest = true;
 
         render(<AISelector variant="card" />);
-        expect(screen.getByText('DeepSeek V4 Flash（預設）')).toBeInTheDocument();
+        expect(screen.getByText('Agnes（系統預設）')).toBeInTheDocument();
     });
 
     it('offers default option in dropdown even when user has configs', async () => {
@@ -81,7 +81,7 @@ describe('AISelector', () => {
         // 開啟下拉選單
         await user.click(screen.getByRole('button'));
         // 預設選項應出現
-        expect(screen.getByText('DeepSeek V4 Flash（預設）')).toBeInTheDocument();
+        expect(screen.getByText('Agnes（系統預設）')).toBeInTheDocument();
     });
 
     it('notifies null when user picks default option', async () => {
@@ -108,7 +108,7 @@ describe('AISelector', () => {
         });
 
         await user.click(screen.getByRole('button'));
-        await user.click(screen.getByText('DeepSeek V4 Flash（預設）'));
+        await user.click(screen.getByText('Agnes（系統預設）'));
 
         expect(onConfigChange).toHaveBeenCalledWith(null);
     });

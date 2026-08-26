@@ -133,7 +133,6 @@ export default function TarotPage() {
 
   const inputSlot = (
     <div className="w-full max-w-4xl mx-auto px-4 py-8 space-y-8">
-      <AISelector variant="card" />
       <div className="text-center space-y-2">
         <h2 className="font-heading text-2xl text-accent">選擇牌陣，默念您的問題</h2>
         <p className="text-foreground-secondary text-sm">不同的牌陣適合不同深度的問題探索</p>
@@ -204,6 +203,9 @@ export default function TarotPage() {
       </div>
 
       {renderRevealBoard()}
+
+      {/* 解牌前的 AI 選擇：影響本次解盤與後續追問 */}
+      <AISelector variant="card" />
 
       <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
         <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>

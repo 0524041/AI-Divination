@@ -110,8 +110,7 @@ export default function LiuYaoPage() {
   );
 
   const inputSlot = (
-    <div className="w-full max-w-2xl mx-auto px-4 py-8 space-y-6">
-      <AISelector variant="card" />
+    <div className="w-full max-w-2xl mx-auto px-4 py-8">
       <Card variant="glass" className="p-6">
         <form onSubmit={startDivination} className="space-y-6">
           <div>
@@ -189,6 +188,9 @@ export default function LiuYaoPage() {
       </div>
 
       <LiuyaoChartCompact chartData={result.chart_data} />
+
+      {/* 解盤前的 AI 選擇：影響本次解盤與後續追問 */}
+      <AISelector variant="card" />
 
       <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
         <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>

@@ -22,7 +22,8 @@ from app.utils.auth import decrypt_api_key, encrypt_api_key
 # 舊版 provider 名稱 → 對應的 OpenAI-compatible base_url
 LEGACY_PROVIDER_BASE_URLS = {
     "openai": "https://api.openai.com/v1",
-    "opencode": "https://opencode.ai/zen/go/v1",
+    # Google 官方 OpenAI 相容層（Bearer API Key）
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
 }
 
 

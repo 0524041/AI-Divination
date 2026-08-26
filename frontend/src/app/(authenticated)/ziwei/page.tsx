@@ -336,7 +336,6 @@ export default function ZiweiPage() {
 
   const inputSlot = (
     <div className="w-full max-w-2xl mx-auto px-4 py-8 space-y-6">
-      <AISelector variant="card" />
       <BirthDataPanel profiles={savedList} selectedId={selectedId} currentName={birthData.name} onDelete={deleteSaved}
         onSelect={(id) => (id ? applySaved(id) : (setSelectedId(null), setBirthData({ ...EMPTY_BIRTH })))} />
 
@@ -449,6 +448,9 @@ export default function ZiweiPage() {
       </div>
 
       <div className="overflow-x-auto">{renderChart()}</div>
+
+      {/* 論命前的 AI 選擇：影響本次解盤與後續追問 */}
+      <AISelector variant="card" />
 
       <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
         <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>請大師論命</Button>

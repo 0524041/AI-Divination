@@ -11,6 +11,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Brain, Loader2, RotateCcw, Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
+import { AISelector } from '@/components/features/AISelector';
 import { ChatMessage, useThreadStream } from '@/hooks/useThreadStream';
 import { CONTEXT_TOKEN_BUDGET, estimateTokens } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
@@ -137,6 +138,11 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
           回應失敗，請重試或更換 AI 設定。
         </div>
       )}
+
+      {/* 對話窗內的 AI 選擇：切換後影響後續追問 */}
+      <div className="mx-4 mb-1">
+        <AISelector variant="compact" />
+      </div>
 
       {/* 上下文預算條 */}
       <ContextBudgetBar messages={stream.messages} contextTokens={stream.contextTokens} />

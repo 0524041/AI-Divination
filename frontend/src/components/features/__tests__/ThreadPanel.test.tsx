@@ -22,25 +22,36 @@ vi.mock('@/lib/api-client', () => ({
   apiGet: vi.fn().mockResolvedValue({}),
 }));
 
+// ThreadPanel 內嵌 AISelector 依賴 AuthContext
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ isGuest: false, user: { username: 'tester', role: 'user' } }),
+}));
+
 import { ThreadPanel } from '@/components/features/ThreadPanel';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 
 describe('ThreadPanel（Ticket 08）', () => {
+  /** 內嵌 AISelector 後會有 quota／settings 等附帶請求，以 URL 分派 mock */
+  function jsonOk() {
+    return Promise.resolve({ ok: true, json: async () => ({ limited: false }) });
+  }
+
   it('送出追問：樂觀插入 user 訊息、串流 delta 累積、done 定稿', async () => {
-    const fetchMock = vi
-      .fn()
-      // quota check
-      .mockResolvedValueOnce({ json: async () => ({ limited: false }) })
-      // followup stream
-      .mockResolvedValueOnce(
-        sseResponse([
-          { event: 'meta', data: { record_id: 1 } },
-          { event: 'delta', data: { type: 'text', text: '世爻' } },
-          { event: 'delta', data: { type: 'text', text: '旺相' } },
-          { event: 'done', data: { message_id: 99, content: '世爻旺相', think: null, model: 'm' } },
-        ])
-      );
+    const fetchMock = vi.fn().mockImplementation((url: unknown) => {
+      const u = String(url);
+      if (u.includes('/followup')) {
+        return Promise.resolve(
+          sseResponse([
+            { event: 'meta', data: { record_id: 1 } },
+            { event: 'delta', data: { type: 'text', text: '世爻' } },
+            { event: 'delta', data: { type: 'text', text: '旺相' } },
+            { event: 'done', data: { message_id: 99, content: '世爻旺相', think: null, model: 'm' } },
+          ])
+        );
+      }
+      return jsonOk();
+    });
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -53,9 +64,9 @@ describe('ThreadPanel（Ticket 08）', () => {
     await waitFor(() => expect(screen.getByText(/世爻旺相/)).toBeTruthy());
 
     // 送出的請求形狀
-    const call = fetchMock.mock.calls[1];
-    expect(call[0]).toBe('/api/records/1/followup?token=');
-    expect(JSON.parse(call[1].body).question).toBe('這卦如何？');
+    const followupCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('/followup'));
+    expect(followupCall![0]).toBe('/api/records/1/followup?token=');
+    expect(JSON.parse(followupCall![1].body).question).toBe('這卦如何？');
   });
 
   it('think 區塊可摺疊切換', async () => {
@@ -129,15 +140,18 @@ describe('ThreadPanel（Ticket 08）', () => {
   });
 
   it('預算條採用後端 meta 回報的 context_tokens（涵蓋 system＋盤面＋錨點）', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ json: async () => ({ limited: false }) })
-      .mockResolvedValueOnce(
-        sseResponse([
-          { event: 'meta', data: { record_id: 1, context_tokens: 20000 } },
-          { event: 'done', data: { message_id: 9, content: '回應', think: null, model: 'm' } },
-        ])
-      );
+    const fetchMock = vi.fn().mockImplementation((url: unknown) => {
+      const u = String(url);
+      if (u.includes('/followup')) {
+        return Promise.resolve(
+          sseResponse([
+            { event: 'meta', data: { record_id: 1, context_tokens: 20000 } },
+            { event: 'done', data: { message_id: 9, content: '回應', think: null, model: 'm' } },
+          ])
+        );
+      }
+      return jsonOk();
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     render(<ThreadPanel recordId={6} />);

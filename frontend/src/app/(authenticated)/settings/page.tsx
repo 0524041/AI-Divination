@@ -35,6 +35,7 @@ interface AIConfig {
   id: number;
   provider: string;
   name: string | null;
+  model: string | null;
   has_api_key: boolean;
   local_url: string | null;
   local_model: string | null;
@@ -49,12 +50,21 @@ const PROVIDER_OPTIONS = [
   { value: 'local', label: '其他 AI（自訂 URL）' },
 ];
 
+/** Gemini 官方 model codes（可下拉選擇，亦可自填其他 id） */
+const GEMINI_MODEL_OPTIONS = [
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash',
+  'gemini-3.6-flash',
+];
+const GEMINI_DEFAULT_MODEL = 'gemini-3.6-flash';
+
 const EMPTY_FORM = {
   provider: 'gemini' as Provider,
   name: '',
   apiKey: '',
   localUrl: '',
   localModel: '',
+  model: GEMINI_DEFAULT_MODEL,
 };
 
 export default function SettingsPage() {
@@ -142,6 +152,7 @@ export default function SettingsPage() {
       apiKey: '',
       localUrl: config.local_url || '',
       localModel: config.local_model || '',
+      model: config.model || GEMINI_DEFAULT_MODEL,
     });
     setFormOpen(true);
     if (config.provider === 'local' && config.local_url) {
@@ -161,9 +172,9 @@ export default function SettingsPage() {
         return;
       }
       if (form.apiKey) body.api_key = form.apiKey;
-      if (form.provider === 'openai') {
-        body.local_model = form.localModel || 'gpt-5.1';
-      }
+      // Gemini／OpenAI 皆可自選或自填模型 id（後端有各自的預設值）
+      const modelId = form.provider === 'gemini' ? form.model : form.localModel;
+      if (modelId) body.model = modelId;
     } else {
       if (!form.localUrl || !form.localModel) {
         toast('請填寫 URL 和模型名稱', { kind: 'error' });
@@ -567,6 +578,31 @@ export default function SettingsPage() {
                   <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm text-foreground-secondary">
                     ⚠️ OpenAI 沒有提供免費 AI Token 次數，請謹慎使用，使用需付費。
                   </p>
+                )}
+
+                {form.provider === 'gemini' && (
+                  <div>
+                    <label htmlFor="byok-gemini-model" className="mb-2 block text-sm font-medium text-foreground-secondary">
+                      模型
+                    </label>
+                    <input
+                      id="byok-gemini-model"
+                      type="text"
+                      list="gemini-model-options"
+                      value={form.model}
+                      onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                      placeholder={GEMINI_DEFAULT_MODEL}
+                      className="w-full rounded-xl border border-border/50 bg-white/80 px-4 py-3 text-foreground-primary placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:bg-black/40"
+                    />
+                    <datalist id="gemini-model-options">
+                      {GEMINI_MODEL_OPTIONS.map((model) => (
+                        <option key={model} value={model} />
+                      ))}
+                    </datalist>
+                    <p className="mt-1 text-xs text-foreground-muted">
+                      可從選單選擇，或直接輸入其他 Gemini 模型 id。
+                    </p>
+                  </div>
                 )}
 
                 {form.provider === 'openai' && (
