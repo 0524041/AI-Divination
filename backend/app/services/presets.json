@@ -42,6 +42,27 @@
       "models": []
     },
     {
+      "id": "opencode",
+      "name": "OpenCode Go",
+      "base_url": "https://opencode.ai/zen/go/v1",
+      "requires_api_key": true,
+      "models": [
+        {"id": "deepseek-v4-flash", "params": {"reasoning_param": null}},
+        {"id": "deepseek-v4-pro", "params": {"reasoning_param": null}},
+        {"id": "glm-5.3-flash", "params": {"reasoning_param": null}},
+        {"id": "glm-5.2", "params": {"reasoning_param": null}},
+        {"id": "glm-5.1", "params": {"reasoning_param": null}},
+        {"id": "kimi-k3", "params": {"reasoning_param": null}},
+        {"id": "kimi-k2.7-code", "params": {"reasoning_param": null}},
+        {"id": "kimi-k2.6", "params": {"reasoning_param": null}},
+        {"id": "longcat-2.0", "params": {"reasoning_param": null}},
+        {"id": "mimo-v2.5", "params": {"reasoning_param": null}},
+        {"id": "mimo-v2.5-pro", "params": {"reasoning_param": null}},
+        {"id": "hy4-preview", "params": {"reasoning_param": null}},
+        {"id": "hy3", "params": {"reasoning_param": null}}
+      ]
+    },
+    {
       "id": "ollama",
       "name": "Ollama（本機）",
       "base_url": "http://localhost:11434/v1",

@@ -148,6 +148,7 @@ Related: `.scratch/ai-chat-refactor/spec.md`（上一輪重構，本 spec 是其
   6. 訪客於 stream 帶使用者 `connection_id` 時**靜默回落系統免費模型**（不報錯，避免洩漏他人連線存在性）。
   7. 新增 `AI_PROBE_MODELS` 環境變數：種子化時的 `/models` 探測開關（測試環境必須關閉）。
 - **範圍外留待後續**（review 發現的 spec gap）：連線「停用」狀態（story 7 僅做了刪除）、設定頁以唯讀項目呈現系統連線（story 8，目前僅在選擇器分組呈現）。
+- **OpenCode Go 相容性限制**（docs/zh-tw/go）：同一 base_url 下模型分屬三種協定——`/v1/chat/completions`（GLM、Kimi、LongCat、DeepSeek、MiMo、Hy 系列）✅ 支援；`/v1/messages`（Anthropic 型：MiniMax、Qwen3.x）與 `/v1/responses`（Grok 4.6、GPT 5.6 Luna、Muse Spark）❌ 本管線不支援。`opencode` preset 的建議模型清單僅含相容模型；手動加入不相容模型會在串流時收到 upstream 錯誤。未來如需支援，需在模型層增加「協定」欄位與對應 adapter。`GET /v1/models` 無需授權即可列出。
 - **已知風險**：
   - Agnes 閘道對 `reasoning_effort` 只接受字串（`low/medium/high`），數值型會被拒——preset 與參數解析必須把這件事編進模型預設，測試需涵蓋。
   - `ai_configs` 的 model/local_model 遷移需寫轉換（local_url→base_url、兩個模型欄位→models JSON），舊資料一律設 `enabled=true` 以免使用者既有模型消失。

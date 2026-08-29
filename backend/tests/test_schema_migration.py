@@ -142,6 +142,21 @@ def test_migration_is_idempotent():
     assert json.loads(models) == [{"id": "llama3", "enabled": True}]
 
 
+def test_makes_provider_nullable_for_legacy_databases():
+    """既有 DB 的 provider 是 NOT NULL（新程式碼不再寫入）→ 重建為 nullable"""
+    conn = _old_db()
+    before = [r for r in conn.execute("PRAGMA table_info(ai_configs)") if r[1] == "provider"]
+    assert before[0][3] == 1  # notnull
+
+    migrate_ai_model_columns(conn)
+
+    after = [r for r in conn.execute("PRAGMA table_info(ai_configs)") if r[1] == "provider"]
+    assert after[0][3] == 0  # nullable
+    # 資料保留
+    count = conn.execute("SELECT COUNT(*) FROM ai_configs").fetchone()[0]
+    assert count == 3
+
+
 def test_migrates_history_ai_connection_id():
     """既有 history 表補 ai_connection_id 欄位（spec 決策 5）"""
     conn = _old_db()

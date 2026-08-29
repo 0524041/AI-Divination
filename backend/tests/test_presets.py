@@ -14,7 +14,7 @@ from app.services.presets import get_preset, load_presets, preset_model_params
 def test_load_presets_contains_known_services():
     ids = {p["id"] for p in load_presets()}
 
-    assert {"agnes", "gemini", "openai", "openrouter", "ollama", "lmstudio", "custom"} <= ids
+    assert {"agnes", "gemini", "openai", "openrouter", "opencode", "ollama", "lmstudio", "custom"} <= ids
 
 
 def test_every_preset_has_required_fields():

@@ -68,4 +68,43 @@ def migrate_ai_model_columns(conn: sqlite3.Connection) -> None:
             (_models_json([model]), model, row_id),
         )
 
+    _make_provider_nullable(conn)
+
     conn.commit()
+
+
+def _make_provider_nullable(conn: sqlite3.Connection) -> None:
+    """既有 DB 的 ai_configs.provider 是 NOT NULL（新程式碼不再寫入）→ 重建表
+
+    SQLite 無法直接修改欄位約束，採標準重建流程；新表 schema 與 ORM 對齊。
+    """
+    cols = conn.execute("PRAGMA table_info(ai_configs)").fetchall()
+    provider = next((c for c in cols if c[1] == "provider"), None)
+    if provider is None or not provider[3]:  # 已是 nullable
+        return
+
+    # 依 ORM 欄位順序重建（SELECT * 依賴欄位順序一致）
+    conn.executescript(
+        """
+        CREATE TABLE ai_configs_new (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            provider VARCHAR(20),
+            name VARCHAR(50),
+            model VARCHAR(100),
+            api_key_encrypted TEXT,
+            local_url VARCHAR(255),
+            local_model VARCHAR(100),
+            is_active BOOLEAN,
+            created_at DATETIME,
+            updated_at DATETIME,
+            base_url VARCHAR(255),
+            models TEXT,
+            preset_id VARCHAR(30)
+        );
+        INSERT INTO ai_configs_new SELECT * FROM ai_configs;
+        DROP TABLE ai_configs;
+        ALTER TABLE ai_configs_new RENAME TO ai_configs;
+        CREATE INDEX IF NOT EXISTS ix_ai_configs_id ON ai_configs (id);
+        """
+    )
