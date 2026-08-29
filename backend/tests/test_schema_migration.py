@@ -29,6 +29,22 @@ CREATE TABLE ai_configs (
 )
 """
 
+OLD_HISTORY = """
+CREATE TABLE history (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER,
+    divination_type VARCHAR(50),
+    question TEXT,
+    chart_data TEXT,
+    interpretation TEXT,
+    ai_provider VARCHAR(20),
+    ai_model VARCHAR(100),
+    status VARCHAR(20),
+    created_at DATETIME,
+    updated_at DATETIME
+)
+"""
+
 OLD_SYSTEM_ENDPOINTS = """
 CREATE TABLE system_ai_endpoints (
     id INTEGER PRIMARY KEY,
@@ -48,6 +64,7 @@ def _old_db():
     conn = sqlite3.connect(":memory:")
     conn.execute(OLD_AI_CONFIGS)
     conn.execute(OLD_SYSTEM_ENDPOINTS)
+    conn.execute(OLD_HISTORY)
     conn.executemany(
         "INSERT INTO ai_configs (user_id, provider, model, local_url, local_model) "
         "VALUES (?, ?, ?, ?, ?)",
@@ -123,3 +140,12 @@ def test_migration_is_idempotent():
         "SELECT models FROM ai_configs WHERE provider='local'"
     ).fetchone()[0]
     assert json.loads(models) == [{"id": "llama3", "enabled": True}]
+
+
+def test_migrates_history_ai_connection_id():
+    """既有 history 表補 ai_connection_id 欄位（spec 決策 5）"""
+    conn = _old_db()
+    migrate_ai_model_columns(conn)
+
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(history)")]
+    assert "ai_connection_id" in cols

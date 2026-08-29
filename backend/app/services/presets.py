@@ -11,8 +11,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-from app.services.ai_provider import UNSET as UNSET_SENTINEL
-from app.services.ai_provider import ModelCallParams
+from app.services.ai_provider import ModelCallParams, call_params_from_dict
 
 _PRESETS_PATH = Path(__file__).parent / "presets.json"
 
@@ -40,13 +39,6 @@ def preset_model_params(preset_id: str, model_id: str) -> ModelCallParams | None
     if preset is None:
         return None
     model = next((m for m in preset.get("models", []) if m.get("id") == model_id), None)
-    if model is None or "params" not in model:
+    if model is None:
         return None
-
-    raw = model["params"]
-    return ModelCallParams(
-        reasoning_param=raw.get("reasoning_param", UNSET_SENTINEL),
-        reasoning_value=raw.get("reasoning_value", UNSET_SENTINEL),
-        temperature=raw.get("temperature", UNSET_SENTINEL),
-        max_tokens=raw.get("max_tokens", UNSET_SENTINEL),
-    )
+    return call_params_from_dict(model.get("params"))

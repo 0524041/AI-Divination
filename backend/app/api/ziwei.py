@@ -33,12 +33,6 @@ class ZiweiDivinationRequest(BaseModel):
     prompt_context: Optional[str] = (
         None  # Make optional as we generate it in backend now
     )
-    use_default_ai: bool = Field(
-        default=False, description="（已棄用，僅相容舊客戶端）"
-    )
-    mode: str = Field(
-        default="thread", description="（已棄用，僅接受 thread 模式）"
-    )
 
 
 class DivinationResponse(BaseModel):

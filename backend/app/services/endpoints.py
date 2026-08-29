@@ -223,6 +223,10 @@ def resolve_endpoint(
         resolved = _resolve_user_connection(db, user_id, connection_id, model_id)
         if resolved is not None:
             return resolved
+        # 連線已刪除或不屬於本人（含舊紀錄綁定）→ 回落系統預設
+        logger.info(
+            "連線 %s 不可用，回落系統預設模型（user_id=%s）", connection_id, user_id
+        )
 
     return _resolve_system(db, model_id if connection_id is None else None)
 
@@ -238,9 +242,9 @@ def resolve_endpoint_for_record(
 ) -> ResolvedEndpoint:
     """由占卜紀錄解析端點（spec: 紀錄綁定 + 舊資料相容）
 
-    優先序：請求參數 > 紀錄綁定（ai_connection_id/ai_model）>
-    舊語意（ai_provider="default" → 系統；其餘 → 使用者 active 設定）。
-    use_system=True 為明確切回系統免費模型（忽略綁定與舊語意）。
+    優先序：請求參數 > 紀錄綁定（ai_connection_id/ai_model）> 系統預設。
+    舊紀錄（無綁定，ai_provider 為 "default" 或 NULL）一律解析到系統預設。
+    use_system=True 為明確切回系統免費模型。
     """
     if use_system:
         return resolve_endpoint(db, model_id=model_id)
@@ -248,22 +252,8 @@ def resolve_endpoint_for_record(
     cid = connection_id if connection_id is not None else record.ai_connection_id
     mid = model_id if model_id is not None else record.ai_model
 
-    if cid is not None or record.ai_provider == "default":
-        return resolve_endpoint(
-            db, user_id=user_id, connection_id=cid, model_id=mid
-        )
-
-    # 舊紀錄相容：沿用使用者 active 設定（無則回落系統預設）
-    legacy = (
-        db.query(AIConfig)
-        .filter(AIConfig.user_id == user_id, AIConfig.is_active.is_(True))
-        .first()
-    )
     return resolve_endpoint(
-        db,
-        user_id=user_id,
-        connection_id=legacy.id if legacy else None,
-        model_id=(legacy.effective_model or None) if legacy else mid,
+        db, user_id=user_id, connection_id=cid, model_id=mid
     )
 
 

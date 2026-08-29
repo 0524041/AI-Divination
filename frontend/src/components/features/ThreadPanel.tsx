@@ -122,10 +122,17 @@ export function ThreadPanel({
             )}
             {message.role === 'assistant' ? (
               message.content ? (
-                <MarkdownRenderer
-                  content={message.content}
-                  streaming={streaming && index === stream.messages.length - 1}
-                />
+                <>
+                  <MarkdownRenderer
+                    content={message.content}
+                    streaming={streaming && index === stream.messages.length - 1}
+                  />
+                  {message.model && !streaming && (
+                    <p className="mt-2 text-[10px] text-foreground-muted/80" data-testid="message-model">
+                      {message.model}
+                    </p>
+                  )}
+                </>
               ) : message.think ? (
                 <span className="inline-flex items-center gap-2 text-foreground-muted">
                   <Brain size={14} className="animate-pulse" /> 正在思考…

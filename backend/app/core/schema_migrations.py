@@ -33,12 +33,13 @@ def _models_json(model_ids: list[str]) -> str:
 
 
 def migrate_ai_model_columns(conn: sqlite3.Connection) -> None:
-    """將 ai_configs 與 system_ai_endpoints 遷移到連線×模型模型（幂等）"""
+    """將 ai_configs / system_ai_endpoints / history 遷移到連線×模型模型（幂等）"""
     _add_column(conn, "ai_configs", "base_url", "VARCHAR(255)")
     _add_column(conn, "ai_configs", "models", "TEXT")
     _add_column(conn, "ai_configs", "preset_id", "VARCHAR(30)")
     _add_column(conn, "system_ai_endpoints", "models", "TEXT")
     _add_column(conn, "system_ai_endpoints", "default_model", "VARCHAR(100)")
+    _add_column(conn, "history", "ai_connection_id", "INTEGER")
 
     # --- ai_configs 資料轉換：僅處理 base_url 尚為 NULL 的舊列 ---
     rows = conn.execute(

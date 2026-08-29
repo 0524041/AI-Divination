@@ -62,6 +62,10 @@ describe('ThreadPanel（Ticket 08）', () => {
 
     await waitFor(() => expect(screen.getByText('這卦如何？')).toBeTruthy());
     await waitFor(() => expect(screen.getByText(/世爻旺相/)).toBeTruthy());
+    // 每則回應顯示實際使用的模型名稱（spec story 19）
+    await waitFor(() =>
+      expect(screen.getAllByTestId('message-model').some((el) => el.textContent === 'm')).toBe(true)
+    );
 
     // 送出的請求形狀
     const followupCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('/followup'));

@@ -134,7 +134,7 @@ def _owned_connection(db: Session, config_id: int, user: User) -> AIConfig:
     return config
 
 
-def _sanitize_base_url(base_url: str, user: User) -> str:
+def _sanitize_base_url(base_url: str) -> str:
     """URL 格式驗證與清理（本機/私有位址已開放所有使用者，可連 Ollama 等）"""
     try:
         return sanitize_url(base_url, allow_private=True)
@@ -167,7 +167,7 @@ def create_connection(
     config = AIConfig(
         user_id=current_user.id,
         name=request.name,
-        base_url=_sanitize_base_url(request.base_url, current_user),
+        base_url=_sanitize_base_url(request.base_url),
         api_key_encrypted=encrypt_api_key(request.api_key) if request.api_key else None,
         preset_id=request.preset_id,
     )
@@ -246,7 +246,7 @@ def update_connection(
     if request.name is not None:
         config.name = request.name
     if request.base_url is not None:
-        config.base_url = _sanitize_base_url(request.base_url, current_user)
+        config.base_url = _sanitize_base_url(request.base_url)
     if request.preset_id is not None:
         config.preset_id = request.preset_id
     if request.api_key:

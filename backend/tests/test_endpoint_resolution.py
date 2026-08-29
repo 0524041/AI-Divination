@@ -320,9 +320,9 @@ async def test_legacy_default_record_uses_system(make_user):
     assert resolved.source == "system"
 
 
-async def test_legacy_record_with_active_config_uses_it(make_user):
-    """舊紀錄（ai_provider=None、無綁定）→ 沿用使用者 active 設定"""
-    user = make_user(username="legacy-active-user")
+async def test_legacy_null_record_uses_system(make_user):
+    """舊紀錄（ai_provider=NULL、無綁定）→ 一律解析到系統預設（spec 決策 5）"""
+    user = make_user(username="legacy-null-user")
     with _db() as db:
         ensure_default_seed(db)
         _make_connection(db, user.id, is_active=True)
@@ -340,9 +340,8 @@ async def test_legacy_record_with_active_config_uses_it(make_user):
         record = db.query(History).filter(History.id == record_id).first()
         resolved = resolve_endpoint_for_record(db, record, user_id=user.id)
 
-    assert resolved.source == "user"
-    assert resolved.model == "m-fast"
-    assert resolved.base_url == "https://example.com/v1"
+    assert resolved.source == "system"
+    assert resolved.model == "agnes-2.0-flash"
 
 
 # --- 用量紀錄 ---
