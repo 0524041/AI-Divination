@@ -11,8 +11,9 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Brain, Loader2, RotateCcw, Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
-import { AISelector } from '@/components/features/AISelector';
+import { ModelSelector } from '@/components/features/ModelSelector';
 import { ChatMessage, useThreadStream } from '@/hooks/useThreadStream';
+import { useModelSelection, type ModelSelection } from '@/hooks/useAIModels';
 import { CONTEXT_TOKEN_BUDGET, estimateTokens } from '@/lib/tokens';
 import { cn } from '@/lib/utils';
 
@@ -44,12 +45,21 @@ function ThinkBlock({ think }: { think: string }) {
 export interface ThreadPanelProps {
   recordId: number;
   initialMessages?: ChatMessage[];
+  /** 揭卦步驟選的模型（首解綁定）；未提供時用「我的預設模型」 */
+  initialModelSelection?: ModelSelection | null;
   onQuotaExceeded?: (info: { used: number; limit: number }) => void;
   onError?: (message: string) => void;
 }
 
-export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, onError }: ThreadPanelProps) {
+export function ThreadPanel({
+  recordId,
+  initialMessages = [],
+  initialModelSelection,
+  onQuotaExceeded,
+  onError,
+}: ThreadPanelProps) {
   const stream = useThreadStream({ onQuotaExceeded, onError });
+  const modelState = useModelSelection();
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -60,8 +70,12 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
       if (initialMessages.length > 0) {
         stream.setMessages(initialMessages);
       }
+      if (initialModelSelection) {
+        modelState.setSelection(initialModelSelection);
+      }
     }
-  }, [initialMessages, stream]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -77,7 +91,7 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
     const question = input.trim();
     if (!question || streaming) return;
     setInput('');
-    await stream.sendFollowup(recordId, question);
+    await stream.sendFollowup(recordId, question, modelState.selection);
   };
 
   return (
@@ -139,9 +153,13 @@ export function ThreadPanel({ recordId, initialMessages = [], onQuotaExceeded, o
         </div>
       )}
 
-      {/* 對話窗內的 AI 選擇：切換後影響後續追問 */}
+      {/* 對話窗內的模型選擇：切換後影響後續追問（並同步紀錄綁定） */}
       <div className="mx-4 mb-1">
-        <AISelector variant="compact" />
+        <ModelSelector
+          variant="compact"
+          value={modelState.selection}
+          onChange={modelState.setSelection}
+        />
       </div>
 
       {/* 上下文預算條 */}

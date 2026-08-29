@@ -13,6 +13,8 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
+import type { ModelSelection } from '@/hooks/useAIModels';
+import { modelSelectionToQuery } from '@/hooks/useAIModels';
 
 export type StreamPhase = 'idle' | 'connecting' | 'streaming' | 'error' | 'done';
 
@@ -187,9 +189,16 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
     []
   );
 
-  /** 首解：從後端載入既有訊息（已完成的 thread），或開啟首解串流 */
+  /** 首解：從後端載入既有訊息（已完成的 thread），或開啟首解串流
+   *
+   * selection（可選）：本次解盤綁定的模型（spec: ai-model-selection），
+   * 後端會寫入紀錄，追問/重試沿用。
+   */
   const openThread = useCallback(
-    async (record: { id: number; interpretation?: string | null }) => {
+    async (
+      record: { id: number; interpretation?: string | null },
+      selection?: ModelSelection | null
+    ) => {
       // 先呈現既有解盤（遷移資料）
       if (record.interpretation) {
         setMessages([
@@ -203,20 +212,36 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
         setPhase('idle');
         return;
       }
-      await runStream(`/api/records/${record.id}/stream`, { method: 'GET' }, `s-${record.id}`);
+      const suffix = selection ? `?${modelSelectionToQuery(selection)}` : '';
+      await runStream(
+        `/api/records/${record.id}/stream${suffix}`,
+        { method: 'GET' },
+        `s-${record.id}`
+      );
     },
     [runStream]
   );
 
   const sendFollowup = useCallback(
-    async (recordId: number, question: string) => {
+    async (recordId: number, question: string, selection?: ModelSelection | null) => {
       setMessages((prev) => [
         ...prev,
         { id: `u-${Date.now()}`, role: 'user', content: question },
       ]);
       await runStream(
         `/api/records/${recordId}/followup`,
-        { method: 'POST', body: { question } },
+        {
+          method: 'POST',
+          body: {
+            question,
+            ...(selection
+              ? {
+                  connection_id: selection.connectionId ?? 'system',
+                  model_id: selection.modelId,
+                }
+              : {}),
+          },
+        },
         `f-${Date.now()}`
       );
     },

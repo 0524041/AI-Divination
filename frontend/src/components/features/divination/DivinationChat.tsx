@@ -18,17 +18,26 @@ import { Button } from '@/components/ui/Button';
 import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
 import { ThreadPanel } from '@/components/features/ThreadPanel';
 import { ChatMessage, useThreadStream } from '@/hooks/useThreadStream';
+import type { ModelSelection } from '@/hooks/useAIModels';
 import { apiGet } from '@/lib/api-client';
 
 interface DivinationChatProps {
   recordId: number;
   /** 原始占卜問題，作為對話流的首則 user 訊息 */
   question?: string;
+  /** 揭卦步驟選擇的模型（綁定本次解盤與後續追問） */
+  modelSelection?: ModelSelection | null;
   onQuotaExceeded?: (info: { used: number; limit: number }) => void;
   onError?: (message: string) => void;
 }
 
-export function DivinationChat({ recordId, question, onQuotaExceeded, onError }: DivinationChatProps) {
+export function DivinationChat({
+  recordId,
+  question,
+  modelSelection,
+  onQuotaExceeded,
+  onError,
+}: DivinationChatProps) {
   const stream = useThreadStream({ onQuotaExceeded, onError });
   const streamRef = useRef(stream);
   streamRef.current = stream;
@@ -39,8 +48,11 @@ export function DivinationChat({ recordId, question, onQuotaExceeded, onError }:
     if (startedRef.current || !recordId) return;
     startedRef.current = true;
     setFallbackDone(false);
-    void streamRef.current.openThread({ id: recordId });
+    void streamRef.current.openThread({ id: recordId }, modelSelectionRef.current);
   }, [recordId]);
+
+  const modelSelectionRef = useRef(modelSelection);
+  modelSelectionRef.current = modelSelection;
 
   useEffect(() => {
     openStream();
@@ -87,7 +99,15 @@ export function DivinationChat({ recordId, question, onQuotaExceeded, onError }:
   const lastAssistant = [...stream.messages].reverse().find((m) => m.role === 'assistant');
 
   if (!streaming && stream.messages.length > 0) {
-    return <ThreadPanel recordId={recordId} initialMessages={handOver()} onQuotaExceeded={onQuotaExceeded} onError={onError} />;
+    return (
+      <ThreadPanel
+        recordId={recordId}
+        initialMessages={handOver()}
+        initialModelSelection={modelSelection}
+        onQuotaExceeded={onQuotaExceeded}
+        onError={onError}
+      />
+    );
   }
 
   if (!streaming && stream.phase === 'error' && fallbackDone) {

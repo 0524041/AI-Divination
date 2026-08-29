@@ -19,7 +19,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
-import { getAIProviderDisplayName } from '@/components/features/AISelector';
+import { getAIProviderDisplayName } from '@/components/features/ModelSelector';
 import { secureApiRequest } from '@/lib/api-client';
 
 interface SharedCard {

@@ -22,7 +22,8 @@ import { ZiweiRevealRitual } from '@/components/features/divination/ZiweiRevealR
 import { BirthDataPanel } from '@/components/features/divination/BirthDataPanel';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
 import { DivinationChat } from '@/components/features/divination/DivinationChat';
-import { AISelector } from '@/components/features/AISelector';
+import { ModelSelector } from '@/components/features/ModelSelector';
+import { useModelSelection } from '@/hooks/useAIModels';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
 import { TAIWAN_CITIES, TaiwanCity } from '@/lib/taiwan-cities';
 import {
@@ -114,6 +115,8 @@ export default function ZiweiPage() {
   const { toast } = useToast();
 
   const [step, setStep] = useState<DivinationStep>('intro');
+  // 解盤模型選擇（綁定本次占卜，初始值為「我的預設模型」）
+  const modelState = useModelSelection();
   const [savedList, setSavedList] = useState<BirthData[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [birthData, setBirthData] = useState<BirthData>({ ...EMPTY_BIRTH });
@@ -450,7 +453,11 @@ export default function ZiweiPage() {
       <div className="overflow-x-auto">{renderChart()}</div>
 
       {/* 論命前的 AI 選擇：影響本次解盤與後續追問 */}
-      <AISelector variant="card" />
+      <ModelSelector
+        variant="card"
+        value={modelState.selection}
+        onChange={modelState.setSelection}
+      />
 
       <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
         <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>請大師論命</Button>
@@ -463,6 +470,7 @@ export default function ZiweiPage() {
     <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto h-[calc(100dvh-120px)] px-3 py-4">
       <DivinationChat
         recordId={result.id}
+        modelSelection={modelState.selection}
         question={question.trim()}
         onQuotaExceeded={({ used, limit }) =>
           toast(`今日 AI 回覆額度已用盡（${used}/${limit}），註冊可解鎖完整對話。`, { kind: 'error', title: '額度上限' })

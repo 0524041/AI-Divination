@@ -143,6 +143,7 @@ Related: `.scratch/ai-chat-refactor/spec.md`（上一輪重構，本 spec 是其
   1. 模型選擇**綁定在首解請求**（而非建卦時）：建卦流程（input 步驟）不動，reveal 步驟的選擇在第一次 stream 請求時隨參數送達並持久化——改動最小、語意正確。
   2. **系統免費模型清單化**：種子時探測 Agnes `/v1/models` 全數納入，admin 可增刪；解決「免費模型只有一個」。
   3. **legacy 直接移除**（前端已全走 thread 模式），不做相容墊片。
+  4. （實作期間追加）**移除「localhost/私有網路僅限管理員」限制**：本機服務（Ollama、LM Studio）開放所有使用者連線——使用者明確指示。`sanitize_url` 保留 URL 格式驗證。
 - **已知風險**：
   - Agnes 閘道對 `reasoning_effort` 只接受字串（`low/medium/high`），數值型會被拒——preset 與參數解析必須把這件事編進模型預設，測試需涵蓋。
   - `ai_configs` 的 model/local_model 遷移需寫轉換（local_url→base_url、兩個模型欄位→models JSON），舊資料一律設 `enabled=true` 以免使用者既有模型消失。

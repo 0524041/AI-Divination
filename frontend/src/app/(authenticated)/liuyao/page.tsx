@@ -15,7 +15,8 @@ import { DivinationFlow, DivinationStep } from '@/components/features/divination
 import { CoinTossRitual } from '@/components/features/divination/CoinTossRitual';
 import { LiuyaoChartCompact, LiuyaoChartData } from '@/components/features/divination/LiuyaoChartCompact';
 import { DivinationChat } from '@/components/features/divination/DivinationChat';
-import { AISelector } from '@/components/features/AISelector';
+import { ModelSelector } from '@/components/features/ModelSelector';
+import { useModelSelection } from '@/hooks/useAIModels';
 import { useToast } from '@/components/ui/Toast';
 import { apiPost } from '@/lib/api-client';
 
@@ -40,6 +41,8 @@ export default function LiuYaoPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [step, setStep] = useState<DivinationStep>('intro');
+  // 解盤模型選擇（綁定本次占卜，初始值為「我的預設模型」）
+  const modelState = useModelSelection();
   const [gender, setGender] = useState<Gender>('male');
   const [target, setTarget] = useState<Target>('self');
   const [question, setQuestion] = useState('');
@@ -189,8 +192,12 @@ export default function LiuYaoPage() {
 
       <LiuyaoChartCompact chartData={result.chart_data} />
 
-      {/* 解盤前的 AI 選擇：影響本次解盤與後續追問 */}
-      <AISelector variant="card" />
+      {/* 解盤前的模型選擇：綁定本次解盤與後續追問 */}
+      <ModelSelector
+        variant="card"
+        value={modelState.selection}
+        onChange={modelState.setSelection}
+      />
 
       <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
         <Button type="button" variant="gold" size="lg" onClick={() => setStep('chat')}>
@@ -217,6 +224,7 @@ export default function LiuYaoPage() {
       <DivinationChat
         recordId={result.id}
         question={question.trim()}
+        modelSelection={modelState.selection}
         onQuotaExceeded={({ used, limit }) =>
           toast(`今日 AI 回覆額度已用盡（${used}/${limit}），註冊可解鎖完整對話。`, { kind: 'error', title: '額度上限' })
         }
