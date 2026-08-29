@@ -1,5 +1,16 @@
 """
-設定 API 路由
+設定 API 路由（spec: ai-model-selection）
+
+- GET  /api/settings/ai/presets        內建服務清單（preset）
+- GET  /api/settings/ai                列出使用者連線
+- POST /api/settings/ai                新增連線（name/base_url/api_key/preset_id）
+- PUT  /api/settings/ai/{id}           更新連線
+- PUT  /api/settings/ai/{id}/models    維護連線的模型清單（顯示/隱藏、參數）
+- DELETE /api/settings/ai/{id}         刪除連線
+- GET  /api/settings/ai/models         聚合模型清單（系統＋使用者；訪客僅系統）
+- PUT  /api/settings/ai/default-model  我的預設模型
+- POST /api/settings/ai/test           連線測試（探測 /models）
+- GET  /api/settings/ai/default-info   系統預設資訊（相容舊選擇器）
 """
 
 from typing import List, Optional
@@ -9,9 +20,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.settings import AIConfig
+from app.models.settings import AIConfig, UserAIPreference
+from app.models.system_ai_endpoint import SystemAIEndpoint
 from app.models.user import User
-from app.services.ai import CustomAIService
+from app.services.ai_probe import test_connection
+from app.services.presets import load_presets
 from app.utils.auth import (
     encrypt_api_key,
     get_current_user,
@@ -21,43 +34,58 @@ from app.utils.security import RateLimitDep, sanitize_url
 
 router = APIRouter(prefix="/api/settings", tags=["設定"])
 
-# Gemini 可選模型（官方 model codes）；使用者亦可自填其他 id
-GEMINI_MODEL_OPTIONS = [
-    "gemini-3-flash-preview",
-    "gemini-3.5-flash",
-    "gemini-3.6-flash",
-]
-# 未指定時的 Gemini 預設（最新穩定版）
-GEMINI_DEFAULT_MODEL = "gemini-3.6-flash"
+
+# ========== Schemas ==========
 
 
-class AIConfigRequest(BaseModel):
-    """AI 設定請求"""
+class ConnectionRequest(BaseModel):
+    """連線新增/更新請求"""
 
-    provider: str = Field(..., description="'gemini' | 'local' | 'openai'")
-    name: Optional[str] = Field(
-        None, description="用戶自訂的 AI 服務名稱", max_length=50
-    )
-    model: Optional[str] = Field(
-        None, description="AI 模型名稱（OpenAI 必填；Gemini 選填，未填用最新穩定版）",
-        max_length=100,
-    )
-    api_key: Optional[str] = Field(None, description="Gemini/OpenAI API Key")
-    local_url: Optional[str] = Field(None, description="Local AI URL")
-    local_model: Optional[str] = Field(None, description="Local AI Model (向後相容)")
+    name: Optional[str] = Field(None, description="服務顯示名稱", max_length=50)
+    base_url: Optional[str] = Field(None, description="OpenAI-compatible 服務位址")
+    api_key: Optional[str] = Field(None, description="API Key")
+    preset_id: Optional[str] = Field(None, description="對應內建服務清單 id")
 
 
-class AIConfigResponse(BaseModel):
-    """AI 設定回應"""
-
+class ConnectionResponse(BaseModel):
     id: int
-    provider: str
     name: Optional[str]
-    model: Optional[str]  # 實際使用的模型名稱
+    base_url: Optional[str]
+    preset_id: Optional[str]
     has_api_key: bool
-    local_url: Optional[str]
-    local_model: Optional[str]
-    is_active: bool
+    models: List[dict] = []
+
+
+class ModelEntry(BaseModel):
+    id: str = Field(..., min_length=1, max_length=150)
+    label: Optional[str] = None
+    enabled: bool = True
+    params: Optional[dict] = None
+
+
+class ModelsRequest(BaseModel):
+    models: List[ModelEntry] = Field(..., max_length=200)
+
+
+class ModelEntryOut(BaseModel):
+    connection_id: Optional[int]
+    connection_name: str
+    model_id: str
+    label: Optional[str] = None
+    source: str  # "system" | "user"
+    params: Optional[dict] = None
+
+
+class ModelsListResponse(BaseModel):
+    models: List[ModelEntryOut]
+    default: dict
+
+
+class DefaultModelRequest(BaseModel):
+    connection_id: Optional[int] = Field(
+        None, description="NULL 代表系統免費模型"
+    )
+    model_id: str = Field(..., min_length=1, max_length=150)
 
 
 class TestConnectionRequest(BaseModel):
@@ -67,14 +95,277 @@ class TestConnectionRequest(BaseModel):
 
 
 class TestConnectionResponse(BaseModel):
-    """測試連線回應"""
-
     success: bool
     models: List[str] = []
     error: Optional[str] = None
 
 
-# ========== Endpoints ==========
+# ========== Presets ==========
+
+
+@router.get("/ai/presets")
+def list_presets(current_user: User = Depends(get_current_user)):
+    """內建服務清單（新增連線時挑選服務）"""
+    return load_presets()
+
+
+# ========== 連線 CRUD ==========
+
+
+def _connection_out(config: AIConfig) -> ConnectionResponse:
+    return ConnectionResponse(
+        id=config.id,
+        name=config.name,
+        base_url=config.base_url,
+        preset_id=config.preset_id,
+        has_api_key=bool(config.api_key_encrypted),
+        models=config.models_list(),
+    )
+
+
+def _owned_connection(db: Session, config_id: int, user: User) -> AIConfig:
+    config = (
+        db.query(AIConfig)
+        .filter(AIConfig.id == config_id, AIConfig.user_id == user.id)
+        .first()
+    )
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="連線不存在")
+    return config
+
+
+def _sanitize_base_url(base_url: str, user: User) -> str:
+    """URL 格式驗證與清理（本機/私有位址已開放所有使用者，可連 Ollama 等）"""
+    try:
+        return sanitize_url(base_url, allow_private=True)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/ai", response_model=List[ConnectionResponse])
+def list_connections(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """取得使用者的服務連線清單"""
+    configs = db.query(AIConfig).filter(AIConfig.user_id == current_user.id).all()
+    return [_connection_out(c) for c in configs]
+
+
+@router.post("/ai", response_model=ConnectionResponse)
+def create_connection(
+    request: ConnectionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """新增服務連線（不自動選用；模型清單另外維護）"""
+    if not request.base_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="需要提供服務位址"
+        )
+
+    config = AIConfig(
+        user_id=current_user.id,
+        name=request.name,
+        base_url=_sanitize_base_url(request.base_url, current_user),
+        api_key_encrypted=encrypt_api_key(request.api_key) if request.api_key else None,
+        preset_id=request.preset_id,
+    )
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+    return _connection_out(config)
+
+# ========== 聚合模型清單與預設模型 ==========
+# （路由需註冊在 /ai/{config_id} 之前，避免被參數化路由搶先匹配）
+
+
+@router.get("/ai/models", response_model=ModelsListResponse)
+def list_selectable_models(
+    current_user: User = Depends(get_current_user_or_guest),
+    db: Session = Depends(get_db),
+):
+    """聚合可選模型清單（系統免費模型＋使用者的；訪客僅系統）"""
+    models = _system_model_entries(db)
+    default = {"connection_id": None, "model_id": None}
+    if current_user.role != "guest":
+        models.extend(_user_model_entries(db, current_user))
+        default = _default_preference(db, current_user)
+    return ModelsListResponse(models=models, default=default)
+
+
+@router.put("/ai/default-model")
+def set_default_model(
+    request: DefaultModelRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """設定「我的預設模型」（每次占卜的初始選擇）"""
+    if request.connection_id is None:
+        # 系統免費模型：驗證 model_id 在系統清單中
+        system_ids = [e.model_id for e in _system_model_entries(db)]
+        if request.model_id not in system_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="模型不在系統免費清單中",
+            )
+    else:
+        config = _owned_connection(db, request.connection_id, current_user)
+        enabled = config.enabled_model_ids()
+        if request.model_id not in enabled:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="模型不在連線的顯示清單中",
+            )
+
+    pref = (
+        db.query(UserAIPreference)
+        .filter(UserAIPreference.user_id == current_user.id)
+        .first()
+    )
+    if pref is None:
+        pref = UserAIPreference(user_id=current_user.id)
+        db.add(pref)
+    pref.default_connection_id = request.connection_id
+    pref.default_model_id = request.model_id
+    db.commit()
+    return {"message": "已設定預設模型"}
+
+
+
+@router.put("/ai/{config_id}", response_model=ConnectionResponse)
+def update_connection(
+    config_id: int,
+    request: ConnectionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """更新連線（名稱/位址/金鑰/preset）"""
+    config = _owned_connection(db, config_id, current_user)
+
+    if request.name is not None:
+        config.name = request.name
+    if request.base_url is not None:
+        config.base_url = _sanitize_base_url(request.base_url, current_user)
+    if request.preset_id is not None:
+        config.preset_id = request.preset_id
+    if request.api_key:
+        config.api_key_encrypted = encrypt_api_key(request.api_key)
+
+    db.commit()
+    db.refresh(config)
+    return _connection_out(config)
+
+
+@router.put("/ai/{config_id}/models", response_model=ConnectionResponse)
+def update_connection_models(
+    config_id: int,
+    request: ModelsRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """維護連線的模型清單（顯示/隱藏、排序、per-model 參數）"""
+    config = _owned_connection(db, config_id, current_user)
+
+    for entry in request.models:
+        if not entry.id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="模型 id 不可為空"
+            )
+
+    config.set_models_list(
+        [
+            {
+                "id": entry.id.strip(),
+                **({"label": entry.label} if entry.label else {}),
+                "enabled": entry.enabled,
+                **({"params": entry.params} if entry.params else {}),
+            }
+            for entry in request.models
+        ]
+    )
+    db.commit()
+    db.refresh(config)
+    return _connection_out(config)
+
+
+@router.delete("/ai/{config_id}")
+def delete_connection(
+    config_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """刪除連線（綁定此連線的舊紀錄追問時回落系統免費模型）"""
+    config = _owned_connection(db, config_id, current_user)
+
+    db.query(UserAIPreference).filter(
+        UserAIPreference.user_id == current_user.id,
+        UserAIPreference.default_connection_id == config_id,
+    ).update({"default_connection_id": None, "default_model_id": None})
+    db.delete(config)
+    db.commit()
+
+    return {"message": "已刪除"}
+
+
+def _system_model_entries(db: Session) -> List[ModelEntryOut]:
+    from app.services.endpoints import ensure_default_seed
+
+    endpoint = (
+        db.query(SystemAIEndpoint)
+        .filter(SystemAIEndpoint.is_default.is_(True), SystemAIEndpoint.is_active)
+        .order_by(SystemAIEndpoint.id)
+        .first()
+    ) or ensure_default_seed(db)
+    if endpoint is None:
+        return []
+
+    entries = []
+    for item in endpoint.models_list():
+        if not item.get("enabled", True):
+            continue
+        entries.append(
+            ModelEntryOut(
+                connection_id=None,
+                connection_name=endpoint.name,
+                model_id=item["id"],
+                label=item.get("label"),
+                source="system",
+                params=item.get("params"),
+            )
+        )
+    return entries
+
+
+def _user_model_entries(db: Session, user: User) -> List[ModelEntryOut]:
+    configs = db.query(AIConfig).filter(AIConfig.user_id == user.id).all()
+    entries = []
+    for config in configs:
+        for item in config.models_list():
+            if not item.get("enabled", True):
+                continue
+            entries.append(
+                ModelEntryOut(
+                    connection_id=config.id,
+                    connection_name=config.name or "我的服務",
+                    model_id=item["id"],
+                    label=item.get("label"),
+                    source="user",
+                    params=item.get("params"),
+                )
+            )
+    return entries
+
+
+def _default_preference(db: Session, user: User) -> dict:
+    pref = db.query(UserAIPreference).filter(UserAIPreference.user_id == user.id).first()
+    return {
+        "connection_id": pref.default_connection_id if pref else None,
+        "model_id": pref.default_model_id if pref else None,
+    }
+
+
+# ========== 系統預設資訊（相容舊選擇器） ==========
 
 
 @router.get("/ai/default-info")
@@ -82,261 +373,16 @@ def get_system_default_info(
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
-    """系統預設端點資訊（訪客與使用者共用；供 AI 選擇器統一顯示）"""
+    """系統預設端點資訊（訪客與使用者共用）"""
     from app.services.endpoints import ensure_default_seed, get_system_default
 
     endpoint = get_system_default(db) or ensure_default_seed(db)
     if endpoint is None:
         return {"name": "系統預設", "model": None}
-    return {"name": endpoint.name, "model": endpoint.model}
+    return {"name": endpoint.name, "model": endpoint.effective_default_model()}
 
 
-@router.get("/ai", response_model=List[AIConfigResponse])
-def get_ai_configs(
-    current_user: User = Depends(get_current_user_or_guest),
-    db: Session = Depends(get_db),
-):
-    """取得用戶的 AI 設定"""
-    if current_user.role == "guest":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="訪客無法存取設定功能，請註冊帳號",
-        )
-
-    configs = db.query(AIConfig).filter(AIConfig.user_id == current_user.id).all()
-
-    return [
-        AIConfigResponse(
-            id=c.id,
-            provider=c.provider,
-            name=c.name,
-            model=c.effective_model,  # 使用 property 取得實際模型
-            has_api_key=bool(c.api_key_encrypted),
-            local_url=c.local_url,
-            local_model=c.local_model,
-            is_active=c.is_active,
-        )
-        for c in configs
-    ]
-
-
-@router.post("/ai", response_model=AIConfigResponse)
-def create_ai_config(
-    request: AIConfigRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """新增 AI 設定"""
-    # 驗證
-    if request.provider == "gemini" and not request.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Gemini 需要提供 API Key"
-        )
-    if request.provider == "openai" and not request.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="OpenAI 需要提供 API Key"
-        )
-    if request.provider == "local" and not (request.local_url and request.local_model):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="自定義 AI 需要提供 URL 和模型",
-        )
-
-    # URL 安全清理與驗證
-    # 管理員可以使用 localhost/私有 IP
-    is_admin = current_user.role == "admin"
-
-    if request.provider == "local":
-        try:
-            request.local_url = sanitize_url(request.local_url, allow_private=is_admin)
-        except ValueError as e:
-            if not is_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="禁止連線到私有網路。只有管理員可以使用 localhost。",
-                )
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    # URL 安全清理與驗證
-    # 管理員可以使用 localhost/私有 IP
-    is_admin = current_user.role == "admin"
-
-    if request.provider == "local":
-        try:
-            request.local_url = sanitize_url(request.local_url, allow_private=is_admin)
-        except ValueError as e:
-            if not is_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="禁止連線到私有網路。只有管理員可以使用 localhost。",
-                )
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-    # 設定模型名稱
-    model_name = request.model
-
-    if request.provider == "gemini":
-        # Gemini：使用者可自選或自填模型 id；未填用最新穩定版
-        model_name = request.model or GEMINI_DEFAULT_MODEL
-    elif request.provider == "openai":
-        # OpenAI 使用用戶輸入，若無則預設 gpt-4o
-        model_name = request.model or "gpt-4o"
-    elif request.provider == "local":
-        # Local 優先使用 model，若無則使用 local_model (向後相容)
-        model_name = request.model or request.local_model
-
-    # 建立新設定：僅加入清單，不自動選用（選用一律經選擇器）
-    config = AIConfig(
-        user_id=current_user.id,
-        provider=request.provider,
-        name=request.name,
-        model=model_name,
-        api_key_encrypted=encrypt_api_key(request.api_key) if request.api_key else None,
-        local_url=request.local_url,
-        local_model=request.local_model,  # 保留向後相容
-        is_active=False,
-    )
-    db.add(config)
-    db.commit()
-    db.refresh(config)
-
-    return AIConfigResponse(
-        id=config.id,
-        provider=config.provider,
-        name=config.name,
-        model=config.effective_model,
-        has_api_key=bool(config.api_key_encrypted),
-        local_url=config.local_url,
-        local_model=config.local_model,
-        is_active=config.is_active,
-    )
-
-
-@router.put("/ai/use-default")
-def use_system_default(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """停用使用者所有自訂設定 → 解析回落到系統預設（Agnes）"""
-    db.query(AIConfig).filter(AIConfig.user_id == current_user.id).update(
-        {"is_active": False}
-    )
-    db.commit()
-    return {"message": "已切換回系統預設"}
-
-
-@router.put("/ai/{config_id}", response_model=AIConfigResponse)
-def update_ai_config(
-    config_id: int,
-    request: AIConfigRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """更新 AI 設定"""
-    config = (
-        db.query(AIConfig)
-        .filter(AIConfig.id == config_id, AIConfig.user_id == current_user.id)
-        .first()
-    )
-
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="設定不存在")
-
-    config.provider = request.provider
-    config.name = request.name
-
-    # 更新模型名稱
-    if request.provider == "gemini":
-        config.model = request.model or GEMINI_DEFAULT_MODEL
-    elif request.provider == "openai":
-        config.model = request.model or "gpt-4o"
-    elif request.provider == "local":
-        config.model = request.model or request.local_model
-
-    if request.api_key:
-        config.api_key_encrypted = encrypt_api_key(request.api_key)
-
-    # 管理員可以使用 localhost/私有 IP
-    is_admin = current_user.role == "admin"
-
-    if request.local_url:
-        try:
-            config.local_url = sanitize_url(request.local_url, allow_private=is_admin)
-        except ValueError as e:
-            if not is_admin:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="禁止連線到私有網路。只有管理員可以使用 localhost。",
-                )
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    else:
-        config.local_url = request.local_url
-
-    config.local_model = request.local_model
-
-    db.commit()
-    db.refresh(config)
-
-    return AIConfigResponse(
-        id=config.id,
-        provider=config.provider,
-        name=config.name,
-        model=config.effective_model,
-        has_api_key=bool(config.api_key_encrypted),
-        local_url=config.local_url,
-        local_model=config.local_model,
-        is_active=config.is_active,
-    )
-
-
-@router.put("/ai/{config_id}/activate")
-def activate_ai_config(
-    config_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """啟用 AI 設定"""
-    config = (
-        db.query(AIConfig)
-        .filter(AIConfig.id == config_id, AIConfig.user_id == current_user.id)
-        .first()
-    )
-
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="設定不存在")
-
-    # 停用其他設定
-    db.query(AIConfig).filter(AIConfig.user_id == current_user.id).update(
-        {"is_active": False}
-    )
-
-    # 啟用此設定
-    config.is_active = True
-    db.commit()
-
-    return {"message": "已啟用"}
-
-
-@router.delete("/ai/{config_id}")
-def delete_ai_config(
-    config_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """刪除 AI 設定"""
-    config = (
-        db.query(AIConfig)
-        .filter(AIConfig.id == config_id, AIConfig.user_id == current_user.id)
-        .first()
-    )
-
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="設定不存在")
-
-    db.delete(config)
-    db.commit()
-
-    return {"message": "已刪除"}
+# ========== 連線測試 ==========
 
 
 @router.post("/ai/test", response_model=TestConnectionResponse)
@@ -347,41 +393,31 @@ async def test_ai_connection(
     _: None = Depends(RateLimitDep(max_requests=5, window_seconds=60)),
 ):
     """
-    測試 AI 連線
-
-    注意：只有管理員可以使用 localhost/私有 IP 進行測試
+    測試 AI 連線（探測 /models 回傳候選模型清單）；
+    本機/私有位址已開放所有使用者。
     """
     import logging
 
     security_logger = logging.getLogger("security.audit")
 
-    # 記錄連線測試嘗試
     client_ip = request.client.host if request.client else "unknown"
-    is_admin = current_user.role == "admin"
 
     security_logger.info(
         f"AI Connection Test | IP: {client_ip} | User: {current_user.username} | "
-        f"Admin: {is_admin} | URL: {body.url}"
+        f"URL: {body.url}"
     )
 
     try:
-        url = sanitize_url(body.url, allow_private=is_admin)
+        url = sanitize_url(body.url, allow_private=True)
     except ValueError as e:
         security_logger.warning(
             f"AI Connection Test BLOCKED | IP: {client_ip} | User: {current_user.username} | "
             f"URL: {body.url} | Reason: {str(e)}"
         )
-        if is_admin:
-            return TestConnectionResponse(success=False, error=str(e))
-        else:
-            return TestConnectionResponse(
-                success=False,
-                error="禁止連線到私有網路。只有管理員可以測試 localhost。",
-            )
+        return TestConnectionResponse(success=False, error=str(e))
 
-    result = await CustomAIService.test_connection(url)
+    result = await test_connection(url)
 
-    # 記錄結果
     if result.get("success"):
         security_logger.info(
             f"AI Connection Test SUCCESS | IP: {client_ip} | URL: {url} | "

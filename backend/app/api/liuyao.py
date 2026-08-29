@@ -5,7 +5,7 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,6 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.history import History
 from app.models.user import User
-from app.services.ai_tasks import process_liuyao_task
 from app.services.liuyao import perform_divination
 from app.utils.auth import get_current_user, get_current_user_or_guest
 
@@ -33,11 +32,10 @@ class LiuYaoRequest(BaseModel):
         None, description="'self' | 'parent' | 'friend' | 'other'"
     )
     use_default_ai: bool = Field(
-        default=False, description="使用者明確選擇使用預設 AI 服務"
+        default=False, description="（已棄用，僅相容舊客戶端）"
     )
     mode: str = Field(
-        default="legacy",
-        description="'legacy'（背景任務+輪詢）| 'thread'（立即返回+SSE 串流）",
+        default="thread", description="（已棄用，僅接受 thread 模式）"
     )
 
 
@@ -59,11 +57,10 @@ class DivinationResponse(BaseModel):
 async def create_liuyao_divination(
     liuyao_request: LiuYaoRequest,
     request: Request,
-    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
-    """六爻占卜"""
+    """六爻占卜（盤面生成後由前端開啟 SSE 串流取得解盤）"""
     try:
         if current_user.role == "guest":
             from app.utils.security import check_guest_daily_limit
@@ -85,32 +82,18 @@ async def create_liuyao_divination(
             target=liuyao_request.target,
             chart_data=json.dumps(result, ensure_ascii=False),
             status="pending",
-            ai_provider="default" if liuyao_request.use_default_ai else None,
+            ai_provider="default",
         )
         db.add(history)
         db.commit()
         db.refresh(history)
 
-        if liuyao_request.mode == "thread":
-            # 新管線（ADR-0002）：不排背景任務，前端接 SSE 串流
-            return DivinationResponse(
-                id=history.id,
-                status=history.status,
-                coins=result["yaogua"],
-                chart_data=result,
-                message="盤面已生成，請開啟串流取得解盤。",
-            )
-
-        background_tasks.add_task(
-            process_liuyao_task, history.id, settings.DATABASE_URL
-        )
-
         return DivinationResponse(
             id=history.id,
-            status="pending",
+            status=history.status,
             coins=result["yaogua"],
             chart_data=result,
-            message="占卜已開始，AI 正在解盤中...",
+            message="盤面已生成，請開啟串流取得解盤。",
         )
     except HTTPException:
         raise

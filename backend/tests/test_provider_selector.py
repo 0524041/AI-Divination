@@ -13,73 +13,40 @@ from app.utils.auth import encrypt_api_key
 # --- Gemini 設定：模型可選可自填 ---
 
 
-def test_create_gemini_config_with_chosen_model(client, auth_headers, make_user):
-    make_user(username="gemini-user")
-    response = client.post(
-        "/api/settings/ai",
-        json={"provider": "gemini", "model": "gemini-3.5-flash", "api_key": "g-key"},
-        headers=auth_headers("gemini-user"),
-    )
-    assert response.status_code == 200
-    assert response.json()["model"] == "gemini-3.5-flash"
-
-
-def test_create_gemini_config_defaults_to_latest_stable(client, auth_headers, make_user):
-    from app.api.settings import GEMINI_DEFAULT_MODEL
-
-    make_user(username="gemini-default-user")
-    response = client.post(
-        "/api/settings/ai",
-        json={"provider": "gemini", "api_key": "g-key"},
-        headers=auth_headers("gemini-default-user"),
-    )
-    assert response.status_code == 200
-    assert response.json()["model"] == GEMINI_DEFAULT_MODEL
-
-
-def test_update_gemini_config_changes_model(client, auth_headers, make_user):
-    make_user(username="gemini-update-user")
-    headers = auth_headers("gemini-update-user")
-    created = client.post(
-        "/api/settings/ai",
-        json={"provider": "gemini", "api_key": "g-key", "model": "gemini-3.5-flash"},
-        headers=headers,
-    ).json()
-
-    updated = client.put(
-        f"/api/settings/ai/{created['id']}",
-        json={"provider": "gemini", "model": "my-custom-gemini-id"},
-        headers=headers,
-    )
-    assert updated.status_code == 200
-    assert updated.json()["model"] == "my-custom-gemini-id"
-
-
-def _make_gemini_config(user_id: int, model: str) -> None:
+def _make_gemini_config(user_id: int, model: str) -> int:
     with SessionLocal() as db:
-        db.add(
-            AIConfig(
-                user_id=user_id,
-                provider="gemini",
-                name="我的 Gemini",
-                model=model,
-                api_key_encrypted=encrypt_api_key("g-key"),
-                is_active=True,
-            )
+        config = AIConfig(
+            user_id=user_id,
+            provider="gemini",
+            name="我的 Gemini",
+            model=model,
+            api_key_encrypted=encrypt_api_key("g-key"),
+            is_active=True,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+            preset_id="gemini",
+            models=f'[{{"id": "{model}", "enabled": true}}]',
         )
+        db.add(config)
         db.commit()
+        db.refresh(config)
+        return config.id
 
 
-# --- 解析：Gemini 經官方 OpenAI 相容層 ---
+# --- 解析：Gemini 經官方 OpenAI 相容層（明確指定連線×模型） ---
 
 
 def test_resolve_gemini_config_uses_google_compat_endpoint(make_user):
     from app.services.endpoints import resolve_endpoint
 
     user = make_user(username="gemini-resolve")
-    _make_gemini_config(user.id, "gemini-3.6-flash")
+    connection_id = _make_gemini_config(user.id, "gemini-3.6-flash")
 
-    resolved = resolve_endpoint(SessionLocal(), user_id=user.id)
+    resolved = resolve_endpoint(
+        SessionLocal(),
+        user_id=user.id,
+        connection_id=connection_id,
+        model_id="gemini-3.6-flash",
+    )
     assert resolved.source == "user"
     assert resolved.model == "gemini-3.6-flash"
     assert resolved.base_url == "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -103,60 +70,11 @@ def test_resolve_without_user_config_falls_back_to_system_default(make_user, fak
     assert resolved.source == "system"
 
 
-def test_use_default_deactivates_configs_and_falls_back(client, auth_headers, make_user, fake_ai):
-    """「使用系統預設」：停用全部自訂設定後，解析真正回到 Agnes"""
-    from app.services.endpoints import ensure_default_seed, resolve_endpoint
-    from app.utils.auth import encrypt_api_key
-
-    with SessionLocal() as db:
-        endpoint = ensure_default_seed(db)
-        endpoint.base_url = fake_ai.base_url
-        endpoint.model = "fake-model"
-        endpoint.api_key_encrypted = encrypt_api_key("sk-test")
-        db.commit()
-
-    make_user(username="use-default-user")
-    headers = auth_headers("use-default-user")
-
-    created = client.post(
-        "/api/settings/ai",
-        json={"provider": "gemini", "api_key": "g-key", "model": "gemini-3.5-flash"},
-        headers=headers,
-    )
-    assert created.status_code == 200
-    # 新增不自動選用：先經選擇器語義（activate）選它
-    activated = client.put(f"/api/settings/ai/{created.json()['id']}/activate", headers=headers)
-    assert activated.status_code == 200
-
-    with SessionLocal() as db:
-        user_id = db.query(AIConfig).first().user_id
-        assert resolve_endpoint(SessionLocal(), user_id=user_id).source == "user"
-
-    response = client.put("/api/settings/ai/use-default", headers=headers)
-    assert response.status_code == 200
-
-    with SessionLocal() as db:
-        actives = db.query(AIConfig).filter(AIConfig.user_id == user_id, AIConfig.is_active).count()
-        assert actives == 0
-        resolved = resolve_endpoint(SessionLocal(), user_id=user_id)
-        assert resolved.source == "system"
+# （舊「activate/use-default」全域切換測試已隨新語意移除：
+#   模型選擇改為綁定紀錄，見 tests/test_record_binding.py）
 
 
 # --- default-info：訪客可讀的系統預設資訊 ---
-
-
-def test_create_does_not_auto_activate(client, auth_headers, make_user):
-    """新增設定只是加進清單，不自動選用（選用一律經選擇器）"""
-    make_user(username="no-auto-user")
-    headers = auth_headers("no-auto-user")
-
-    created = client.post(
-        "/api/settings/ai",
-        json={"provider": "gemini", "api_key": "g-key", "model": "gemini-3.5-flash"},
-        headers=headers,
-    )
-    assert created.status_code == 200
-    assert created.json()["is_active"] is False
 
 
 def test_default_info_accessible(client, auth_headers, make_user):

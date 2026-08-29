@@ -1,0 +1,71 @@
+{
+  "presets": [
+    {
+      "id": "agnes",
+      "name": "Agnes",
+      "base_url": "https://apihub.agnes-ai.com/v1",
+      "requires_api_key": true,
+      "models": [
+        {
+          "id": "agnes-2.0-flash",
+          "label": "Agnes 2.0 Flash",
+          "params": {"reasoning_param": "reasoning_effort", "reasoning_value": "high"}
+        }
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "requires_api_key": true,
+      "models": [
+        {"id": "gemini-3.6-flash", "label": "Gemini 3.6 Flash"},
+        {"id": "gemini-3.5-flash", "label": "Gemini 3.5 Flash"},
+        {"id": "gemini-3-flash-preview", "label": "Gemini 3 Flash (Preview)"}
+      ]
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "base_url": "https://api.openai.com/v1",
+      "requires_api_key": true,
+      "models": [
+        {"id": "gpt-5.1", "label": "GPT-5.1"},
+        {"id": "gpt-4o", "label": "GPT-4o"}
+      ]
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "requires_api_key": true,
+      "models": []
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama（本機）",
+      "base_url": "http://localhost:11434/v1",
+      "requires_api_key": false,
+      "models": [
+        {"id": "llama3", "params": {"reasoning_param": null}},
+        {"id": "qwen2.5:14b", "params": {"reasoning_param": null}}
+      ]
+    },
+    {
+      "id": "lmstudio",
+      "name": "LM Studio（本機）",
+      "base_url": "http://localhost:1234/v1",
+      "requires_api_key": false,
+      "models": [
+        {"id": "local-model", "params": {"reasoning_param": null}}
+      ]
+    },
+    {
+      "id": "custom",
+      "name": "自訂服務",
+      "base_url": "",
+      "requires_api_key": false,
+      "models": []
+    }
+  ]
+}

@@ -54,31 +54,15 @@ def run_migrations():
     import sqlite3
     from pathlib import Path
 
+    from app.core.schema_migrations import migrate_ai_model_columns
+
     db_path = Path(settings.DATABASE_URL.replace("sqlite:///", ""))
     if not db_path.exists():
         return
 
     conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    migrations = [
-        {
-            "table": "ai_configs",
-            "column": "name",
-            "sql": "ALTER TABLE ai_configs ADD COLUMN name VARCHAR(50)",
-        },
-    ]
-
     try:
-        for migration in migrations:
-            cursor.execute(f"PRAGMA table_info({migration['table']})")
-            columns = [col[1] for col in cursor.fetchall()]
-
-            if migration["column"] not in columns:
-                cursor.execute(migration["sql"])
-                print(f"✓ 遷移完成: {migration['table']}.{migration['column']}")
-
-        conn.commit()
+        migrate_ai_model_columns(conn)
     except sqlite3.Error as e:
         print(f"✗ 遷移失敗: {e}")
         conn.rollback()

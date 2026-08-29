@@ -5,14 +5,13 @@
 import json
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.history import History
-from app.services.ai_tasks import process_tarot_task
 from app.utils.auth import get_current_user, get_current_user_or_guest
 
 router = APIRouter(prefix="/api/tarot", tags=["塔羅"])
@@ -36,20 +35,17 @@ class TarotRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500)
     cards: Optional[List[TarotCard]] = Field(
         default=None,
-        min_items=1,
-        max_items=10,
-        description="legacy 模式必填（前端抽牌）；thread 模式由後端抽取",
+        description="（已棄用，僅相容舊客戶端）牌面一律由後端抽取",
     )
     spread_type: str = Field(
         default="three_card",
         pattern="^(three_card|single|celtic_cross)$",
     )  # "three_card", "single", "celtic_cross"
     use_default_ai: bool = Field(
-        default=False, description="使用者明確選擇使用預設 AI 服務"
+        default=False, description="（已棄用，僅相容舊客戶端）"
     )
     mode: str = Field(
-        default="legacy",
-        description="'legacy'（背景任務+輪詢）| 'thread'（後端抽牌+SSE 串流）",
+        default="thread", description="（已棄用，僅接受 thread 模式）"
     )
 
 
@@ -70,11 +66,10 @@ class TarotResponse(BaseModel):
 async def create_tarot_divination(
     tarot_request: TarotRequest,
     http_request: Request,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user_or_guest),
 ):
-    """建立塔羅占卜"""
+    """建立塔羅占卜（牌面由後端抽取，解盤經 SSE 串流）"""
 
     if current_user.role == "guest":
         from app.utils.security import check_guest_daily_limit
@@ -92,31 +87,11 @@ async def create_tarot_divination(
         "celtic_cross": "凱爾特十字",
     }
 
-    is_thread = tarot_request.mode == "thread"
+    # 牌面由後端決定（前端不再送牌）
+    from app.services.tarot_draw import draw_cards, validate_cards
 
-    if is_thread:
-        # 新管線：牌面由後端決定（前端不再送牌）
-        from app.services.tarot_draw import draw_cards, validate_cards
-
-        cards = draw_cards(tarot_request.spread_type)
-        validate_cards(cards, tarot_request.spread_type)
-    else:
-        if not tarot_request.cards:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="legacy 模式必須提供 cards",
-            )
-        from fastapi import HTTPException as _HTTPException
-
-        from app.services.tarot_draw import validate_cards
-
-        cards = [card.dict() for card in tarot_request.cards]
-        try:
-            validate_cards(
-                [{**c, "id": int(c["id"])} for c in cards], tarot_request.spread_type
-            )
-        except ValueError as exc:
-            raise _HTTPException(status_code=422, detail=str(exc))
+    cards = draw_cards(tarot_request.spread_type)
+    validate_cards(cards, tarot_request.spread_type)
 
     chart_data = {
         "spread": tarot_request.spread_type,
@@ -131,31 +106,19 @@ async def create_tarot_divination(
         question=tarot_request.question,
         chart_data=json.dumps(chart_data, ensure_ascii=False),
         status="pending",
-        ai_provider="default" if tarot_request.use_default_ai else None,
+        ai_provider="default",
     )
 
     db.add(history)
     db.commit()
     db.refresh(history)
 
-    if is_thread:
-        return TarotResponse(
-            id=history.id,
-            status=history.status,
-            message="牌陣已生成，請開啟串流取得解盤。",
-            coins=[card["reversed"] for card in cards],
-            chart_data=chart_data,
-        )
-
-    db_url = settings.DATABASE_URL
-    if db_url.startswith("sqlite"):
-        if "///" not in db_url:
-            db_url = db_url.replace("sqlite://", "sqlite:///")
-
-    background_tasks.add_task(process_tarot_task, history.id, db_url)
-
     return TarotResponse(
-        id=history.id, status="pending", message="塔羅占卜已建立，正在進行 AI 解盤..."
+        id=history.id,
+        status=history.status,
+        message="牌陣已生成，請開啟串流取得解盤。",
+        coins=[card["reversed"] for card in cards],
+        chart_data=chart_data,
     )
 
 

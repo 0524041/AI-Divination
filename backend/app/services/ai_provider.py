@@ -18,12 +18,39 @@ from dataclasses import dataclass
 
 import httpx
 
-# --- 固定請求參數（刻意不設設定檔/DB 欄位：管理者不可調） ---
+# --- 固定請求參數（全域預設；可被 preset／連線的 per-model 參數覆蓋） ---
 REQUEST_TEMPERATURE = 0.9
 THINKING_LEVEL = 0.9
 DEFAULT_TIMEOUT_SECONDS = 300.0
 # 推理型模型會先輸出大量 reasoning_content，預留足夠空間給正文
 MAX_OUTPUT_TOKENS = 16384
+
+
+class _Unset:
+    """區分「未指定」（繼承上層/預設）與 None（明確停用）的 sentinel"""
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+UNSET = _Unset()
+
+
+@dataclass
+class ModelCallParams:
+    """單一模型的呼叫參數（spec: ai-model-selection）
+
+    - UNSET：未指定（合併時繼承上層）
+    - reasoning_param: 思考參數名稱（如 "reasoning_effort"、"thinking_level"）；
+      None 表示此模型不送任何思考參數
+    - reasoning_value: 思考程度值（字串 low/medium/high 或數值；Agnes 閘道只收字串）
+    - temperature / max_tokens: UNSET 時用全域預設
+    """
+
+    reasoning_param: str | None | _Unset = UNSET
+    reasoning_value: str | int | None | _Unset = UNSET
+    temperature: float | None | _Unset = UNSET
+    max_tokens: int | None | _Unset = UNSET
 
 
 def effort_label(level: float) -> str:
@@ -33,6 +60,43 @@ def effort_label(level: float) -> str:
     if level < 0.67:
         return "medium"
     return "high"
+
+
+DEFAULT_CALL_PARAMS = ModelCallParams(
+    reasoning_param="reasoning_effort",
+    reasoning_value=effort_label(THINKING_LEVEL),
+    temperature=REQUEST_TEMPERATURE,
+    max_tokens=MAX_OUTPUT_TOKENS,
+)
+
+
+def merge_call_params(*layers: ModelCallParams | None) -> ModelCallParams:
+    """逐層合併呼叫參數：後層非 UNSET 的欄位覆蓋前層（None 是明確值，會覆蓋）"""
+    merged = ModelCallParams()
+    for layer in layers:
+        if layer is None:
+            continue
+        for field in ("reasoning_param", "reasoning_value", "temperature", "max_tokens"):
+            value = getattr(layer, field)
+            if value is not UNSET:
+                setattr(merged, field, value)
+    return merged
+
+
+def call_params_from_dict(raw: dict | None) -> ModelCallParams | None:
+    """由 JSON 模型項目的 params dict 轉為 ModelCallParams
+
+    未出現的欄位保持 UNSET；"reasoning_param": null 表示明確停用。
+    raw 為空或非 dict → None（不覆蓋）。
+    """
+    if not isinstance(raw, dict) or not raw:
+        return None
+    return ModelCallParams(
+        reasoning_param=raw.get("reasoning_param", UNSET),
+        reasoning_value=raw.get("reasoning_value", UNSET),
+        temperature=raw.get("temperature", UNSET),
+        max_tokens=raw.get("max_tokens", UNSET),
+    )
 
 
 def completions_url(base_url: str) -> str:
@@ -68,10 +132,12 @@ class OpenAICompatProvider:
         model: str,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         client: httpx.AsyncClient | None = None,
+        call_params: ModelCallParams | None = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
+        self._call_params = call_params
         self._client = client or httpx.AsyncClient(timeout=timeout_seconds)
         self.last_usage: StreamUsage | None = None
         self.last_duration_ms: int | None = None
@@ -81,21 +147,34 @@ class OpenAICompatProvider:
         await self._client.aclose()
 
     async def stream_messages(
-        self, messages: list[dict[str, str]]
+        self,
+        messages: list[dict[str, str]],
+        call_params: ModelCallParams | None = None,
     ) -> AsyncIterator[dict]:
         """逐 delta 產生 {"type": "thinking"|"text", "text": str}
 
         完成後 last_usage 讀取 token 用量；失敗時 raise AIProviderError。
+        call_params 覆蓋全域預設（spec: per-model 呼叫參數）。
         """
+        params = merge_call_params(DEFAULT_CALL_PARAMS, self._call_params, call_params)
         self.last_usage = None
-        payload = {
+        payload: dict = {
             "model": self.model,
             "messages": messages,
-            "temperature": REQUEST_TEMPERATURE,
-            "max_tokens": MAX_OUTPUT_TOKENS,
-            "reasoning_effort": effort_label(THINKING_LEVEL),
             "stream": True,
         }
+        if params.temperature is UNSET:
+            payload["temperature"] = REQUEST_TEMPERATURE
+        else:
+            payload["temperature"] = params.temperature
+        if params.max_tokens is UNSET:
+            payload["max_tokens"] = MAX_OUTPUT_TOKENS
+        else:
+            payload["max_tokens"] = params.max_tokens
+        if params.reasoning_param is UNSET:
+            payload["reasoning_effort"] = effort_label(THINKING_LEVEL)
+        elif params.reasoning_param and params.reasoning_value is not None:
+            payload[params.reasoning_param] = params.reasoning_value
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",

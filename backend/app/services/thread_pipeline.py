@@ -153,11 +153,19 @@ async def stream_interpretation_preclaimed(
     *,
     user_id: int,
     heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
+    connection_id: int | None = None,
+    model_id: str | None = None,
+    use_system: bool = False,
 ) -> AsyncIterator[str]:
     """slot 已由路由層佔用；直接跑內部串流，不再重複檢查"""
     try:
         async for event in _stream_inner(
-            record_id, user_id=user_id, heartbeat_interval=heartbeat_interval
+            record_id,
+            user_id=user_id,
+            heartbeat_interval=heartbeat_interval,
+            connection_id=connection_id,
+            model_id=model_id,
+            use_system=use_system,
         ):
             yield event
     finally:
@@ -223,11 +231,15 @@ async def stream_followup(
     heartbeat_interval: float = HEARTBEAT_INTERVAL_SECONDS,
     persist_user: bool = True,
     preclaimed: bool = False,
+    connection_id: int | None = None,
+    model_id: str | None = None,
+    use_system: bool = False,
 ) -> AsyncIterator[str]:
     """追問：持久化 user 訊息 → 串流回應 → 持久化 assistant 訊息
 
     重試路徑傳 persist_user=False（問題已存在，避免重複）；
     路由層已預佔 slot 時傳 preclaimed=True（略過內部檢查）。
+    帶 connection_id/model_id/use_system 時切換模型並同步紀錄綁定。
     """
     if not preclaimed:
         if record_id in _active_streams:
@@ -240,6 +252,9 @@ async def stream_followup(
             question=question,
             heartbeat_interval=heartbeat_interval,
             persist_user=persist_user,
+            connection_id=connection_id,
+            model_id=model_id,
+            use_system=use_system,
         ):
             yield event
     finally:
@@ -253,6 +268,9 @@ async def _stream_followup_inner(
     question: str,
     heartbeat_interval: float,
     persist_user: bool = True,
+    connection_id: int | None = None,
+    model_id: str | None = None,
+    use_system: bool = False,
 ) -> AsyncIterator[str]:
     with SessionLocal() as db:
         record = db.query(History).filter(History.id == record_id).first()
@@ -261,12 +279,27 @@ async def _stream_followup_inner(
             return
 
         try:
-            resolved = endpoint_service.resolve_endpoint(
-                db, user_id=user_id, use_system=(record.ai_provider == "default")
+            resolved = endpoint_service.resolve_endpoint_for_record(
+                db,
+                record,
+                user_id=user_id,
+                connection_id=connection_id,
+                model_id=model_id,
+                use_system=use_system,
             )
+        except ValueError as exc:
+            yield _sse("error", {"kind": "invalid_model", "message": str(exc)})
+            return
         except LookupError as exc:
             yield _sse("error", {"kind": "no_endpoint", "message": str(exc)})
             return
+
+    # 綁定寫入獨立 session（避免 expire 影響後續對 record 的存取）
+    with SessionLocal() as db:
+        bound = db.query(History).filter(History.id == record_id).first()
+        if bound is not None:
+            _bind_record_selection(bound, resolved)
+            db.commit()
 
     # 先落一則 user 訊息（即使後續失敗，問題也不會丟失）
     if persist_user:
@@ -558,11 +591,24 @@ async def stream_interpretation(
         _active_streams.discard(record_id)
 
 
+def _bind_record_selection(record, resolved) -> None:
+    """將本次實際使用的連線×模型寫入紀錄（spec: 紀錄綁定）"""
+    record.ai_connection_id = (
+        resolved.endpoint_id if resolved.source == "user" else None
+    )
+    record.ai_model = resolved.model
+    if record.ai_provider != "default":
+        record.ai_provider = "default"
+
+
 async def _stream_inner(
     record_id: int,
     *,
     user_id: int,
     heartbeat_interval: float,
+    connection_id: int | None = None,
+    model_id: str | None = None,
+    use_system: bool = False,
 ) -> AsyncIterator[str]:
     with SessionLocal() as db:
         record = db.query(History).filter(History.id == record_id).first()
@@ -577,12 +623,20 @@ async def _stream_inner(
             return
 
         try:
-            resolved = endpoint_service.resolve_endpoint(
+            resolved = endpoint_service.resolve_endpoint_for_record(
                 db,
-                user_id=user_id if record.ai_provider != "default" else None,
-                use_system=(record.ai_provider == "default"),
+                record,
+                user_id=user_id,
+                connection_id=connection_id,
+                model_id=model_id,
+                use_system=use_system,
             )
+            _bind_record_selection(record, resolved)
+            db.commit()
             system_prompt, user_message = _build_first_messages(record)
+        except ValueError as exc:
+            yield _sse("error", {"kind": "invalid_model", "message": str(exc)})
+            return
         except NotImplementedError as exc:
             yield _sse("error", {"kind": "upstream", "message": str(exc)})
             return

@@ -22,10 +22,10 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DIR}/test.db"
 # 明確提供金鑰，避免測試觸碰/生成 backend 下的金鑰檔
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pytest")
 os.environ.setdefault("ENCRYPTION_KEY", Fernet.generate_key().decode())
-os.environ.setdefault("OPENCODE_API_KEY", "test-opencode-key")
 os.environ.setdefault("AGNES_API_KEY", "test-agnes-key")
 os.environ.setdefault("AGNES_BASE_URL", "https://apihub.agnes-ai.com/v1")
 os.environ.setdefault("AGNES_MODEL_ID", "agnes-2.0-flash")
+os.environ.setdefault("AI_PROBE_MODELS", "false")  # 測試不對外探測模型清單
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402

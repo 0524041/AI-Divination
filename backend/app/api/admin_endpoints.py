@@ -35,6 +35,8 @@ class EndpointIn(BaseModel):
     base_url: str = Field(..., min_length=1, max_length=255)
     api_key: str = Field(..., min_length=1)
     model: str = Field(..., min_length=1, max_length=100)
+    models: list[dict] | None = Field(None, description="免費模型清單 [{id, enabled}]")
+    default_model: str | None = Field(None, description="預設免費模型 id")
 
 
 class EndpointOut(BaseModel):
@@ -42,6 +44,8 @@ class EndpointOut(BaseModel):
     name: str
     base_url: str
     model: str
+    models: list[dict] = []
+    default_model: str | None = None
     is_default: bool
     is_active: bool
     key_preview: str  # 僅尾四碼
@@ -67,6 +71,8 @@ def _to_out(endpoint: SystemAIEndpoint) -> EndpointOut:
         name=endpoint.name,
         base_url=endpoint.base_url,
         model=endpoint.model,
+        models=endpoint.models_list(),
+        default_model=endpoint.default_model,
         is_default=endpoint.is_default,
         is_active=endpoint.is_active,
         key_preview=preview,
@@ -99,6 +105,10 @@ def create_endpoint(
         is_default=False,
         is_active=True,
     )
+    if payload.models is not None:
+        endpoint.set_models_list(payload.models)
+    if payload.default_model:
+        endpoint.default_model = payload.default_model
     db.add(endpoint)
     db.commit()
     db.refresh(endpoint)
@@ -119,6 +129,10 @@ def update_endpoint(
     endpoint.base_url = payload.base_url.rstrip("/")
     endpoint.api_key_encrypted = encrypt_api_key(payload.api_key)
     endpoint.model = payload.model
+    if payload.models is not None:
+        endpoint.set_models_list(payload.models)
+    if payload.default_model:
+        endpoint.default_model = payload.default_model
     db.commit()
     return _to_out(endpoint)
 

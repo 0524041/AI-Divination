@@ -32,6 +32,31 @@ router = APIRouter(prefix="/api/records", tags=["thread"])
 
 class FollowupRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=1000)
+    connection_id: str | None = Field(
+        None, description="切換模型：使用者連線 id 或 'system'（切回系統免費模型）"
+    )
+    model_id: str | None = Field(None, description="切換模型：模型 id")
+
+
+def _parse_connection_id(value: str | None) -> int | None:
+    """"system"/空 → None（系統免費模型）；數字字串 → 連線 id"""
+    if not value or value == "system":
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="無效的 connection_id"
+        )
+
+
+def _model_switch(connection_value: str | None, model_value: str | None) -> dict:
+    """組出模型切換參數（明確 'system' 時強制使用系統免費模型）"""
+    return {
+        "connection_id": _parse_connection_id(connection_value),
+        "model_id": model_value or None,
+        "use_system": (connection_value or "") == "system",
+    }
 
 
 def _authenticate(token: str) -> User:
@@ -121,14 +146,19 @@ async def stream_record(
     record_id: int,
     token: str = Query(default=""),
     heartbeat: float = Query(default=15.0, gt=0, le=60),
+    connection_id: str = Query(default="", description="使用者連線 id 或 'system'"),
+    model_id: str = Query(default="", description="本次使用的模型 id"),
 ):
-    """訂閱占卜紀錄的首解串流"""
+    """訂閱占卜紀錄的首解串流（選擇會綁定到紀錄）"""
     user = _authenticate(token)
     _guard(record_id, user, check_slot=True)
 
     return _sse_response(
         lambda: stream_interpretation_preclaimed(
-            record_id, user_id=user.id, heartbeat_interval=heartbeat
+            record_id,
+            user_id=user.id,
+            heartbeat_interval=heartbeat,
+            **_model_switch(connection_id, model_id),
         ),
         record_id,
     )
@@ -141,7 +171,7 @@ async def followup_record(
     token: str = Query(default=""),
     heartbeat: float = Query(default=15.0, gt=0, le=60),
 ):
-    """追問：問題持久化後，回應以 SSE 串流送達"""
+    """追問：問題持久化後，回應以 SSE 串流送達（可帶模型切換）"""
     user = _authenticate(token)
     _guard(record_id, user, check_slot=True)
 
@@ -152,6 +182,7 @@ async def followup_record(
             question=body.question,
             heartbeat_interval=heartbeat,
             preclaimed=True,
+            **_model_switch(body.connection_id, body.model_id),
         ),
         record_id,
     )

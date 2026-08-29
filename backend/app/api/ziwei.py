@@ -12,7 +12,6 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.history import History
 from app.models.user import User
-from app.services.ai_tasks import process_ziwei_task
 from app.utils.auth import get_current_user, get_current_user_or_guest
 
 router = APIRouter(prefix="/api/ziwei", tags=["紫微斗數"], redirect_slashes=False)
@@ -35,11 +34,10 @@ class ZiweiDivinationRequest(BaseModel):
         None  # Make optional as we generate it in backend now
     )
     use_default_ai: bool = Field(
-        default=False, description="使用者明確選擇使用預設 AI 服務"
+        default=False, description="（已棄用，僅相容舊客戶端）"
     )
     mode: str = Field(
-        default="legacy",
-        description="'legacy'（背景任務+輪詢）| 'thread'（驗證後立即返回+SSE 串流）",
+        default="thread", description="（已棄用，僅接受 thread 模式）"
     )
 
 
@@ -70,16 +68,13 @@ async def create_divination(
     if data.query_type != "natal" and not data.query_date:
         raise HTTPException(status_code=400, detail="流年/流月/流日需要提供查詢日期")
 
-    is_thread = data.mode == "thread"
+    # 後端 schema 驗證（前端 iztro 排盤，拒收畸形資料）
+    from app.services.prompts import validate_ziwei_chart
 
-    if is_thread:
-        # 新管線：後端 schema 驗證（前端 iztro 排盤，拒收畸形資料）
-        from app.services.prompts import validate_ziwei_chart
-
-        try:
-            validate_ziwei_chart(data.chart_data)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=f"命盤資料不完整：{exc}")
+    try:
+        validate_ziwei_chart(data.chart_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"命盤資料不完整：{exc}")
 
     try:
 
@@ -98,27 +93,16 @@ async def create_divination(
             gender=data.gender,
             chart_data=json.dumps(final_chart_data, ensure_ascii=False),
             status="pending",
-            ai_provider="default" if data.use_default_ai else None,
+            ai_provider="default",
         )
         db.add(history)
         db.commit()
         db.refresh(history)
 
-        if is_thread:
-            return {
-                "id": history.id,
-                "status": history.status,
-                "message": "命盤已生成，請開啟串流取得解盤。",
-            }
-
-        background_tasks.add_task(
-            process_ziwei_task, history.id, str(settings.DATABASE_URL)
-        )
-
         return {
             "id": history.id,
-            "status": "pending",
-            "message": "占卜建立成功，AI 解讀中...",
+            "status": history.status,
+            "message": "命盤已生成，請開啟串流取得解盤。",
         }
 
     except Exception as e:
