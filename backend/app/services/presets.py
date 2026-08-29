@@ -28,6 +28,17 @@ def get_preset(preset_id: str) -> dict | None:
     return next((p for p in load_presets() if p["id"] == preset_id), None)
 
 
+def preset_model_protocol(preset_id: str, model_id: str) -> str | None:
+    """preset 中該模型的請求協定（"responses" 或 None=chat/completions）"""
+    preset = get_preset(preset_id)
+    if preset is None:
+        return None
+    model = next((m for m in preset.get("models", []) if m.get("id") == model_id), None)
+    if model is None:
+        return None
+    return model.get("protocol")
+
+
 def preset_model_params(preset_id: str, model_id: str) -> ModelCallParams | None:
     """preset 中該模型的呼叫參數
 

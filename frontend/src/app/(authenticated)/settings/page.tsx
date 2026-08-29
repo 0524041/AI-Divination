@@ -40,6 +40,7 @@ interface ModelEntryItem {
   label?: string | null;
   enabled: boolean;
   params?: Record<string, unknown> | null;
+  protocol?: string | null;
 }
 
 interface Connection {
@@ -56,7 +57,7 @@ interface Preset {
   name: string;
   base_url: string;
   requires_api_key: boolean;
-  models: { id: string; label?: string; params?: Record<string, unknown> }[];
+  models: { id: string; label?: string; params?: Record<string, unknown>; protocol?: string }[];
 }
 
 /** per-model 呼叫參數的表單狀態（空字串＝未指定） */
@@ -281,7 +282,13 @@ export default function SettingsPage() {
       const merged = [...draft];
       for (const s of suggested) {
         if (!ids.has(s.id)) {
-          merged.push({ id: s.id, label: s.label ?? null, enabled: false, params: s.params ?? null });
+          merged.push({
+            id: s.id,
+            label: s.label ?? null,
+            enabled: false,
+            params: s.params ?? null,
+            protocol: s.protocol ?? null,
+          });
           ids.add(s.id);
         }
       }
@@ -340,6 +347,7 @@ export default function SettingsPage() {
           enabled: m.enabled,
           ...(m.label ? { label: m.label } : {}),
           params: formToParams(paramsDraft[m.id] ?? EMPTY_PARAMS) ?? undefined,
+          protocol: m.protocol ?? undefined,
         })),
       });
       if (res.ok) {

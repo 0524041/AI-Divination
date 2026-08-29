@@ -59,7 +59,14 @@
         {"id": "mimo-v2.5", "params": {"reasoning_param": null}},
         {"id": "mimo-v2.5-pro", "params": {"reasoning_param": null}},
         {"id": "hy4-preview", "params": {"reasoning_param": null}},
-        {"id": "hy3", "params": {"reasoning_param": null}}
+        {"id": "hy3", "params": {"reasoning_param": null}},
+        {"id": "grok-4.6", "label": "Grok 4.6（Responses）", "protocol": "responses"},
+        {"id": "gpt-5.6-luna", "label": "GPT 5.6 Luna（Responses）", "protocol": "responses"},
+        {
+          "id": "muse-spark-1.2-contributor",
+          "label": "Muse Spark 1.2（Responses）",
+          "protocol": "responses"
+        }
       ]
     },
     {

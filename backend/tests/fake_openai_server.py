@@ -126,6 +126,56 @@ class FakeOpenAICompatServer:
                 )
             return JSONResponse(content=self.models_response)
 
+        @app.post("/v1/responses")
+        async def responses_api(request: Request):
+            body = await self._read_body(request)
+            self._record(request, body)
+
+            if self.mode == "error":
+                return JSONResponse(
+                    status_code=self.error_status, content=self.error_body
+                )
+            return StreamingResponse(
+                self._stream_responses_events(),
+                media_type="text/event-stream",
+            )
+
+    async def _stream_responses_events(self) -> Any:
+        """OpenAI Responses API 串流：reasoning/text delta + completed usage"""
+        seq = 0
+
+        def _event(data: dict) -> str:
+            nonlocal seq
+            data = {"type": data.pop("type"), "sequence_number": seq, **data}
+            seq += 1
+            return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+        yield _event({"type": "response.created", "response": {"id": "resp-fake"}})
+        items = self.stream_items or [("text", t) for t in self.stream_deltas]
+        for kind, text in items:
+            if self.stream_delay:
+                await asyncio.sleep(self.stream_delay)
+            if kind == "thinking":
+                yield _event({
+                    "type": "response.reasoning_summary_text.delta",
+                    "delta": text,
+                })
+            else:
+                yield _event({
+                    "type": "response.output_text.delta",
+                    "delta": text,
+                })
+        usage = None
+        if self.stream_usage is not None:
+            usage = {
+                "input_tokens": self.stream_usage.get("prompt_tokens"),
+                "output_tokens": self.stream_usage.get("completion_tokens"),
+            }
+        yield _event({
+            "type": "response.completed",
+            "response": {"id": "resp-fake", "usage": usage},
+        })
+
     async def _stream_events(self) -> Any:
         items = self.stream_items or [("text", t) for t in self.stream_deltas]
         for kind, text in items:

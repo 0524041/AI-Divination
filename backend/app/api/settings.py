@@ -61,6 +61,9 @@ class ModelEntry(BaseModel):
     label: Optional[str] = None
     enabled: bool = True
     params: Optional[dict] = None
+    protocol: Optional[str] = Field(
+        None, description='請求協定："responses" 或 NULL（chat/completions）'
+    )
 
 
 class ModelsRequest(BaseModel):
@@ -74,6 +77,7 @@ class ModelEntryOut(BaseModel):
     label: Optional[str] = None
     source: str  # "system" | "user"
     params: Optional[dict] = None
+    protocol: Optional[str] = None
 
 
 class ModelsListResponse(BaseModel):
@@ -280,6 +284,7 @@ def update_connection_models(
                 **({"label": entry.label} if entry.label else {}),
                 "enabled": entry.enabled,
                 **({"params": entry.params} if entry.params else {}),
+                **({"protocol": entry.protocol} if entry.protocol else {}),
             }
             for entry in request.models
         ]
@@ -332,6 +337,7 @@ def _system_model_entries(db: Session) -> List[ModelEntryOut]:
                 label=item.get("label"),
                 source="system",
                 params=item.get("params"),
+                protocol=item.get("protocol"),
             )
         )
     return entries
@@ -352,6 +358,7 @@ def _user_model_entries(db: Session, user: User) -> List[ModelEntryOut]:
                     label=item.get("label"),
                     source="user",
                     params=item.get("params"),
+                    protocol=item.get("protocol"),
                 )
             )
     return entries

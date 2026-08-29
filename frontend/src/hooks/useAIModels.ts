@@ -26,6 +26,7 @@ export interface ModelEntry {
   label: string | null;
   source: 'system' | 'user';
   params: Record<string, unknown> | null;
+  protocol?: string | null;
 }
 
 export interface ModelsResponse {

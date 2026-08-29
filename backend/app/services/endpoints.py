@@ -28,7 +28,7 @@ from app.services.ai_provider import (
     completions_url,
     merge_call_params,
 )
-from app.services.presets import preset_model_params
+from app.services.presets import preset_model_params, preset_model_protocol
 from app.utils.auth import decrypt_api_key, encrypt_api_key
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,7 @@ class ResolvedEndpoint:
     model: str
     source: str  # "user" | "system"
     call_params: ModelCallParams | None = field(default=None)
+    protocol: str = "chat"  # "chat" | "responses"
 
     def make_provider(self) -> OpenAICompatProvider:
         return OpenAICompatProvider(
@@ -54,6 +55,7 @@ class ResolvedEndpoint:
             api_key=self.api_key,
             model=self.model,
             call_params=self.call_params,
+            protocol=self.protocol,
         )
 
     @property
@@ -160,6 +162,17 @@ def _entry_call_params(preset_id: str | None, model_id: str, entry: dict | None)
     return merge_call_params(preset_layer, entry_layer)
 
 
+def _entry_protocol(preset_id: str | None, model_id: str, entry: dict | None) -> str:
+    """模型請求協定：entry protocol > preset protocol > chat"""
+    if entry and entry.get("protocol"):
+        return entry["protocol"]
+    if preset_id:
+        preset_protocol = preset_model_protocol(preset_id, model_id)
+        if preset_protocol:
+            return preset_protocol
+    return "chat"
+
+
 def _resolve_user_connection(
     db: Session, user_id: int, connection_id: int, model_id: str | None
 ) -> ResolvedEndpoint | None:
@@ -202,6 +215,7 @@ def _resolve_user_connection(
         model=model,
         source="user",
         call_params=_entry_call_params(config.preset_id, model, entry),
+        protocol=_entry_protocol(config.preset_id, model, entry),
     )
 
 

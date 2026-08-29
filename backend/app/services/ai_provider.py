@@ -133,11 +133,13 @@ class OpenAICompatProvider:
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         client: httpx.AsyncClient | None = None,
         call_params: ModelCallParams | None = None,
+        protocol: str = "chat",
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self._call_params = call_params
+        self.protocol = protocol  # "chat" | "responses"
         self._client = client or httpx.AsyncClient(timeout=timeout_seconds)
         self.last_usage: StreamUsage | None = None
         self.last_duration_ms: int | None = None
@@ -158,23 +160,7 @@ class OpenAICompatProvider:
         """
         params = merge_call_params(DEFAULT_CALL_PARAMS, self._call_params, call_params)
         self.last_usage = None
-        payload: dict = {
-            "model": self.model,
-            "messages": messages,
-            "stream": True,
-        }
-        if params.temperature is UNSET:
-            payload["temperature"] = REQUEST_TEMPERATURE
-        else:
-            payload["temperature"] = params.temperature
-        if params.max_tokens is UNSET:
-            payload["max_tokens"] = MAX_OUTPUT_TOKENS
-        else:
-            payload["max_tokens"] = params.max_tokens
-        if params.reasoning_param is UNSET:
-            payload["reasoning_effort"] = effort_label(THINKING_LEVEL)
-        elif params.reasoning_param and params.reasoning_value is not None:
-            payload[params.reasoning_param] = params.reasoning_value
+        payload = self._build_payload(messages, params)
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -183,7 +169,7 @@ class OpenAICompatProvider:
         try:
             async with self._client.stream(
                 "POST",
-                completions_url(self.base_url),
+                self._request_url(),
                 json=payload,
                 headers=headers,
             ) as response:
@@ -203,18 +189,113 @@ class OpenAICompatProvider:
                 async for line in response.aiter_lines():
                     if not line.startswith("data:"):
                         continue
-                    payload = line[len("data:") :].strip()
-                    if not payload:
+                    data = line[len("data:") :].strip()
+                    if not data:
                         continue
-                    if payload == "[DONE]":
+                    if data == "[DONE]":
                         break
-                    delta = self._parse_chunk(payload)
+                    if self.protocol == "responses":
+                        delta = self._parse_responses_chunk(data)
+                    else:
+                        delta = self._parse_chunk(data)
                     if delta is not None:
                         yield delta
         except httpx.TimeoutException as exc:
             raise AIProviderError("timeout", f"上游逾時：{exc}") from exc
         except httpx.HTTPError as exc:
             raise AIProviderError("upstream", f"連線失敗：{exc}") from exc
+
+    def _request_url(self) -> str:
+        """依 protocol 組出請求位址（容納含/不含 /v1 的 base_url）"""
+        trimmed = self.base_url.rstrip("/")
+        if self.protocol == "responses":
+            if trimmed.endswith("/v1"):
+                return f"{trimmed}/responses"
+            return f"{trimmed}/v1/responses"
+        return completions_url(self.base_url)
+
+    def _build_payload(
+        self, messages: list[dict[str, str]], params: ModelCallParams
+    ) -> dict:
+        """依 protocol 組出請求 payload"""
+        if params.temperature is UNSET:
+            temperature: float | None = REQUEST_TEMPERATURE
+        else:
+            temperature = params.temperature
+        if params.max_tokens is UNSET:
+            max_tokens = MAX_OUTPUT_TOKENS
+        else:
+            max_tokens = params.max_tokens
+
+        if self.protocol == "responses":
+            # OpenAI Responses API（OpenCode Go /v1/responses 相容模型）
+            payload: dict = {
+                "model": self.model,
+                "input": [
+                    {
+                        "role": m["role"],
+                        "content": [{"type": "input_text", "text": m["content"]}],
+                    }
+                    for m in messages
+                ],
+                "max_output_tokens": max_tokens,
+                "stream": True,
+            }
+            # 思考程度：Responses API 只有 reasoning.effort（low/medium/high）
+            if params.reasoning_param is not UNSET and params.reasoning_param:
+                value = (
+                    params.reasoning_value
+                    if params.reasoning_value not in (None, UNSET)
+                    else effort_label(THINKING_LEVEL)
+                )
+                payload["reasoning"] = {"effort": value}
+            if temperature is not None:
+                payload["temperature"] = temperature
+            return payload
+
+        # OpenAI chat/completions
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        if params.reasoning_param is UNSET:
+            payload["reasoning_effort"] = effort_label(THINKING_LEVEL)
+        elif params.reasoning_param and params.reasoning_value is not None:
+            payload[params.reasoning_param] = params.reasoning_value
+        return payload
+
+    def _parse_responses_chunk(self, payload: str) -> dict | None:
+        """解析 Responses API 事件；usage 於 response.completed 寫入 last_usage"""
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError:
+            return None
+
+        event_type = data.get("type", "")
+        if event_type == "response.output_text.delta":
+            delta = data.get("delta")
+            return {"type": "text", "text": delta} if delta else None
+        if event_type in (
+            "response.reasoning_summary_text.delta",
+            "response.reasoning_text.delta",
+        ):
+            delta = data.get("delta")
+            return {"type": "thinking", "text": delta} if delta else None
+        if event_type == "response.completed":
+            usage = (data.get("response") or {}).get("usage") or {}
+            self.last_usage = StreamUsage(
+                prompt_tokens=usage.get("input_tokens"),
+                completion_tokens=usage.get("output_tokens"),
+            )
+            return None
+        if event_type == "response.failed":
+            error = (data.get("response") or {}).get("error") or {}
+            message = error.get("message") or "上游回應失敗"
+            raise AIProviderError("upstream", f"上游回應失敗：{message}")
+        return None
 
     def _parse_chunk(self, payload: str) -> dict | None:
         """解析一個 JSON chunk；回傳 delta dict 或 None（無內容）"""
