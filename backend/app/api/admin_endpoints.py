@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/admin", tags=["管理"])
 class EndpointIn(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
     base_url: str = Field(..., min_length=1, max_length=255)
-    api_key: str = Field(..., min_length=1)
+    api_key: str | None = Field(None, description="編輯時留空表示沿用原金鑰")
     model: str = Field(..., min_length=1, max_length=100)
     models: list[dict] | None = Field(None, description="免費模型清單 [{id, enabled}]")
     default_model: str | None = Field(None, description="預設免費模型 id")
@@ -97,6 +97,10 @@ def create_endpoint(
     db: Session = Depends(get_db),
     admin_user=Depends(get_admin_user),
 ):
+    if not payload.api_key:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST, detail="新增端點需要提供 API Key"
+        )
     endpoint = SystemAIEndpoint(
         name=payload.name,
         base_url=payload.base_url.rstrip("/"),
@@ -127,14 +131,36 @@ def update_endpoint(
         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="端點不存在")
     endpoint.name = payload.name
     endpoint.base_url = payload.base_url.rstrip("/")
-    endpoint.api_key_encrypted = encrypt_api_key(payload.api_key)
+    if payload.api_key:
+        endpoint.api_key_encrypted = encrypt_api_key(payload.api_key)
     endpoint.model = payload.model
     if payload.models is not None:
         endpoint.set_models_list(payload.models)
-    if payload.default_model:
-        endpoint.default_model = payload.default_model
+    if payload.default_model is not None:
+        endpoint.default_model = payload.default_model or None
     db.commit()
     return _to_out(endpoint)
+
+
+@router.get("/endpoints/{endpoint_id}/probe-models")
+def probe_endpoint_models(
+    endpoint_id: int,
+    db: Session = Depends(get_db),
+    admin_user=Depends(get_admin_user),
+):
+    """即時探測端點 /models；供管理員挑選要開放的模型"""
+    from app.services.endpoints import probe_models
+
+    endpoint = db.query(SystemAIEndpoint).filter_by(id=endpoint_id).first()
+    if not endpoint:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="端點不存在")
+    try:
+        models = probe_models(endpoint.base_url, decrypt_api_key(endpoint.api_key_encrypted))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_502_BAD_GATEWAY, detail=f"探測失敗：{exc}"
+        )
+    return {"models": models}
 
 
 @router.delete("/endpoints/{endpoint_id}")

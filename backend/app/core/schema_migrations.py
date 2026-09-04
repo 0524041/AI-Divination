@@ -103,6 +103,9 @@ def migrate_ai_model_columns(conn: sqlite3.Connection) -> None:
     # --- 4. provider NOT NULL 重建 ---
     _make_provider_nullable(conn)
 
+    # --- 5. Agnes 系統端點模型可見性收斂（一次性） ---
+    _lock_agnes_system_models(conn)
+
     conn.commit()
 
 
@@ -214,4 +217,67 @@ def _make_provider_nullable(conn: sqlite3.Connection) -> None:
         ALTER TABLE ai_configs_new RENAME TO ai_configs;
         CREATE INDEX IF NOT EXISTS ix_ai_configs_id ON ai_configs (id);
         """
+    )
+
+
+# Agnes 系統端點（舊版種子會把探測到的全部模型設 enabled，使用者全看得到）；
+# 本遷移一次性收斂為僅 preset 內建款 enabled，其餘 disabled 供管理員手動開啟。
+_AGNES_HOST_SUFFIX = "agnes-ai.com"
+_LOCK_MARKER_KEY = "agnes_system_models_locked"
+
+
+def _agnes_visible_model_ids() -> set[str]:
+    """使用者可見的 Agnes 系統模型 id（presets.json 的 agnes 款）"""
+    from app.services.presets import get_preset
+
+    return {m["id"] for m in (get_preset("agnes") or {}).get("models", [])}
+
+
+def _lock_agnes_system_models(conn: sqlite3.Connection) -> None:
+    """將 Agnes 系統端點非內建款模型 disabled（一次性，冪等）
+
+    以 migration_markers 表記錄已執行，避免覆蓋管理員之後的手動調整。
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS migration_markers ("
+        "key VARCHAR(60) PRIMARY KEY, applied_at DATETIME)"
+    )
+    marker = conn.execute(
+        "SELECT 1 FROM migration_markers WHERE key = ?", (_LOCK_MARKER_KEY,)
+    ).fetchone()
+    if marker:
+        return
+
+    tables = {
+        r[0]
+        for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    if "system_ai_endpoints" in tables:
+        rows = conn.execute(
+            "SELECT id, models FROM system_ai_endpoints "
+            "WHERE models IS NOT NULL AND base_url LIKE ?",
+            (f"%{_AGNES_HOST_SUFFIX}%",),
+        ).fetchall()
+        visible = _agnes_visible_model_ids()
+        for row_id, models_json in rows:
+            try:
+                entries = json.loads(models_json)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(entries, list):
+                continue
+            updated = [
+                {**entry, "enabled": bool(entry.get("enabled")) and entry.get("id") in visible}
+                if isinstance(entry, dict)
+                else entry
+                for entry in entries
+            ]
+            conn.execute(
+                "UPDATE system_ai_endpoints SET models = ? WHERE id = ?",
+                (json.dumps(updated, ensure_ascii=False), row_id),
+            )
+
+    conn.execute(
+        "INSERT OR IGNORE INTO migration_markers (key, applied_at) VALUES (?, CURRENT_TIMESTAMP)",
+        (_LOCK_MARKER_KEY,),
     )

@@ -30,7 +30,7 @@ from app.services.ai_provider import (
     merge_call_params,
     session_headers,
 )
-from app.services.presets import preset_model_params, preset_model_protocol
+from app.services.presets import get_preset, preset_model_params, preset_model_protocol
 from app.utils.auth import decrypt_api_key, encrypt_api_key
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,9 @@ def probe_models(
 def ensure_default_seed(db: Session) -> SystemAIEndpoint | None:
     """系統預設端點種子化：表為空且環境提供 Agnes 金鑰時建立；幂等
 
-    種子時探測 /models 建立免費模型清單；探測失敗僅寫入環境設定的單一模型。
+    種子時探測 /models 建立候選清單；僅 preset 內建的 Agnes 模型 enabled
+    （使用者只看得到建議款），其餘探測到的模型 disabled 供管理員視需要開啟。
+    探測失敗僅寫入 preset 模型。
     """
     if db.query(SystemAIEndpoint).count() > 0:
         return db.query(SystemAIEndpoint).first()
@@ -96,17 +98,34 @@ def ensure_default_seed(db: Session) -> SystemAIEndpoint | None:
     if not settings.AGNES_API_KEY:
         return None
 
+    # 建議清單（presets.json 的 agnes 款）為使用者可見的系統免費模型
+    preset = get_preset("agnes") or {}
+    visible_ids = {m["id"] for m in preset.get("models", [])}
+    if settings.AGNES_MODEL_ID:
+        visible_ids.add(settings.AGNES_MODEL_ID)
+
     try:
         if get_settings().AI_PROBE_MODELS:
             model_ids = probe_models(settings.AGNES_BASE_URL, settings.AGNES_API_KEY)
         else:
             model_ids = []
     except Exception as exc:
-        logger.info("Agnes 模型探測失敗，使用環境預設：%s", exc)
+        logger.info("Agnes 模型探測失敗，僅使用內建清單：%s", exc)
         model_ids = []
 
-    if settings.AGNES_MODEL_ID not in model_ids:
-        model_ids.insert(0, settings.AGNES_MODEL_ID)
+    # 排序：preset 模型在前（enabled），其餘探測到的在後（disabled）
+    ordered = [m for m in model_ids if m in visible_ids]
+    ordered += [m for m in model_ids if m not in visible_ids]
+    for preset_id in sorted(visible_ids - set(model_ids)):
+        ordered.append(preset_id)
+
+    entries = [
+        {"id": m, "enabled": m in visible_ids}
+        for m in ordered
+        if m
+    ]
+    if settings.AGNES_MODEL_ID not in ordered:
+        entries.insert(0, {"id": settings.AGNES_MODEL_ID, "enabled": True})
 
     endpoint = SystemAIEndpoint(
         name="Agnes 預設",
@@ -114,9 +133,7 @@ def ensure_default_seed(db: Session) -> SystemAIEndpoint | None:
         api_key_encrypted=encrypt_api_key(settings.AGNES_API_KEY),
         model=settings.AGNES_MODEL_ID,
         default_model=settings.AGNES_MODEL_ID,
-        models=json.dumps(
-            [{"id": m, "enabled": True} for m in model_ids], ensure_ascii=False
-        ),
+        models=json.dumps(entries, ensure_ascii=False),
         is_default=True,
         is_active=True,
     )

@@ -5,16 +5,24 @@
  */
 
 import { useState } from 'react';
-import { Check, Loader2, Plug, Server, Star } from 'lucide-react';
+import { Check, List, Loader2, Plug, Server, Star } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+
+export interface AdminEndpointModel {
+  id: string;
+  label?: string | null;
+  enabled: boolean;
+}
 
 export interface AdminEndpoint {
   id: number;
   name: string;
   base_url: string;
   model: string;
+  models: AdminEndpointModel[];
+  default_model: string | null;
   is_default: boolean;
   is_active: boolean;
   key_preview: string;
@@ -40,9 +48,10 @@ interface EndpointCardProps {
   onDelete: (endpoint: AdminEndpoint) => void;
   onSetDefault: (endpoint: AdminEndpoint) => Promise<void>;
   onTest: (endpoint: AdminEndpoint) => Promise<TestResult>;
+  onManageModels: (endpoint: AdminEndpoint) => void;
 }
 
-export function EndpointCard({ endpoint, onEdit, onDelete, onSetDefault, onTest }: EndpointCardProps) {
+export function EndpointCard({ endpoint, onEdit, onDelete, onSetDefault, onTest, onManageModels }: EndpointCardProps) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
 
@@ -75,6 +84,7 @@ export function EndpointCard({ endpoint, onEdit, onDelete, onSetDefault, onTest 
             </p>
             <p className="text-xs text-foreground-muted mt-0.5">
               模型：<span className="text-foreground-secondary">{endpoint.model}</span>
+              ・開放 {endpoint.models.filter((m) => m.enabled).length}/{endpoint.models.length}
               ・金鑰：<span className="text-foreground-secondary font-mono">{endpoint.key_preview}</span>
             </p>
           </div>
@@ -97,6 +107,9 @@ export function EndpointCard({ endpoint, onEdit, onDelete, onSetDefault, onTest 
               設為預設
             </Button>
           )}
+          <Button type="button" variant="ghost" size="sm" leftIcon={<List size={14} />} onClick={() => onManageModels(endpoint)}>
+            模型
+          </Button>
           <Button type="button" variant="ghost" size="sm" onClick={() => onEdit(endpoint)}>
             編輯
           </Button>

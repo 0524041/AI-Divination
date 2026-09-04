@@ -68,7 +68,7 @@ def test_seed_creates_default_from_env():
 
 
 def test_seed_probes_models_and_stores_list(monkeypatch):
-    """種子時探測 /models → 多個免費模型寫入，預設模型取 AGNES_MODEL_ID"""
+    """種子時探測 /models → 內建款 enabled，探測到的其他款 disabled"""
     monkeypatch.setattr(get_settings(), "AI_PROBE_MODELS", True)
     monkeypatch.setattr(
         "app.services.endpoints.probe_models",
@@ -77,12 +77,14 @@ def test_seed_probes_models_and_stores_list(monkeypatch):
     with _db() as db:
         endpoint = ensure_default_seed(db)
 
-    assert endpoint.enabled_model_ids() == ["agnes-2.5-pro", "agnes-2.0-flash"]
+    assert endpoint.enabled_model_ids() == ["agnes-2.0-flash", "agnes-2.5-flash"]
     assert endpoint.effective_default_model() == "agnes-2.0-flash"
+    entries = {m["id"]: m["enabled"] for m in endpoint.models_list()}
+    assert entries["agnes-2.5-pro"] is False
 
 
-def test_seed_probe_failure_falls_back_to_env_model(monkeypatch):
-    """探測失敗 → 只寫入環境設定的單一模型"""
+def test_seed_probe_failure_falls_back_to_preset_models(monkeypatch):
+    """探測失敗 → 僅內建款 enabled"""
     def _boom(base_url, api_key):
         raise RuntimeError("network down")
 
@@ -91,7 +93,10 @@ def test_seed_probe_failure_falls_back_to_env_model(monkeypatch):
     with _db() as db:
         endpoint = ensure_default_seed(db)
 
-    assert endpoint.enabled_model_ids() == ["agnes-2.0-flash"]
+    assert sorted(endpoint.enabled_model_ids()) == [
+        "agnes-2.0-flash",
+        "agnes-2.5-flash",
+    ]
 
 
 def test_seed_is_idempotent():
@@ -134,15 +139,15 @@ async def test_system_enabled_model_selects_specific(fake_ai, monkeypatch):
     monkeypatch.setattr(get_settings(), "AI_PROBE_MODELS", True)
     monkeypatch.setattr(
         "app.services.endpoints.probe_models",
-        lambda base_url, api_key: ["agnes-2.0-flash", "agnes-2.5-pro"],
+        lambda base_url, api_key: ["agnes-2.0-flash", "agnes-2.5-flash"],
     )
     with _db() as db:
         ensure_default_seed(db)
 
     with _db() as db:
-        resolved = resolve_endpoint(db, model_id="agnes-2.5-pro")
+        resolved = resolve_endpoint(db, model_id="agnes-2.5-flash")
 
-    assert resolved.model == "agnes-2.5-pro"
+    assert resolved.model == "agnes-2.5-flash"
     assert resolved.source == "system"
 
 
