@@ -7,6 +7,11 @@
       "requires_api_key": true,
       "models": [
         {
+          "id": "agnes-2.5-flash",
+          "label": "Agnes 2.5 Flash",
+          "params": {"reasoning_param": "reasoning_effort", "reasoning_value": "high"}
+        },
+        {
           "id": "agnes-2.0-flash",
           "label": "Agnes 2.0 Flash",
           "params": {"reasoning_param": "reasoning_effort", "reasoning_value": "high"}

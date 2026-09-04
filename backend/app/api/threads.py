@@ -79,7 +79,7 @@ def _authenticate(token: str) -> User:
 def _owned_record(record_id: int, user: User) -> None:
     with SessionLocal() as db:
         record = db.query(History).filter(History.id == record_id).first()
-    if record is None or record.user_id != user.id:
+    if record is None or (record.user_id != user.id and user.role != "admin"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="紀錄不存在")
 
 

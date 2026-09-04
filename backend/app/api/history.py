@@ -304,12 +304,11 @@ def get_history_item(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """取得單筆歷史紀錄"""
-    history = (
-        db.query(History)
-        .filter(History.id == history_id, History.user_id == current_user.id)
-        .first()
-    )
+    """取得單筆歷史紀錄（admin 可查看他人紀錄）"""
+    query = db.query(History).filter(History.id == history_id)
+    if current_user.role != "admin":
+        query = query.filter(History.user_id == current_user.id)
+    history = query.first()
 
     if not history:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="紀錄不存在")
@@ -348,12 +347,11 @@ def delete_history_item(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """刪除歷史紀錄"""
-    history = (
-        db.query(History)
-        .filter(History.id == history_id, History.user_id == current_user.id)
-        .first()
-    )
+    """刪除歷史紀錄（admin 可刪除他人紀錄）"""
+    query = db.query(History).filter(History.id == history_id)
+    if current_user.role != "admin":
+        query = query.filter(History.user_id == current_user.id)
+    history = query.first()
 
     if not history:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="紀錄不存在")
@@ -378,12 +376,12 @@ def retry_ai_interpretation(
 
     thread 模式的重試請使用 POST /api/records/{id}/retry。
     此端點保留路徑相容，將舊紀錄重置為 pending 後引導前端開啟串流。
+    admin 可重試他人紀錄。
     """
-    history = (
-        db.query(History)
-        .filter(History.id == history_id, History.user_id == current_user.id)
-        .first()
-    )
+    query = db.query(History).filter(History.id == history_id)
+    if current_user.role != "admin":
+        query = query.filter(History.user_id == current_user.id)
+    history = query.first()
 
     if not history:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="紀錄不存在")

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # 系統預設 AI 端點（Agnes）— 作為系統預設端點的種子資料
     AGNES_API_KEY: str = ""
     AGNES_BASE_URL: str = "https://apihub.agnes-ai.com/v1"
-    AGNES_MODEL_ID: str = "agnes-2.0-flash"
+    AGNES_MODEL_ID: str = "agnes-2.5-flash"
     # 種子化時是否探測 /models 建立免費模型清單（測試環境關閉以避免外部網路）
     AI_PROBE_MODELS: bool = True
 
