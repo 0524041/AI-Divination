@@ -200,6 +200,7 @@ async def test_endpoint_connection(
         api_key=decrypt_api_key(endpoint.api_key_encrypted),
         model=endpoint.model,
         timeout_seconds=20.0,
+        session_id=f"endpoint-test-{endpoint_id}",
     )
     started = __import__("time").monotonic()
     try:

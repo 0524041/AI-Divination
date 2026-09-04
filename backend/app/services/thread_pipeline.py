@@ -328,7 +328,7 @@ async def _stream_followup_inner(
         },
     )
 
-    provider = resolved.make_provider()
+    provider = resolved.make_provider(session_id=f"thread-{record_id}")
     content_parts: list[str] = []
     think_parts: list[str] = []
     started = time.monotonic()
@@ -647,7 +647,7 @@ async def _stream_inner(
         record.status = "processing"
         db.commit()
 
-    provider = resolved.make_provider()
+    provider = resolved.make_provider(session_id=f"thread-{record_id}")
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_message},

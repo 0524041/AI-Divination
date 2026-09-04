@@ -10,18 +10,26 @@ import logging
 
 import httpx
 
+from app.services.ai_provider import OPENCODE_PROBE_SESSION_ID, session_headers
+
 logger = logging.getLogger(__name__)
 
 
-async def test_connection(base_url: str) -> dict:
-    """探測服務的模型清單；回傳 {success, models} 或 {success, error}"""
+async def test_connection(
+    base_url: str, session_id: str | None = None
+) -> dict:
+    """探測服務的模型清單；回傳 {success, models} 或 {success, error}
+
+    非對話請求無會話 ID 時用固定探測值，滿足 OpenCode Go 的 header 要求。
+    """
     MAX_SIZE = 1024 * 50  # 限制讀取 50KB
+    headers = session_headers(session_id or OPENCODE_PROBE_SESSION_ID)
 
     async def fetch_safely(client, url):
         try:
             # 使用 stream=True 避免直接下載大檔案
             async with client.stream(
-                "GET", url, follow_redirects=False
+                "GET", url, headers=headers, follow_redirects=False
             ) as response:
                 if response.status_code != 200:
                     return None

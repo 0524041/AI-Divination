@@ -22,11 +22,13 @@ from app.models.ai_request_log import AIRequestLog
 from app.models.settings import AIConfig
 from app.models.system_ai_endpoint import SystemAIEndpoint
 from app.services.ai_provider import (
+    OPENCODE_PROBE_SESSION_ID,
     ModelCallParams,
     OpenAICompatProvider,
     call_params_from_dict,
     completions_url,
     merge_call_params,
+    session_headers,
 )
 from app.services.presets import preset_model_params, preset_model_protocol
 from app.utils.auth import decrypt_api_key, encrypt_api_key
@@ -49,13 +51,15 @@ class ResolvedEndpoint:
     call_params: ModelCallParams | None = field(default=None)
     protocol: str = "chat"  # "chat" | "responses"
 
-    def make_provider(self) -> OpenAICompatProvider:
+    def make_provider(self, session_id: str | None = None) -> OpenAICompatProvider:
+        """建構串流客戶端；session_id 為 OpenCode Go 會話 ID（同一對話全程固定）"""
         return OpenAICompatProvider(
             base_url=self.base_url,
             api_key=self.api_key,
             model=self.model,
             call_params=self.call_params,
             protocol=self.protocol,
+            session_id=session_id,
         )
 
     @property
@@ -63,10 +67,16 @@ class ResolvedEndpoint:
         return completions_url(self.base_url)
 
 
-def probe_models(base_url: str, api_key: str) -> list[str]:
-    """探測 OpenAI-compatible 服務的模型清單（GET {base_url}/models）；失敗時 raise"""
+def probe_models(
+    base_url: str, api_key: str, session_id: str | None = None
+) -> list[str]:
+    """探測 OpenAI-compatible 服務的模型清單（GET {base_url}/models）；失敗時 raise
+
+    非對話請求無會話 ID 時用固定探測值，滿足 OpenCode Go 的 header 要求。
+    """
     url = f"{base_url.rstrip('/')}/models"
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    headers.update(session_headers(session_id or OPENCODE_PROBE_SESSION_ID))
     with httpx.Client(timeout=PROBE_TIMEOUT_SECONDS) as client:
         response = client.get(url, headers=headers, follow_redirects=False)
         response.raise_for_status()

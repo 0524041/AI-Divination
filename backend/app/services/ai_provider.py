@@ -25,6 +25,20 @@ DEFAULT_TIMEOUT_SECONDS = 300.0
 # 推理型模型會先輸出大量 reasoning_content，預留足夠空間給正文
 MAX_OUTPUT_TOKENS = 16384
 
+# OpenCode Go 要求的會話 header（2026-09-06 起缺失會直接 error）。
+# 每個對話用一個穩定 ID；非對話請求（探測/連線測試）用固定探測值。
+# 有 session 時一律帶上：未知 header 會被其他供應商忽略，
+# 且能涵蓋經自訂 base_url 代理到 OpenCode 的情況。
+OPENCODE_SESSION_HEADER = "x-opencode-session"
+OPENCODE_PROBE_SESSION_ID = "connection-probe"
+
+
+def session_headers(session_id: str | None) -> dict[str, str]:
+    """組出 x-opencode-session header；無 session 時回空 dict"""
+    if not session_id:
+        return {}
+    return {OPENCODE_SESSION_HEADER: session_id}
+
 
 class _Unset:
     """區分「未指定」（繼承上層/預設）與 None（明確停用）的 sentinel"""
@@ -134,12 +148,15 @@ class OpenAICompatProvider:
         client: httpx.AsyncClient | None = None,
         call_params: ModelCallParams | None = None,
         protocol: str = "chat",
+        session_id: str | None = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self._call_params = call_params
         self.protocol = protocol  # "chat" | "responses"
+        # OpenCode Go 會話 ID（同一對話全程固定；見 OPENCODE_SESSION_HEADER）
+        self.session_id = session_id
         self._client = client or httpx.AsyncClient(timeout=timeout_seconds)
         self.last_usage: StreamUsage | None = None
         self.last_duration_ms: int | None = None
@@ -164,6 +181,7 @@ class OpenAICompatProvider:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
+            **session_headers(self.session_id),
         }
 
         try:
