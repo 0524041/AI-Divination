@@ -18,6 +18,7 @@ from datetime import datetime
 from app.core.database import SessionLocal
 from app.models.ai_request_log import AIRequestLog
 from app.models.history import History
+from app.models.stream_slot import StreamSlot
 from app.models.thread_message import ThreadMessage
 from app.models.user import User
 from app.services import endpoints as endpoint_service
@@ -27,8 +28,10 @@ from app.services.tokens import CONTEXT_TOKEN_BUDGET, estimate_messages_tokens
 
 logger = logging.getLogger(__name__)
 
-# 同一紀錄同時僅允許一條活躍解盤串流
-_active_streams: set[int] = set()
+# 同一紀錄同時僅允許一條活躍解盤串流。
+# 以 thread_stream_slots 表為準（跨實例可見）；逾時未釋放視為 stale 可接管，
+# 避免 crash 殘留永久卡住。本地單實例行為與舊 in-memory set 一致。
+STREAM_SLOT_STALE_SECONDS = 10 * 60
 
 HEARTBEAT_INTERVAL_SECONDS = 15.0
 
@@ -133,19 +136,44 @@ def _build_first_messages(record: History) -> tuple[str, str]:
 
 
 def stream_is_active(record_id: int) -> bool:
-    return record_id in _active_streams
+    with SessionLocal() as db:
+        slot = db.query(StreamSlot).filter_by(record_id=record_id).first()
+        if slot is None:
+            return False
+        age = (datetime.utcnow() - slot.acquired_at).total_seconds()
+        return age < STREAM_SLOT_STALE_SECONDS
 
 
 def acquire_stream_slot(record_id: int) -> bool:
-    """同步佔位（路由層用），避免 lazy-generator 競態"""
-    if record_id in _active_streams:
-        return False
-    _active_streams.add(record_id)
-    return True
+    """同步佔位（路由層用），避免 lazy-generator 競態
+
+    跨實例互斥：主鍵衝突代表別處已佔；stale 佔位可接管。
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    now = datetime.utcnow()
+    with SessionLocal() as db:
+        slot = db.query(StreamSlot).filter_by(record_id=record_id).first()
+        if slot is not None:
+            age = (now - slot.acquired_at).total_seconds()
+            if age < STREAM_SLOT_STALE_SECONDS:
+                return False
+            slot.acquired_at = now  # 接管 stale 佔位
+            db.commit()
+            return True
+        try:
+            db.add(StreamSlot(record_id=record_id, acquired_at=now))
+            db.commit()
+            return True
+        except IntegrityError:
+            db.rollback()
+            return False  # 併發插入撞主鍵：對方先佔
 
 
 def release_stream_slot(record_id: int) -> None:
-    _active_streams.discard(record_id)
+    with SessionLocal() as db:
+        db.query(StreamSlot).filter_by(record_id=record_id).delete()
+        db.commit()
 
 
 async def stream_interpretation_preclaimed(
@@ -242,9 +270,8 @@ async def stream_followup(
     帶 connection_id/model_id/use_system 時切換模型並同步紀錄綁定。
     """
     if not preclaimed:
-        if record_id in _active_streams:
+        if not acquire_stream_slot(record_id):
             raise RuntimeError("此紀錄已有進行中的解盤串流")
-        _active_streams.add(record_id)
     try:
         async for event in _stream_followup_inner(
             record_id,
@@ -258,7 +285,8 @@ async def stream_followup(
         ):
             yield event
     finally:
-        _active_streams.discard(record_id)
+        if not preclaimed:
+            release_stream_slot(record_id)
 
 
 async def _stream_followup_inner(
@@ -579,16 +607,15 @@ async def stream_interpretation(
 
     呼叫端需先驗證擁有權。併發第二條串流 raise RuntimeError。
     """
-    if record_id in _active_streams:
+    if not acquire_stream_slot(record_id):
         raise RuntimeError("此紀錄已有進行中的解盤串流")
-    _active_streams.add(record_id)
     try:
         async for event in _stream_inner(
             record_id, user_id=user_id, heartbeat_interval=heartbeat_interval
         ):
             yield event
     finally:
-        _active_streams.discard(record_id)
+        release_stream_slot(record_id)
 
 
 def _bind_record_selection(record, resolved) -> None:

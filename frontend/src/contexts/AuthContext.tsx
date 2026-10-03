@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { resolveApiUrl } from '@/lib/api-client';
 
 export interface User {
     id: number;
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         try {
-            const res = await fetch('/api/auth/me', {
+            const res = await fetch(resolveApiUrl('/api/auth/me'), {
                 headers: { Authorization: `Bearer ${token}` },
             });
 

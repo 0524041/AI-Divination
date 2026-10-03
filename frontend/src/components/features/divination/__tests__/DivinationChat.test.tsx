@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('@/lib/api-client', () => ({
   apiGet: vi.fn().mockResolvedValue({ ok: false }),
+  resolveApiUrl: (u: string) => u, // 測試環境未設 NEXT_PUBLIC_API_URL，直通相對路徑
 }));
 
 import { DivinationChat } from '@/components/features/divination/DivinationChat';

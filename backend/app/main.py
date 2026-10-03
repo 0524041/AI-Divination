@@ -3,6 +3,7 @@ FastAPI 主應用程式
 """
 
 import logging
+import os
 import traceback
 
 from fastapi import FastAPI, Request
@@ -37,8 +38,11 @@ logging.basicConfig(
 
 settings = get_settings()
 
-run_migrations()
-run_thread_migrations()
+# Vercel Serverless：cold start 不跑啟動遷移（schema 由遷移腳本／CI 管理，
+# 且多實例併發跑冪等遷移純屬浪費）。後端 Vercel 專案設 SKIP_STARTUP_MIGRATIONS=1。
+if os.getenv("SKIP_STARTUP_MIGRATIONS") != "1":
+    run_migrations()
+    run_thread_migrations()
 
 # 建立應用程式
 # 生產環境隱藏 API 文件

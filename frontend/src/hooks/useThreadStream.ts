@@ -15,6 +15,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { ModelSelection } from '@/hooks/useAIModels';
 import { modelSelectionToQuery } from '@/hooks/useAIModels';
+import { resolveApiUrl } from '@/lib/api-client';
 
 export type StreamPhase = 'idle' | 'connecting' | 'streaming' | 'error' | 'done';
 
@@ -75,7 +76,9 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
 
       try {
         const token = getToken();
-        const fullUrl = url.includes('?') ? `${url}&token=${token}` : `${url}?token=${token}`;
+        const urlWithToken = url.includes('?') ? `${url}&token=${token}` : `${url}?token=${token}`;
+        // 未設 NEXT_PUBLIC_API_URL 時維持相對路徑（本地 rewrite），有設則直連後端域名
+        const fullUrl = resolveApiUrl(urlWithToken);
 
         const response = await fetch(fullUrl, {
           method: init.method,

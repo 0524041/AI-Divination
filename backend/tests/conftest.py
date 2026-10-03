@@ -18,7 +18,11 @@ from cryptography.fernet import Fernet
 
 # --- 環境隔離（務必在導入 app.* 之前） ---
 _TMP_DIR = tempfile.mkdtemp(prefix="ai-divination-test-")
-os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DIR}/test.db"
+# 預設 SQLite；設 TEST_DATABASE_URL 可把整套測試切到 Postgres（如 Neon dev 分支）
+# 跑通即證明雙引擎相容
+os.environ["DATABASE_URL"] = os.getenv(
+    "TEST_DATABASE_URL", f"sqlite:///{_TMP_DIR}/test.db"
+)
 # 明確提供金鑰，避免測試觸碰/生成 backend 下的金鑰檔
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pytest")
 os.environ.setdefault("ENCRYPTION_KEY", Fernet.generate_key().decode())

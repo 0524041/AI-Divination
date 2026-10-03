@@ -20,6 +20,8 @@ dependencies = [
     "google-genai>=0.3.0",
     "openai>=1.0.0",
     "iztro-py>=0.3.3",
+    # Postgres 驅動（Neon 用；postgresql:// URL 開箱即用）
+    "psycopg2-binary>=2.9.0",
 ]
 
 [project.scripts]

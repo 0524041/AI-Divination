@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Vercel Serverless 不支援 WebSocket：設為 'false' 直接停用（count 維持 null，
+// 頁面其餘功能不受影響）；本地預設啟用。另有重試上限，後端未啟時不會無限重連。
+const PRESENCE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PRESENCE !== 'false';
+const MAX_RETRIES = 5;
+
 export function useOnlineCount() {
   const [count, setCount] = useState<number | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const wsRef = useRef<WebSocket | null>(null);
+  const retriesRef = useRef(0);
 
   useEffect(() => {
+    if (!PRESENCE_ENABLED) return;
     const connect = () => {
       // 判斷是否為 HTTPS 以決定使用 wss 或 ws
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -20,7 +27,12 @@ export function useOnlineCount() {
       // 使用 /api/ws/online 路徑，以便 Next.js rewrite 可以嘗試代理
       // 或者如果 Cloudflare Ingress 設定了 /api/* -> localhost:8000 也能生效
       
-      if (window.location.port === '3000') {
+      // 後端位址：有設 NEXT_PUBLIC_API_URL（Vercel 部署）則連後端域名，
+      // 否則沿用本地規則（:3000 → :8000，同源則直連）
+      const apiHost = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+      if (apiHost) {
+        wsUrl = `${protocol}//${apiHost}/api/ws/online`;
+      } else if (window.location.port === '3000') {
         // 開發環境：直接連後端 (因為 Next.js rewrite 對 WS 支援不穩定，開發時分開連較穩)
         wsUrl = `${protocol}//${host}:8000/api/ws/online`;
       } else {
@@ -56,7 +68,9 @@ export function useOnlineCount() {
       };
 
       ws.onclose = () => {
-        // console.log('WS Disconnected, retrying...');
+        // 重試上限：後端沒開或平台不支援 WS 時安靜退場，不無限重連
+        if (retriesRef.current >= MAX_RETRIES) return;
+        retriesRef.current += 1;
         reconnectTimeoutRef.current = setTimeout(connect, 5000);
       };
       

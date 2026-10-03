@@ -20,6 +20,7 @@ function sseResponse(events: Array<{ event: string; data: unknown }>) {
 
 vi.mock('@/lib/api-client', () => ({
   apiGet: vi.fn().mockResolvedValue({}),
+  resolveApiUrl: (u: string) => u, // 測試環境未設 NEXT_PUBLIC_API_URL，直通相對路徑
 }));
 
 // ThreadPanel 內嵌 AISelector 依賴 AuthContext

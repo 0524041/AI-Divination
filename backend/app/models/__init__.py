@@ -5,6 +5,7 @@ from .ai_request_log import AIRequestLog
 from .history import History
 from .settings import AIConfig, UserAIPreference
 from .share_token import ShareToken
+from .stream_slot import StreamSlot
 from .system_ai_endpoint import SystemAIEndpoint
 from .thread_message import ThreadMessage
 from .user import User
@@ -18,5 +19,6 @@ __all__ = [
     'SystemAIEndpoint',
     'AIRequestLog',
     'ThreadMessage',
+    'StreamSlot',
 ]
 

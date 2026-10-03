@@ -318,7 +318,7 @@ async def test_concurrent_second_stream_conflict(make_user, auth_headers, fake_a
     async with api_client() as client:
         record_id = await _create_record(client, headers, "併發測試")
 
-    thread_pipeline._active_streams.add(record_id)
+    thread_pipeline.acquire_stream_slot(record_id)
     try:
         async with api_client() as client:
             response = await client.get(
@@ -326,7 +326,7 @@ async def test_concurrent_second_stream_conflict(make_user, auth_headers, fake_a
             )
         assert response.status_code == 409
     finally:
-        thread_pipeline._active_streams.discard(record_id)
+        thread_pipeline.release_stream_slot(record_id)
 
 
 # --- 未知類型明確報錯 ---

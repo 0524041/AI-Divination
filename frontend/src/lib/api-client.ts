@@ -4,9 +4,18 @@
  */
 
 // API 配置 - 使用相對路徑通過 Next.js 代理
-const API_CONFIG = {
-  baseUrl: '',  // 使用相對路徑，讓 Next.js 代理處理
-};
+// Vercel 部署時設 NEXT_PUBLIC_API_URL（後端專案域名），瀏覽器直連後端；
+// 未設則維持相對路徑（本地經 next.config.js rewrite 到 localhost:8000）
+const BACKEND_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+
+/**
+ * 把 /api/... 路徑解析為實際請求位址。
+ * 已是絕對 URL 則原樣回傳；測試與本地維持相對路徑不變。
+ */
+export function resolveApiUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) return path;
+  return BACKEND_URL ? `${BACKEND_URL}${path}` : path;
+}
 
 /**
  * 安全的 API 請求選項
@@ -25,10 +34,8 @@ export async function secureApiRequest(
 ): Promise<Response> {
   const { skipAuth = false, skipSignature = false, ...fetchOptions } = options;
 
-  // 構建 URL - 使用相對路徑
-  const url = endpoint.startsWith('http')
-    ? endpoint
-    : endpoint;  // 保持相對路徑
+  // 構建 URL - 未設後端位址時維持相對路徑（Next.js rewrite 處理）
+  const url = resolveApiUrl(endpoint);
 
   // 準備請求頭
   const headers = new Headers(fetchOptions.headers);
@@ -109,8 +116,8 @@ export async function apiDelete(endpoint: string, options: SecureRequestOptions 
 }
 
 /**
- * 導出 API 配置
+ * 導出 API 配置（後端位址，未設即同源相對路徑）
  */
-export async function getApiConfig(): Promise<typeof API_CONFIG> {
-  return API_CONFIG;
+export async function getApiConfig(): Promise<{ baseUrl: string }> {
+  return { baseUrl: BACKEND_URL };
 }

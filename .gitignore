@@ -67,3 +67,4 @@ __pycache__
 node_modules
 *.tsbuildinfo
 backend/*.backup-*
+.neon

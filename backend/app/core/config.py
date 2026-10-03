@@ -5,8 +5,10 @@
 import secrets
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
-from pydantic_settings import BaseSettings
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode
 
 # 專案根目錄
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -18,6 +20,9 @@ class Settings(BaseSettings):
     # 應用程式
     APP_NAME: str = "AI-Divination"
     DEBUG: bool = False
+    # development | production（Vercel 後端專案設為 production：
+    # 密鑰缺失時直接報錯，不再自動生成寫檔）
+    ENVIRONMENT: str = "development"
 
     # 資料庫
     DATABASE_URL: str = f"sqlite:///{BASE_DIR}/divination.db"
@@ -37,8 +42,24 @@ class Settings(BaseSettings):
     # 種子化時是否探測 /models 建立免費模型清單（測試環境關閉以避免外部網路）
     AI_PROBE_MODELS: bool = True
 
-    # CORS 設定
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # CORS 設定（支援逗號分隔字串，供 Vercel env 注入多域名）
+    ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def _split_origins(cls, v):
+        if isinstance(v, str):
+            # 相容 JSON 陣列與逗號分隔兩種寫法
+            v = v.strip()
+            if v.startswith("["):
+                import json
+
+                return json.loads(v)
+            return [o.strip() for o in v.split(",") if o.strip()]
+        return v
 
     class Config:
         env_file = ".env"
@@ -49,7 +70,17 @@ class Settings(BaseSettings):
         self._ensure_keys()
 
     def _ensure_keys(self):
-        """確保金鑰存在"""
+        """確保金鑰存在
+
+        優先順序：環境變數 > 本機金鑰檔（本地開發）；
+        production 環境缺密鑰即報錯（Vercel 檔案系統唯讀，不可寫檔）。
+        """
+        import os
+
+        is_production = (
+            self.ENVIRONMENT == "production" or os.getenv("VERCEL") == "1"
+        )
+
         secret_key_file = BASE_DIR / ".secret_key"
         encryption_key_file = BASE_DIR / ".encryption_key"
 
@@ -57,6 +88,10 @@ class Settings(BaseSettings):
         if not self.SECRET_KEY:
             if secret_key_file.exists():
                 self.SECRET_KEY = secret_key_file.read_text().strip()
+            elif is_production:
+                raise RuntimeError(
+                    "SECRET_KEY 未設定：production 環境必須經環境變數提供"
+                )
             else:
                 self.SECRET_KEY = secrets.token_urlsafe(32)
                 secret_key_file.write_text(self.SECRET_KEY)
@@ -65,6 +100,10 @@ class Settings(BaseSettings):
         if not self.ENCRYPTION_KEY:
             if encryption_key_file.exists():
                 self.ENCRYPTION_KEY = encryption_key_file.read_text().strip()
+            elif is_production:
+                raise RuntimeError(
+                    "ENCRYPTION_KEY 未設定：production 環境必須經環境變數提供"
+                )
             else:
                 from cryptography.fernet import Fernet
 
