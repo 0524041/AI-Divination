@@ -181,14 +181,17 @@ export default function HistoryPage() {
   const [deleting, setDeleting] = useState(false);
 
   const historyEndpoint = useMemo(() => {
+    const suffix = `page=${currentPage}&page_size=${PAGE_SIZE}&summary=1${
+      searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ''
+    }`;
     if (isAdmin && selectedUserId !== null) {
       const base =
         selectedUserId === 0
           ? `/api/history/admin/all?`
           : `/api/history/admin/all?user_id=${selectedUserId}&`;
-      return `${base}page=${currentPage}&page_size=${PAGE_SIZE}${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ''}`;
+      return `${base}${suffix}`;
     }
-    return `/api/history?page=${currentPage}&page_size=${PAGE_SIZE}${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ''}`;
+    return `/api/history?${suffix}`;
   }, [isAdmin, selectedUserId, currentPage, searchTerm]);
 
   const fetchHistory = useCallback(
@@ -239,18 +242,43 @@ export default function HistoryPage() {
     }
   }, [user]);
 
-  // 輪詢：有進行中的紀錄時每 3 秒靜默刷新
+  // 是否有進行中的紀錄（決定要不要輪詢）
+  const hasPending = useMemo(
+    () =>
+      history.some(
+        (item) => item.status === 'pending' || item.status === 'processing'
+      ),
+    [history]
+  );
+
+  // 輪詢：有進行中的紀錄時自適應退避（5s→10s→20s→30s），分頁隱藏時暫停
   useEffect(() => {
-    const hasPending = history.some(
-      (item) => item.status === 'pending' || item.status === 'processing'
-    );
     if (!hasPending || loading) return;
 
-    const interval = setInterval(() => {
-      fetchHistory(true);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [history, loading, fetchHistory]);
+    let delay = 5000;
+    let timer: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+
+    const schedule = () => {
+      timer = setTimeout(async () => {
+        if (cancelled) return;
+        if (document.visibilityState === 'hidden') {
+          delay = 5000; // 回到前景時快速跟進
+          schedule();
+          return;
+        }
+        await fetchHistory(true);
+        delay = Math.min(delay * 2, 30000);
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [hasPending, loading, fetchHistory]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
@@ -289,7 +317,17 @@ export default function HistoryPage() {
   };
 
   const handleCopy = async (item: HistoryItem) => {
-    const ok = await copyText(buildCopyText(item));
+    // 列表走 summary 模式不含解盤全文；複製時即時補抓單筆詳情
+    let full = item;
+    if (item.interpretation == null) {
+      try {
+        const res = await apiGet(`/api/history/${item.id}`);
+        if (res.ok) full = await res.json();
+      } catch {
+        // 補抓失敗仍複製既有欄位
+      }
+    }
+    const ok = await copyText(buildCopyText(full));
     toast(ok ? '已複製到剪貼簿' : '複製失敗，請手動複製內容', {
       kind: ok ? 'success' : 'error',
     });

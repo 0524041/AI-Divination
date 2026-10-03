@@ -321,7 +321,7 @@ def _system_model_entries(db: Session) -> List[ModelEntryOut]:
         .filter(SystemAIEndpoint.is_default.is_(True), SystemAIEndpoint.is_active)
         .order_by(SystemAIEndpoint.id)
         .first()
-    ) or ensure_default_seed(db)
+    ) or ensure_default_seed(db, probe=False)
     if endpoint is None:
         return []
 
@@ -383,7 +383,7 @@ def get_system_default_info(
     """系統預設端點資訊（訪客與使用者共用）"""
     from app.services.endpoints import ensure_default_seed, get_system_default
 
-    endpoint = get_system_default(db) or ensure_default_seed(db)
+    endpoint = get_system_default(db) or ensure_default_seed(db, probe=False)
     if endpoint is None:
         return {"name": "系統預設", "model": None}
     return {"name": endpoint.name, "model": endpoint.effective_default_model()}

@@ -23,13 +23,10 @@
     "framer-motion": "^13.1.1",
     "iztro": "^2.5.4",
     "lucide-react": "0.344.0",
-    "lunar-javascript": "^1.7.7",
     "next": "14.2.29",
     "p5": "^2.2.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-p5": "^1.4.1",
-    "react-p5-wrapper": "^4.1.2",
     "streamdown": "^2.6.0",
     "tailwind-merge": "2.2.1"
   },

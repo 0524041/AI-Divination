@@ -29,9 +29,10 @@ from app.services.tokens import CONTEXT_TOKEN_BUDGET, estimate_messages_tokens
 logger = logging.getLogger(__name__)
 
 # 同一紀錄同時僅允許一條活躍解盤串流。
-# 以 thread_stream_slots 表為準（跨實例可見）；逾時未釋放視為 stale 可接管，
-# 避免 crash 殘留永久卡住。本地單實例行為與舊 in-memory set 一致。
-STREAM_SLOT_STALE_SECONDS = 10 * 60
+# 以 thread_stream_slots 表為準（跨實例可見）；串流期間每次心跳刷新 acquired_at，
+# 停止刷新（函式被平台逾時硬殺）超過門檻即視為 stale 可接管。
+# 門檻須遠大於心跳間隔（3×）以免誤搶活躍串流；本地單實例行為與舊 in-memory set 一致。
+STREAM_SLOT_STALE_SECONDS = 90
 
 HEARTBEAT_INTERVAL_SECONDS = 15.0
 
@@ -159,6 +160,10 @@ def acquire_stream_slot(record_id: int) -> bool:
             if age < STREAM_SLOT_STALE_SECONDS:
                 return False
             slot.acquired_at = now  # 接管 stale 佔位
+            # 前一條串流被平台逾時硬殺時，紀錄會卡在 processing；順手重置回 pending
+            stale_record = db.query(History).filter(History.id == record_id).first()
+            if stale_record is not None and stale_record.status == "processing":
+                stale_record.status = "pending"
             db.commit()
             return True
         try:
@@ -174,6 +179,27 @@ def release_stream_slot(record_id: int) -> None:
     with SessionLocal() as db:
         db.query(StreamSlot).filter_by(record_id=record_id).delete()
         db.commit()
+
+
+def touch_stream_slot(record_id: int) -> None:
+    """串流心跳時刷新佔位時間戳；函式存活＝佔位保鮮，被硬殺則自然逾時可接管"""
+    with SessionLocal() as db:
+        db.query(StreamSlot).filter_by(record_id=record_id).update(
+            {"acquired_at": datetime.utcnow()}
+        )
+        db.commit()
+
+
+def _touch_slot_if_due(record_id: int, last_touch: float, interval: float) -> float:
+    """節流刷新佔位：距上次刷新達 interval 才寫 DB，避免每個 delta 都寫
+
+    連續輸出（無閒置 ping）的長串流也必須保鮮，否則會誤判 stale 被搶佔。
+    """
+    now = time.monotonic()
+    if now - last_touch >= interval:
+        touch_stream_slot(record_id)
+        return now
+    return last_touch
 
 
 async def stream_interpretation_preclaimed(
@@ -360,11 +386,15 @@ async def _stream_followup_inner(
     content_parts: list[str] = []
     think_parts: list[str] = []
     started = time.monotonic()
+    last_slot_touch = time.monotonic()
 
     try:
         async for kind, delta in _pump_deltas(
             provider, messages, heartbeat_interval=heartbeat_interval
         ):
+            last_slot_touch = _touch_slot_if_due(
+                record_id, last_slot_touch, heartbeat_interval
+            )
             if kind == "ping":
                 yield _sse_ping()
                 continue
@@ -694,11 +724,15 @@ async def _stream_inner(
     content_parts: list[str] = []
     think_parts: list[str] = []
     started = time.monotonic()
+    last_slot_touch = time.monotonic()
 
     try:
         async for kind, delta in _pump_deltas(
             provider, messages, heartbeat_interval=heartbeat_interval
         ):
+            last_slot_touch = _touch_slot_if_due(
+                record_id, last_slot_touch, heartbeat_interval
+            )
             if kind == "ping":
                 yield _sse_ping()
                 continue

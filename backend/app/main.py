@@ -80,13 +80,13 @@ app.add_middleware(APISecurityMiddleware)
 # 性能監控 Middleware（必須在 CORS 之後）
 app.add_middleware(PerformanceMiddleware)
 
-# CORS 設定 - 使用配置中的允許來源
+# CORS 設定 - 精確來源白名單（env 注入）；JWT 走 header，不需 credentials
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # 註冊路由

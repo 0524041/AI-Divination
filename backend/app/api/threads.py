@@ -1,15 +1,16 @@
 """
 Thread 串流 API（ADR-0002）
 
-- GET  /api/records/{record_id}/stream?token=   首解串流
-- POST /api/records/{record_id}/followup?token= 追問（回應走 SSE）
-- POST /api/records/{record_id}/retry?token=    重試最後回應（替換語意）
-- GET  /api/records/quota?token=                訪客額度餘量
+- GET  /api/records/{record_id}/stream    首解串流
+- POST /api/records/{record_id}/followup  追問（回應走 SSE）
+- POST /api/records/{record_id}/retry     重試最後回應（替換語意）
+- GET  /api/records/quota                 訪客額度餘量
 
-EventSource 無法帶 header，token 走 query param（沿用前端 SecureSSEConnection 慣例）。
+認證優先讀 `Authorization: Bearer` header；query `token` 僅為舊客戶端向後相容
+fallback（新前端不再把 token 放進 query string，避免進 access log／瀏覽器歷史）。
 """
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -57,6 +58,14 @@ def _model_switch(connection_value: str | None, model_value: str | None) -> dict
         "model_id": model_value or None,
         "use_system": (connection_value or "") == "system",
     }
+
+
+def _extract_token(request: Request, query_token: str) -> str:
+    """優先 Authorization: Bearer header；query token 為向後相容 fallback"""
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return query_token
 
 
 def _authenticate(token: str) -> User:
@@ -134,9 +143,9 @@ def _sse_response(generator_factory, record_id: int) -> StreamingResponse:
 
 
 @router.get("/quota")
-async def get_quota(token: str = Query(default="")):
+async def get_quota(request: Request, token: str = Query(default="")):
     """訪客額度餘量；登入使用者不受限"""
-    user = _authenticate(token)
+    user = _authenticate(_extract_token(request, token))
     with SessionLocal() as db:
         return guest_quota_status(db, user.id)
 
@@ -144,13 +153,14 @@ async def get_quota(token: str = Query(default="")):
 @router.get("/{record_id}/stream")
 async def stream_record(
     record_id: int,
+    request: Request,
     token: str = Query(default=""),
-    heartbeat: float = Query(default=15.0, gt=0, le=60),
+    heartbeat: float = Query(default=15.0, gt=0, le=30),
     connection_id: str = Query(default="", description="使用者連線 id 或 'system'"),
     model_id: str = Query(default="", description="本次使用的模型 id"),
 ):
     """訂閱占卜紀錄的首解串流（選擇會綁定到紀錄）"""
-    user = _authenticate(token)
+    user = _authenticate(_extract_token(request, token))
     _guard(record_id, user, check_slot=True)
 
     return _sse_response(
@@ -168,11 +178,12 @@ async def stream_record(
 async def followup_record(
     record_id: int,
     body: FollowupRequest,
+    request: Request,
     token: str = Query(default=""),
-    heartbeat: float = Query(default=15.0, gt=0, le=60),
+    heartbeat: float = Query(default=15.0, gt=0, le=30),
 ):
     """追問：問題持久化後，回應以 SSE 串流送達（可帶模型切換）"""
-    user = _authenticate(token)
+    user = _authenticate(_extract_token(request, token))
     _guard(record_id, user, check_slot=True)
 
     return _sse_response(
@@ -191,12 +202,13 @@ async def followup_record(
 @router.post("/{record_id}/retry")
 async def retry_record(
     record_id: int,
+    request: Request,
     token: str = Query(default=""),
-    heartbeat: float = Query(default=15.0, gt=0, le=60),
+    heartbeat: float = Query(default=15.0, gt=0, le=30),
 ):
     """重試最後一則助手回應（替換語意）"""
-    user = _authenticate(token)
-    _guard(record_id, user)
+    user = _authenticate(_extract_token(request, token))
+    _guard(record_id, user, check_slot=True)
 
     return _sse_response(
         lambda: retry_last_response(

@@ -362,3 +362,99 @@ async def test_unknown_type_reports_not_implemented(
         "error",
         {"kind": "upstream", "message": "類型 astrology_x 尚未接入新管線"},
     )
+
+
+# --- Ticket 02：SSE 認證可走 Authorization header（無 query token） ---
+
+
+async def test_stream_accepts_authorization_header_without_query_token(
+    make_user, auth_headers, fake_ai
+):
+    user = make_user(username="header-auth-user")
+    headers = auth_headers(user.username)
+    _seed_default_pointing_to(fake_ai)
+
+    async with api_client() as client:
+        record_id = await _create_record(client, headers, "header 認證")
+        fake_ai.respond_stream_items([("text", "收到 header 認證")])
+        response = await client.get(
+            f"/api/records/{record_id}/stream", headers=headers
+        )
+
+    assert response.status_code == 200
+    events = _parse_sse_events(response.text)
+    assert events[-1][0] == "done"
+
+
+# --- Ticket 01：串流佔位心跳與 stale 接管 ---
+
+
+async def test_slot_stale_takeover_resets_processing_status(make_user):
+    from datetime import datetime, timedelta
+
+    from app.models.stream_slot import StreamSlot
+
+    user = make_user(username="stale-slot-user")
+    with SessionLocal() as db:
+        record = History(
+            user_id=user.id,
+            divination_type="liuyao",
+            question="q",
+            chart_data="{}",
+            status="processing",
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        record_id = record.id
+        db.add(
+            StreamSlot(
+                record_id=record_id,
+                acquired_at=datetime.utcnow() - timedelta(seconds=200),
+            )
+        )
+        db.commit()
+
+    try:
+        assert thread_pipeline.acquire_stream_slot(record_id) is True
+        with SessionLocal() as db:
+            refreshed = db.query(History).filter(History.id == record_id).first()
+            assert refreshed.status == "pending"
+    finally:
+        thread_pipeline.release_stream_slot(record_id)
+
+
+async def test_slot_touch_keeps_active_stream_locked(make_user):
+    from datetime import datetime, timedelta
+
+    from app.models.stream_slot import StreamSlot
+
+    user = make_user(username="touch-slot-user")
+    with SessionLocal() as db:
+        record = History(
+            user_id=user.id,
+            divination_type="liuyao",
+            question="q",
+            chart_data="{}",
+            status="processing",
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        record_id = record.id
+
+    assert thread_pipeline.acquire_stream_slot(record_id) is True
+    try:
+        # 模擬串流期間時間推進：未刷新時已逾門檻
+        with SessionLocal() as db:
+            slot = db.query(StreamSlot).filter_by(record_id=record_id).first()
+            slot.acquired_at = datetime.utcnow() - timedelta(seconds=200)
+            db.commit()
+
+        thread_pipeline.touch_stream_slot(record_id)
+
+        # 心跳刷新後，另一請求不得搶佔
+        assert thread_pipeline.acquire_stream_slot(record_id) is False
+    finally:
+        thread_pipeline.release_stream_slot(record_id)
+

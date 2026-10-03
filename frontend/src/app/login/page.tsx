@@ -47,7 +47,7 @@ export default function LoginPage() {
 
   const checkInit = useCallback(async () => {
     try {
-      const res = await apiGet('/api/auth/check-init', { skipSignature: true });
+      const res = await apiGet('/api/auth/check-init');
       const data = await res.json();
       setIsInit(data.initialized);
       if (!data.initialized) {
@@ -99,7 +99,7 @@ export default function LoginPage() {
         body = { username, password };
       }
 
-      const res = await apiPost(endpoint, body, { skipSignature: true });
+      const res = await apiPost(endpoint, body);
       const data = await res.json();
 
       if (res.ok) {

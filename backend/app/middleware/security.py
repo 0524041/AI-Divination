@@ -60,29 +60,15 @@ class APISecurityMiddleware(BaseHTTPMiddleware):
             logger.debug(f"Request from external origin: {origin}")
     
     def _add_security_headers(self, response: Response):
-        """添加安全響應頭"""
-        # 防止點擊劫持
-        response.headers["X-Frame-Options"] = "DENY"
-        
-        # 防止 MIME 類型嗅探
+        """添加安全響應頭
+
+        API 回應多為 JSON／SSE，CSP 只在文件層有意義；前端 HTML 的 CSP 由
+        Next.js（Vercel）以 next.config headers 提供。此處保留最嚴格的空政策，
+        避免 API 回應被當成文件渲染，並移除已淘汰的 X-XSS-Protection。
+        """
         response.headers["X-Content-Type-Options"] = "nosniff"
-        
-        # 啟用 XSS 過濾
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        
-        # 內容安全策略 - 放寬限制以支援 Safari 和各種功能
-        # 'unsafe-inline' 和 'unsafe-eval' 用於支援 Next.js 開發模式
-        # img-src * data: 允許各種圖片來源
-        # font-src * data: 允許字體載入
-        # connect-src * 允許 API 連接
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "img-src * data: blob:; "
-            "font-src * data:; "
-            "connect-src *; "
-            "style-src 'self' 'unsafe-inline';"
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
         )
-        
-        # 嚴格的傳輸安全（Cloudflare 已處理 HTTPS，此 header 由 Cloudflare 添加）
-        # 在 localhost 開發環境不啟用
-        # response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

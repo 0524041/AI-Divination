@@ -103,6 +103,10 @@ def get_history(
     page_size: int = Query(20, ge=1, le=100),
     divination_type: Optional[str] = None,
     search: Optional[str] = Query(None, description="搜尋問題內容"),
+    summary: bool = Query(
+        False,
+        description="只回列表所需欄位（略過完整解盤全文）；詳情另抓單筆端點",
+    ),
     current_user: User = Depends(get_current_user_or_guest),
     db: Session = Depends(get_db),
 ):
@@ -134,7 +138,7 @@ def get_history(
                 gender=item.gender,
                 target=item.target,
                 chart_data=json.loads(item.chart_data),
-                interpretation=item.interpretation,
+                interpretation=None if summary else item.interpretation,
                 ai_provider=item.ai_provider,
                 ai_model=item.ai_model,
                 status=item.status,
@@ -190,7 +194,7 @@ def get_statistics(
         )
 
     # 今天的計數
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     if query_all_users:
         today_count = (
             db.query(History).filter(History.created_at >= today_start).count()
@@ -205,7 +209,7 @@ def get_statistics(
         )
 
     # 最近7天的類型統計
-    seven_days_ago = datetime.now() - timedelta(days=7)
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
     if query_all_users:
         type_counts = (
             db.query(History.divination_type, func.count(History.id).label("count"))
@@ -253,6 +257,7 @@ def get_all_history(
     user_id: Optional[int] = None,
     divination_type: Optional[str] = None,
     search: Optional[str] = Query(None, description="搜尋問題內容"),
+    summary: bool = Query(False, description="只回列表所需欄位（略過完整解盤全文）"),
     admin_user: User = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -283,7 +288,7 @@ def get_all_history(
                 gender=history.gender,
                 target=history.target,
                 chart_data=json.loads(history.chart_data),
-                interpretation=history.interpretation,
+                interpretation=None if summary else history.interpretation,
                 ai_provider=history.ai_provider,
                 ai_model=history.ai_model,
                 status=history.status,

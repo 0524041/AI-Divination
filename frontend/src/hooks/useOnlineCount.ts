@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 
-// Vercel Serverless 不支援 WebSocket：設為 'false' 直接停用（count 維持 null，
-// 頁面其餘功能不受影響）；本地預設啟用。另有重試上限，後端未啟時不會無限重連。
-const PRESENCE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PRESENCE !== 'false';
+// Vercel Serverless 不支援 WebSocket：預設停用（opt-in），需顯式設
+// NEXT_PUBLIC_ENABLE_PRESENCE=true 才連線；本地或支援長連線的環境才開啟。
+// 另有重試上限，後端未啟時不會無限重連。
+const PRESENCE_ENABLED = process.env.NEXT_PUBLIC_ENABLE_PRESENCE === 'true';
 const MAX_RETRIES = 5;
 
 export function useOnlineCount() {

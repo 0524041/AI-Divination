@@ -76,9 +76,9 @@ export function useThreadStream(callbacks?: StreamCallbacks) {
 
       try {
         const token = getToken();
-        const urlWithToken = url.includes('?') ? `${url}&token=${token}` : `${url}?token=${token}`;
+        // 認證走 Authorization header；不再把 token 放進 query string（避免進 access log／瀏覽器歷史）
         // 未設 NEXT_PUBLIC_API_URL 時維持相對路徑（本地 rewrite），有設則直連後端域名
-        const fullUrl = resolveApiUrl(urlWithToken);
+        const fullUrl = resolveApiUrl(url);
 
         const response = await fetch(fullUrl, {
           method: init.method,

@@ -84,12 +84,15 @@ def probe_models(
     return [m.get("id", "") for m in data.get("data", []) if m.get("id")]
 
 
-def ensure_default_seed(db: Session) -> SystemAIEndpoint | None:
+def ensure_default_seed(db: Session, *, probe: bool = True) -> SystemAIEndpoint | None:
     """系統預設端點種子化：表為空且環境提供 Agnes 金鑰時建立；幂等
 
-    種子時探測 /models 建立候選清單；僅 preset 內建的 Agnes 模型 enabled
-    （使用者只看得到建議款），其餘探測到的模型 disabled 供管理員視需要開啟。
-    探測失敗僅寫入 preset 模型。
+    種子時可選擇探測 /models 建立候選清單（probe=False 時跳過，只寫 preset 模型）；
+    僅 preset 內建的 Agnes 模型 enabled（使用者只看得到建議款），
+    其餘探測到的模型 disabled 供管理員視需要開啟。探測失敗僅寫入 preset 模型。
+
+    讀取路徑（模型清單、預設資訊、解盤解析）一律 probe=False：探測是同步外部
+    網路呼叫，不該在請求路徑阻塞 event loop。
     """
     if db.query(SystemAIEndpoint).count() > 0:
         return db.query(SystemAIEndpoint).first()
@@ -105,7 +108,7 @@ def ensure_default_seed(db: Session) -> SystemAIEndpoint | None:
         visible_ids.add(settings.AGNES_MODEL_ID)
 
     try:
-        if get_settings().AI_PROBE_MODELS:
+        if probe and settings.AI_PROBE_MODELS:
             model_ids = probe_models(settings.AGNES_BASE_URL, settings.AGNES_API_KEY)
         else:
             model_ids = []
@@ -158,7 +161,7 @@ def _resolve_system(
     """系統免費模型解析；model_id 不在清單時 ValueError"""
     system_default = get_system_default(db)
     if system_default is None:
-        ensure_default_seed(db)
+        ensure_default_seed(db, probe=False)
         system_default = get_system_default(db)
 
     if system_default is None:

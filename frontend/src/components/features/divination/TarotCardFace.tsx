@@ -50,6 +50,10 @@ export function TarotCardFace({ card, size = 'md', showPosition = true, classNam
         <img
           src={`/tarot-cards/${card.image}`}
           alt={`${card.name_cn}（${card.reversed ? '逆位' : '正位'}）`}
+          width={300}
+          height={450}
+          loading="lazy"
+          decoding="async"
           className={cn('absolute inset-0 w-full h-full object-cover', card.reversed && 'rotate-180')}
         />
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 to-transparent px-2 pt-6 pb-1.5 text-center">

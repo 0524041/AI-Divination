@@ -70,7 +70,7 @@ describe('ThreadPanel（Ticket 08）', () => {
 
     // 送出的請求形狀
     const followupCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('/followup'));
-    expect(followupCall![0]).toBe('/api/records/1/followup?token=');
+    expect(followupCall![0]).toBe('/api/records/1/followup');
     expect(JSON.parse(followupCall![1].body).question).toBe('這卦如何？');
   });
 

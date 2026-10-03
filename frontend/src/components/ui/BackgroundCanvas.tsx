@@ -26,9 +26,30 @@ interface Particle {
 
 const BackgroundCanvas = () => {
     const { theme } = useTheme();
-    // We need to track the actual coloring based on theme
-    // We can't access CSS variables easily inside p5 setup without some tricks
-    // So we'll pass the theme string to the sketch and handle colors there
+    // 尊重 reduced-motion：不播放全站背景動畫；hydration 後才決定，避免 SSR 不一致
+    const [enabled, setEnabled] = useState(false);
+    const p5Ref = useRef<P5CanvasInstance | null>(null);
+
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const update = () => setEnabled(!mq.matches);
+        update();
+        mq.addEventListener?.('change', update);
+        return () => mq.removeEventListener?.('change', update);
+    }, []);
+
+    // 分頁隱藏時暫停動畫，回到前景再恢復，省 CPU／電量
+    useEffect(() => {
+        if (!enabled) return;
+        const onVisibility = () => {
+            const inst = p5Ref.current;
+            if (!inst) return;
+            if (document.hidden) inst.noLoop();
+            else inst.loop();
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => document.removeEventListener('visibilitychange', onVisibility);
+    }, [enabled]);
 
     // Define the sketch
     const sketch = (p5: P5CanvasInstance) => {
@@ -49,6 +70,7 @@ const BackgroundCanvas = () => {
         };
 
         p5.setup = () => {
+            p5Ref.current = p5;
             const canvas = p5.createCanvas(window.innerWidth, window.innerHeight);
             canvas.position(0, 0);
             canvas.style('z-index', '-1');
@@ -207,6 +229,8 @@ const BackgroundCanvas = () => {
             }
         }
     };
+
+    if (!enabled) return null;
 
     return <P5Wrapper sketch={sketch} theme={theme} />;
 };

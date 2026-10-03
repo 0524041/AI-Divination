@@ -15,6 +15,7 @@ import { ModelSelector } from '@/components/features/ModelSelector';
 import { ChatMessage, useThreadStream } from '@/hooks/useThreadStream';
 import { useModelSelection, type ModelSelection } from '@/hooks/useAIModels';
 import { CONTEXT_TOKEN_BUDGET, estimateTokens } from '@/lib/tokens';
+import { apiGet } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
 /** 估算超過預算此比例時轉朱砂警示 */
@@ -271,8 +272,8 @@ function GuestQuotaNotice() {
   const [quota, setQuota] = useState<{ remaining: number; limit: number } | null>(null);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-    fetch(`/api/records/quota?token=${token}`)
+    // 認證走 Authorization header（apiGet），不再把 token 放進 query string
+    apiGet('/api/records/quota')
       .then((r) => r.json())
       .then((data) => {
         if (data.limited && data.remaining <= 3) setQuota(data);
