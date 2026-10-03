@@ -14,11 +14,13 @@ Status: done（P0/P1 code 第 1 批；架構項 10/13/14 延後）
 
 **未做（另行討論）**：tickets 10、13、14。
 
-**後續修正（2026-10-03，第二輪）**
+**後續修正（2026-10-03，第二輪，commit 80cd15d）**
 
 - 正式環境 CSP 擋下 p5 的 eval（`EvalError`）：`@p5-wrapper/react` 打包內含 core-js regenerator，在無 `'unsafe-eval'` 時執行 `Function("r","regeneratorRuntime = r")` 拋出未捕捉錯誤。改以**零依賴 canvas** 重寫 `BackgroundCanvas`，移除 `p5` 與 `@p5-wrapper/react`（約 1MB），維持嚴格 CSP。
 - CI 強化（ticket 15）：部署前 `next build`＋Playwright E2E 冒煙（對 production build 斷言無 runtime／CSP 錯誤）；後端 `compileall`；`dorny/paths-filter` 只在相關目錄變更時跑；Vercel 兩專案加 `ignoreCommand`，只有自己目錄有變更才建置。
+- CI action 升到 Node 24 runtime，消除 Node 20 deprecation 警告：`checkout@v5`、`setup-node@v5`、`setup-uv@v7`、`upload-artifact@v7`、`paths-filter@v4`。
 - `ai-divination-akspace` 專案（同 repo 的第三個、rootDirectory 為空）已刪除（ticket 16）；現存 Vercel 專案僅 frontend／backend。
+- 驗證：CI 成功且日誌無 Node 20 警告；frontend job 確實執行 `Production build`＋`E2E smoke`；兩 Vercel 專案 Ready；以真實瀏覽器載入正式站 `https://ai-divination-akspace.vercel.app`，`pageerror`／console error 皆為 0（CSP `EvalError` 已消失）。
 
 **部署驗證（2026-10-03，commit c57726c）**
 
