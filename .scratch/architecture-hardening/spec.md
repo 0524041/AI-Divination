@@ -14,6 +14,15 @@ Status: done（P0/P1 code 第 1 批；架構項 10/13/14 延後）
 
 **未做（另行討論）**：tickets 10、13、14。
 
+**部署驗證（2026-10-03，commit c57726c）**
+
+- CI（GitHub Actions）成功；前端 `ai-divination-frontend` 與後端 `ai-divination-backend` 兩個 Vercel 專案皆 Ready（Production）。
+- 後端 `GET /health` → 200 `{"status":"ok"}`，回應含嚴格 CSP（`default-src 'none'`）、`X-Content-Type-Options`、`Referrer-Policy`，不再有 `X-XSS-Protection`。
+- 前端公開網域回應 200，含 CSP（`connect-src 'self' <後端網域>`、`frame-ancestors 'none'`）、`X-Frame-Options: DENY`、`Referrer-Policy`、`Permissions-Policy`、HSTS，且無 `X-Powered-By`。
+- CORS：允許來源回 `Access-Control-Allow-Origin`；非白名單來源（`evil.example`）preflight 回 400 且不帶 allow-origin。
+- 公開 API `GET /api/auth/check-init` → 200 `{"initialized":true}`。
+
+
 ## Problem Statement
 
 網站已上 Vercel（前端與後端各一專案）＋ Neon Postgres，但拓撲本身有三個結構性事實造成浪費與風險：
