@@ -14,6 +14,12 @@ Status: done（P0/P1 code 第 1 批；架構項 10/13/14 延後）
 
 **未做（另行討論）**：tickets 10、13、14。
 
+**後續修正（2026-10-03，第二輪）**
+
+- 正式環境 CSP 擋下 p5 的 eval（`EvalError`）：`@p5-wrapper/react` 打包內含 core-js regenerator，在無 `'unsafe-eval'` 時執行 `Function("r","regeneratorRuntime = r")` 拋出未捕捉錯誤。改以**零依賴 canvas** 重寫 `BackgroundCanvas`，移除 `p5` 與 `@p5-wrapper/react`（約 1MB），維持嚴格 CSP。
+- CI 強化（ticket 15）：部署前 `next build`＋Playwright E2E 冒煙（對 production build 斷言無 runtime／CSP 錯誤）；後端 `compileall`；`dorny/paths-filter` 只在相關目錄變更時跑；Vercel 兩專案加 `ignoreCommand`，只有自己目錄有變更才建置。
+- `ai-divination-akspace` 專案（同 repo 的第三個、rootDirectory 為空）已刪除（ticket 16）；現存 Vercel 專案僅 frontend／backend。
+
 **部署驗證（2026-10-03，commit c57726c）**
 
 - CI（GitHub Actions）成功；前端 `ai-divination-frontend` 與後端 `ai-divination-backend` 兩個 Vercel 專案皆 Ready（Production）。
@@ -60,6 +66,8 @@ Status: done（P0/P1 code 第 1 批；架構項 10/13/14 延後）
 | 12 | next.config 清理與安全 headers | code | ✅ |
 | 13 | 同源 API 代理（架構） | 架構 | 🚫 延後討論 |
 | 14 | 後端常駐容器／async DB（架構） | 架構 | 🚫 延後討論 |
+| 15 | CI 部署前編譯＋E2E，並只在有變更時觸發 | code | ✅ |
+| 16 | 修正／清理 `ai-divination-akspace` 專案 | ops（人） | ✅ 已刪除 |
 
 ## Decisions
 

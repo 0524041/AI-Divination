@@ -6,29 +6,67 @@ on:
   pull_request:
     branches: [master, main]
 
+# 同一分支的新 push 取消舊的執行，避免浪費
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# dorny/paths-filter 在 PR 上需要讀取 PR 檔案清單
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  # 只有對應目錄（或 CI 設定本身）有變更時，才跑該語言的檢查
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'scripts/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - 'scripts/**'
+              - '.github/workflows/ci.yml'
+
   backend:
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.10"
       - run: uv sync
+      # 部署前先確認所有模組可成功編譯（import/語法層級）
+      - name: Compile check
+        run: uv run python -m compileall -q app
       - run: uv run ruff check app/ tests/
       - run: uv run pytest tests/ -q -p no:warnings
 
   frontend:
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           # jsdom 27 的 ESM 依賴需 Node 20.19+ 的 require(esm)；本地與 Vercel 皆為新版
           node-version: 22
@@ -38,3 +76,18 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run test:run
+      # 部署前先做 production build：任何編譯／建置錯誤在 CI 就擋下
+      - name: Production build
+        run: npm run build
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      # E2E 冒煙：對 production build 驗證頁面可載入且無 runtime／CSP 錯誤
+      - name: E2E smoke
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          retention-days: 7

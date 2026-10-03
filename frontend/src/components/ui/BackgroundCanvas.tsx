@@ -1,238 +1,176 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
-import { type P5CanvasInstance } from '@p5-wrapper/react';
+/**
+ * 全站背景動畫（零依賴 canvas 實作）
+ *
+ * 原以 p5 + @p5-wrapper/react 繪製 flow-field；p5 打包內含 core-js regenerator，
+ * 在嚴格 CSP（無 'unsafe-eval'）下會執行 `Function("r","regeneratorRuntime = r")`
+ * 而拋出未捕捉的 EvalError。改用原生 canvas 重寫同一視覺概念（主題色流場粒子），
+ * 同時移除約 1MB 依賴、且不需要 'unsafe-eval'。
+ *
+ * 尊重 prefers-reduced-motion：不播放；分頁隱藏時暫停。
+ */
+
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 
-// Dynamically import ReactP5Wrapper to avoid SSR issues
-const P5Wrapper = dynamic(
-    () => import('@p5-wrapper/react').then((mod) => mod.ReactP5Wrapper),
-    { ssr: false }
-);
-
 interface Particle {
-    pos: any; // p5.Vector
-    vel: any; // p5.Vector
-    acc: any; // p5.Vector
-    maxSpeed: number;
-    prevPos: any; // p5.Vector
-    update: () => void;
-    follow: (vectors: any[]) => void;
-    applyForce: (force: any) => void;
-    show: (p5: P5CanvasInstance) => void;
-    edges: (p5: P5CanvasInstance) => void;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  px: number;
+  py: number;
+}
+
+const FIELD_SCALE = 40; // 流場格距（px）
+const NOISE_STEP = 0.1; // 空間頻率
+const Z_SPEED = 0.35; // 時間演化速度（度/秒）
+const FORCE_MAG = 0.5;
+const MAX_SPEED = 1.5;
+
+/** 平順的偽 noise：少數正弦疊加，足夠做出有機流場且無外部依賴 */
+function fieldAngle(x: number, y: number, t: number): number {
+  const a = Math.sin(x * NOISE_STEP + t) + Math.cos(y * NOISE_STEP + t * 1.3);
+  const b = Math.sin((x + y) * NOISE_STEP * 0.5 - t * 0.7);
+  return (a + b) * Math.PI;
 }
 
 const BackgroundCanvas = () => {
-    const { theme } = useTheme();
-    // 尊重 reduced-motion：不播放全站背景動畫；hydration 後才決定，避免 SSR 不一致
-    const [enabled, setEnabled] = useState(false);
-    const p5Ref = useRef<P5CanvasInstance | null>(null);
+  const { theme } = useTheme();
+  const [enabled, setEnabled] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-    useEffect(() => {
-        const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-        const update = () => setEnabled(!mq.matches);
-        update();
-        mq.addEventListener?.('change', update);
-        return () => mq.removeEventListener?.('change', update);
-    }, []);
+  // 尊重 reduced-motion；hydration 後才決定，避免 SSR 不一致
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setEnabled(!mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
 
-    // 分頁隱藏時暫停動畫，回到前景再恢復，省 CPU／電量
-    useEffect(() => {
-        if (!enabled) return;
-        const onVisibility = () => {
-            const inst = p5Ref.current;
-            if (!inst) return;
-            if (document.hidden) inst.noLoop();
-            else inst.loop();
-        };
-        document.addEventListener('visibilitychange', onVisibility);
-        return () => document.removeEventListener('visibilitychange', onVisibility);
-    }, [enabled]);
+  useEffect(() => {
+    if (!enabled) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
 
-    // Define the sketch
-    const sketch = (p5: P5CanvasInstance) => {
-        let cols: number, rows: number;
-        let scl = 40; // Scale of the grid
-        let zoff = 0; // Z-axis offset for 3D noise (time)
-        let flowfield: any[];
-        let particles: Particle[] = [];
-        let flowColors: any;
+    const isDark = theme === 'dark';
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let width = 0;
+    let height = 0;
+    let cols = 0;
+    let rows = 0;
+    let particles: Particle[] = [];
+    let raf = 0;
+    let last = 0;
+    let time = 0;
 
-        // Theme configuration
-        let isDark = theme === 'dark';
-
-        p5.updateWithProps = (props: any) => {
-            if (props.theme) {
-                isDark = props.theme === 'dark';
-            }
-        };
-
-        p5.setup = () => {
-            p5Ref.current = p5;
-            const canvas = p5.createCanvas(window.innerWidth, window.innerHeight);
-            canvas.position(0, 0);
-            canvas.style('z-index', '-1');
-            canvas.style('position', 'fixed');
-            canvas.style('top', '0');
-            canvas.style('left', '0');
-
-            cols = p5.floor(window.innerWidth / scl);
-            rows = p5.floor(window.innerHeight / scl);
-
-            flowfield = new Array(cols * rows);
-
-            // Initialize particles
-            // Fewer particles for Zen feel, not too chaotic
-            const particleCount = window.innerWidth < 768 ? 100 : 300;
-            particles = [];
-            for (let i = 0; i < particleCount; i++) {
-                particles[i] = new Particle(p5);
-            }
-        };
-
-        p5.draw = () => {
-            // Clear background with very high transparency for trail effect
-            // Or just clear completely for cleaner look?
-            // For "Zen", trails might be nice but let's prevent muddying
-            if (isDark) {
-                p5.background(13, 17, 23, 20); // Deep void with slight trail
-            } else {
-                p5.background(242, 240, 233, 40); // Warm paper with slight trail
-            }
-
-            let yoff = 0;
-            for (let y = 0; y < rows; y++) {
-                let xoff = 0;
-                for (let x = 0; x < cols; x++) {
-                    let index = x + y * cols;
-                    // 4D noise: x, y, z(time), and a 4th dimension for extra subtlety? 
-                    // Just 3D is enough.
-                    let angle = p5.noise(xoff, yoff, zoff) * p5.TWO_PI * 2;
-                    // let v = p5.Vector.fromAngle(angle); // Typescript error on wrapper
-                    let v = p5.createVector(p5.cos(angle), p5.sin(angle));
-                    v.setMag(0.5); // Very gentle force
-                    flowfield[index] = v;
-                    xoff += 0.1;
-
-                    // Debug: show field
-                    // p5.stroke(0, 50);
-                    // p5.push();
-                    // p5.translate(x * scl, y * scl);
-                    // p5.rotate(v.heading());
-                    // p5.strokeWeight(1);
-                    // p5.line(0, 0, scl, 0);
-                    // p5.pop();
-                }
-                yoff += 0.1;
-                zoff += 0.0003; // Very slow evolution
-            }
-
-            for (let i = 0; i < particles.length; i++) {
-                particles[i].follow(flowfield);
-                particles[i].update();
-                particles[i].edges(p5);
-                particles[i].show(p5);
-            }
-        };
-
-        p5.windowResized = () => {
-            p5.resizeCanvas(window.innerWidth, window.innerHeight);
-            cols = p5.floor(window.innerWidth / scl);
-            rows = p5.floor(window.innerHeight / scl);
-            flowfield = new Array(cols * rows);
-        };
-
-        class Particle {
-            pos: any;
-            vel: any;
-            acc: any;
-            maxSpeed: number;
-            prevPos: any;
-            p5: P5CanvasInstance;
-
-            constructor(p5Instance: P5CanvasInstance) {
-                this.p5 = p5Instance;
-                this.pos = this.p5.createVector(this.p5.random(this.p5.width), this.p5.random(this.p5.height));
-                this.vel = this.p5.createVector(0, 0);
-                this.acc = this.p5.createVector(0, 0);
-                this.maxSpeed = 1.5; // Slow movement
-                this.prevPos = this.pos.copy();
-            }
-
-            update() {
-                this.vel.add(this.acc);
-                this.vel.limit(this.maxSpeed);
-                this.pos.add(this.vel);
-                this.acc.mult(0);
-            }
-
-            follow(vectors: any[]) {
-                let x = this.p5.floor(this.pos.x / scl);
-                let y = this.p5.floor(this.pos.y / scl);
-                let index = x + y * cols;
-                let force = vectors[index];
-                this.applyForce(force);
-            }
-
-            applyForce(force: any) {
-                if (force) {
-                    this.acc.add(force);
-                }
-            }
-
-            show(p5: P5CanvasInstance) {
-                // Line based drawing for trails
-
-                let strokeColor;
-                if (isDark) {
-                    // Gold/Lavender in dark mode
-                    strokeColor = p5.color(212, 175, 55, 100);
-                    // Or maybe subtle blue: p5.color(100, 150, 255, 50);
-                } else {
-                    // Sage/Ink in light mode
-                    // strokeColor = p5.color(44, 44, 44, 30); // Ink
-                    strokeColor = p5.color(143, 166, 145, 100); // Sage
-                }
-
-                p5.stroke(strokeColor);
-                p5.strokeWeight(1);
-                p5.line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
-
-                // p5.point(this.pos.x, this.pos.y);
-                this.updatePrev();
-            }
-
-            updatePrev() {
-                this.prevPos.x = this.pos.x;
-                this.prevPos.y = this.pos.y;
-            }
-
-            edges(p5: P5CanvasInstance) {
-                if (this.pos.x > p5.width) {
-                    this.pos.x = 0;
-                    this.updatePrev();
-                }
-                if (this.pos.x < 0) {
-                    this.pos.x = p5.width;
-                    this.updatePrev();
-                }
-                if (this.pos.y > p5.height) {
-                    this.pos.y = 0;
-                    this.updatePrev();
-                }
-                if (this.pos.y < 0) {
-                    this.pos.y = p5.height;
-                    this.updatePrev();
-                }
-            }
-        }
+    const newParticle = (): Particle => {
+      const x = Math.random() * width;
+      const y = Math.random() * height;
+      return { x, y, vx: 0, vy: 0, px: x, py: y };
     };
 
-    if (!enabled) return null;
+    const resize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cols = Math.ceil(width / FIELD_SCALE) + 2;
+      rows = Math.ceil(height / FIELD_SCALE) + 2;
+      const count = width < 768 ? 100 : 300;
+      particles = Array.from({ length: count }, newParticle);
+      ctx.clearRect(0, 0, width, height);
+    };
 
-    return <P5Wrapper sketch={sketch} theme={theme} />;
+    const step = (dt: number) => {
+      time += Z_SPEED * dt;
+
+      // 淡化上一幀，留下殘影（等同原 p5 的 background 透明度）
+      ctx.fillStyle = isDark ? 'rgba(13, 17, 23, 0.08)' : 'rgba(242, 240, 233, 0.16)';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = isDark
+        ? 'rgba(212, 175, 55, 0.39)'
+        : 'rgba(143, 166, 145, 0.39)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+
+      for (const p of particles) {
+        const gx = Math.floor(p.x / FIELD_SCALE);
+        const gy = Math.floor(p.y / FIELD_SCALE);
+        const angle = fieldAngle(gx, gy, time);
+
+        p.vx += Math.cos(angle) * FORCE_MAG;
+        p.vy += Math.sin(angle) * FORCE_MAG;
+        const speed = Math.hypot(p.vx, p.vy);
+        if (speed > MAX_SPEED) {
+          p.vx = (p.vx / speed) * MAX_SPEED;
+          p.vy = (p.vy / speed) * MAX_SPEED;
+        }
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // 邊界環繞
+        if (p.x > width) p.x = 0;
+        else if (p.x < 0) p.x = width;
+        if (p.y > height) p.y = 0;
+        else if (p.y < 0) p.y = height;
+
+        ctx.moveTo(p.px, p.py);
+        ctx.lineTo(p.x, p.y);
+        p.px = p.x;
+        p.py = p.y;
+      }
+      ctx.stroke();
+    };
+
+    const loop = (now: number) => {
+      if (!raf) return; // 已暫停
+      const dt = last ? Math.min((now - last) / 1000, 0.05) : 0;
+      last = now;
+      step(dt);
+      raf = requestAnimationFrame(loop);
+    };
+
+    const start = () => {
+      if (raf) return;
+      last = 0;
+      raf = requestAnimationFrame(loop);
+    };
+    const stop = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    };
+
+    const onVisibility = () => (document.hidden ? stop() : start());
+
+    resize();
+    start();
+    window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [enabled, theme]);
+
+  if (!enabled) return null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden
+      className="pointer-events-none fixed inset-0"
+      style={{ zIndex: -1 }}
+    />
+  );
 };
 
 export default BackgroundCanvas;
