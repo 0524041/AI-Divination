@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
   BarChart3,
@@ -35,7 +36,12 @@ import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
 import type { User } from '@/contexts/AuthContext';
-import { ThreadDialog } from './ThreadDialog';
+
+// 對話視窗含 Markdown 管線（streamdown，約 141KB gz）；開啟紀錄時才載入。
+const ThreadDialog = dynamic(() => import('./ThreadDialog').then((m) => m.ThreadDialog), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 z-50 bg-black/40" aria-hidden />,
+});
 
 interface ChartData {
   benguaming?: string;
@@ -653,15 +659,17 @@ export default function HistoryPage() {
       </main>
 
       {/* 對話視窗 */}
-      <ThreadDialog
-        recordId={openThreadId}
-        question={openThreadQuestion}
-        onClose={() => setOpenThreadId(null)}
-        onQuotaExceeded={({ used, limit }) =>
-          toast(`今日訪客額度已用完（${used}/${limit}），註冊可解鎖完整對話`, { kind: 'error', title: '額度用盡' })
-        }
-        onError={(message) => toast(message, { kind: 'error', title: '對話失敗' })}
-      />
+      {openThreadId !== null && (
+        <ThreadDialog
+          recordId={openThreadId}
+          question={openThreadQuestion}
+          onClose={() => setOpenThreadId(null)}
+          onQuotaExceeded={({ used, limit }) =>
+            toast(`今日訪客額度已用完（${used}/${limit}），註冊可解鎖完整對話`, { kind: 'error', title: '額度用盡' })
+          }
+          onError={(message) => toast(message, { kind: 'error', title: '對話失敗' })}
+        />
+      )}
 
       {/* 刪除確認 */}
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>

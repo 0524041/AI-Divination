@@ -9,7 +9,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, useReducedMotion } from 'framer-motion';
 import { Eye, EyeOff, User, Lock, Compass } from 'lucide-react';
 import { initializeApiClient } from '@/lib/api-init';
 import { apiGet, apiPost } from '@/lib/api-client';
@@ -34,9 +33,10 @@ function validatePassword(pwd: string): string | null {
 
 export default function LoginPage() {
   const router = useRouter();
-  const reducedMotion = useReducedMotion();
 
-  const [isInit, setIsInit] = useState<boolean | null>(null);
+  // 先以「已初始化」渲染登入表單，check-init 在背景確認；
+  // 避免一個 DB round trip 卡住整個登入頁（冷啟動時可達數秒）。
+  const [isInit, setIsInit] = useState<boolean>(true);
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -104,6 +104,10 @@ export default function LoginPage() {
 
       if (res.ok) {
         localStorage.setItem('token', data.access_token);
+        if (data.user) {
+          // 讓下一頁的 AuthProvider 先用快取渲染，背景再向 /api/auth/me 驗證
+          localStorage.setItem('auth_user', JSON.stringify(data.user));
+        }
         router.push('/');
       } else {
         setError(data.detail || '操作失敗');
@@ -118,37 +122,9 @@ export default function LoginPage() {
   const inputClasses =
     'w-full rounded-xl border border-border/50 bg-white/80 py-3 pl-10 pr-12 text-foreground-primary placeholder:text-foreground-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 dark:bg-black/40';
 
-  if (isInit === null) {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <div className="mb-4 flex justify-center">
-              <Compass className="h-16 w-16 animate-pulse text-accent" aria-hidden />
-            </div>
-            <div className="mx-auto h-9 w-32 animate-pulse rounded bg-foreground-muted/20" />
-            <p className="mt-4 text-sm text-foreground-muted">載入中…</p>
-          </div>
-          <Card variant="glass" padding="lg">
-            <div className="space-y-4">
-              <div className="h-12 animate-pulse rounded bg-foreground-muted/20" />
-              <div className="h-12 animate-pulse rounded bg-foreground-muted/20" />
-              <div className="h-12 animate-pulse rounded bg-foreground-muted/20" />
-            </div>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <motion.div
-        className="w-full max-w-md"
-        initial={reducedMotion ? undefined : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={reducedMotion ? { duration: 0 } : { duration: 0.5, ease: 'easeOut' }}
-      >
+      <div className="w-full max-w-md animate-fade-up">
         {/* Logo */}
         <div className="mb-8 text-center">
           <div className="mb-4 flex justify-center">
@@ -317,7 +293,7 @@ export default function LoginPage() {
             </div>
           )}
         </Card>
-      </motion.div>
+      </div>
     </div>
   );
 }

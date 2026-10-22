@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { Noto_Serif_TC } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
@@ -10,6 +11,15 @@ const BackgroundCanvas = dynamic(() => import('@/components/ui/BackgroundCanvas'
   ssr: false,
 });
 
+// 標題 serif 自架；內文改用系統中文字型（PingFang TC／Microsoft JhengHei），
+// 避免下載三套 Google Fonts、13 種權重（實測首頁 858KB）。
+const notoSerif = Noto_Serif_TC({
+  weight: '600',
+  display: 'swap',
+  variable: '--font-serif-tc',
+  preload: false,
+});
+
 export const metadata: Metadata = {
   title: '玄覺空間 - AI 玄學占卜',
   description: '結合傳統玄學智慧與 AI 科技的占卜系統',
@@ -18,15 +28,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-TW" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="zh-TW" className={notoSerif.variable} suppressHydrationWarning>
       <body className="font-sans antialiased bg-background-primary text-foreground-primary transition-colors duration-300 relative min-h-screen">
         <ThemeProvider>
           <AuthProvider>

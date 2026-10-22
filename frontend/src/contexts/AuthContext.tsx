@@ -22,6 +22,20 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// 記住上次驗證過的使用者，讓回訪時先渲染、背景再驗證，
+// 避免每次開站都卡在 /api/auth/me（跨區時可達 1 秒以上）。
+const USER_CACHE_KEY = 'auth_user';
+
+function readCachedUser(): User | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = localStorage.getItem(USER_CACHE_KEY);
+        return raw ? (JSON.parse(raw) as User) : null;
+    } catch {
+        return null;
+    }
+}
+
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = ['/login', '/share'];
 
@@ -43,6 +57,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const token = localStorage.getItem('token');
 
         if (!token) {
+            localStorage.removeItem(USER_CACHE_KEY);
             setUser(null);
             setLoading(false);
             return false;
@@ -56,11 +71,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
             if (res.ok) {
                 const data = await res.json();
                 setUser(data);
+                localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data));
                 setLoading(false);
                 return true;
             } else {
                 // Token invalid
                 localStorage.removeItem('token');
+                localStorage.removeItem(USER_CACHE_KEY);
                 setUser(null);
                 setLoading(false);
                 return false;
@@ -80,9 +97,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const logout = useCallback(() => {
         localStorage.removeItem('token');
+        localStorage.removeItem(USER_CACHE_KEY);
         setUser(null);
         router.push('/login');
     }, [router]);
+
+    // 回訪時先用快取樂觀渲染；checkAuth 仍會在背景下驗證 token。
+    useEffect(() => {
+        const cached = readCachedUser();
+        if (cached && localStorage.getItem('token')) {
+            setUser(cached);
+            setLoading(false);
+        }
+    }, []);
 
     // Check auth on mount and route changes
     useEffect(() => {

@@ -8,6 +8,7 @@
  */
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Calendar, MapPin, Save, Star, User, Users } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
@@ -18,10 +19,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { useToast } from '@/components/ui/Toast';
 import { DivinationFlow, DivinationStep } from '@/components/features/divination/DivinationFlow';
-import { ZiweiRevealRitual } from '@/components/features/divination/ZiweiRevealRitual';
 import { BirthDataPanel } from '@/components/features/divination/BirthDataPanel';
 import { ZiweiChart } from '@/components/ziwei/ZiweiChart';
-import { DivinationChat } from '@/components/features/divination/DivinationChat';
 import { ModelSelector } from '@/components/features/ModelSelector';
 import { useModelSelection } from '@/hooks/useAIModels';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
@@ -34,6 +33,18 @@ import {
   getChineseTimeIndex,
   Gender,
 } from '@/lib/astro';
+
+// 對話面板含 Markdown 管線（streamdown，約 141KB gz）；首解後才載入。
+const DivinationChat = dynamic(
+  () => import('@/components/features/divination/DivinationChat').then((m) => m.DivinationChat),
+  { ssr: false, loading: () => <div className="h-40 animate-pulse rounded-xl bg-white/5" /> }
+);
+
+// 排盤儀式含 framer-motion；改為進到儀式步驟才載入。
+const ZiweiRevealRitual = dynamic(
+  () => import('@/components/features/divination/ZiweiRevealRitual').then((m) => m.ZiweiRevealRitual),
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-xl bg-white/5" /> }
+);
 
 type QueryType = 'natal' | 'yearly' | 'monthly' | 'daily';
 
@@ -234,6 +245,9 @@ export default function ZiweiPage() {
     }
     setError('');
     setSubmitting(true);
+    // 預取儀式與對話 chunk，避免 API 回來後才開始下載
+    void import('@/components/features/divination/ZiweiRevealRitual');
+    void import('@/components/features/divination/DivinationChat');
     try {
       const computed = computeChart();
       const res = await apiPost('/api/ziwei', {

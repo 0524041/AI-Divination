@@ -8,7 +8,6 @@
  */
 
 import { ReactNode } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export type DivinationStep = 'intro' | 'input' | 'ritual' | 'reveal' | 'chat';
@@ -42,7 +41,6 @@ export function DivinationFlow({
   revealSlot,
   chatSlot,
 }: DivinationFlowProps) {
-  const reducedMotion = useReducedMotion();
   const currentIndex = STEPS.indexOf(currentStep);
   const labels = STEP_LABELS[type];
 
@@ -99,18 +97,9 @@ export function DivinationFlow({
 
       {/* 步驟內容 */}
       <main className="flex-1 flex flex-col">
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={currentStep}
-            initial={reducedMotion ? false : { opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reducedMotion ? undefined : { opacity: 0, y: -12 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
-            className="flex-1 flex flex-col"
-          >
-            {slots[currentStep]}
-          </motion.div>
-        </AnimatePresence>
+        <div key={currentStep} className="flex-1 flex flex-col animate-fade-up">
+          {slots[currentStep]}
+        </div>
       </main>
     </div>
   );

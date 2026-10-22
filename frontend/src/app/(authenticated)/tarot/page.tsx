@@ -6,19 +6,30 @@
  */
 
 import { FormEvent, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { MessageCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { DivinationFlow, DivinationStep } from '@/components/features/divination/DivinationFlow';
-import { TarotShuffleRitual } from '@/components/features/divination/TarotShuffleRitual';
 import { DivinedTarotCard, TarotCardFace } from '@/components/features/divination/TarotCardFace';
-import { DivinationChat } from '@/components/features/divination/DivinationChat';
 import { ModelSelector } from '@/components/features/ModelSelector';
 import { useModelSelection } from '@/hooks/useAIModels';
 import { useToast } from '@/components/ui/Toast';
 import { apiPost } from '@/lib/api-client';
+
+// 對話面板含 Markdown 管線（streamdown，約 141KB gz）；首解後才載入。
+const DivinationChat = dynamic(
+  () => import('@/components/features/divination/DivinationChat').then((m) => m.DivinationChat),
+  { ssr: false, loading: () => <div className="h-40 animate-pulse rounded-xl bg-white/5" /> }
+);
+
+// 儀式元件含 framer-motion；改為進到洗牌步驟才載入。
+const TarotShuffleRitual = dynamic(
+  () => import('@/components/features/divination/TarotShuffleRitual').then((m) => m.TarotShuffleRitual),
+  { ssr: false, loading: () => <div className="h-64 animate-pulse rounded-xl bg-white/5" /> }
+);
 
 interface TarotResult {
   id: number;
@@ -65,6 +76,9 @@ export default function TarotPage() {
     }
     setError('');
     setSubmitting(true);
+    // 預取儀式與對話 chunk，避免 API 回來後才開始下載
+    void import('@/components/features/divination/TarotShuffleRitual');
+    void import('@/components/features/divination/DivinationChat');
     try {
       // thread 模式：後端抽牌，前端不送任何牌面
       const res = await apiPost('/api/tarot', { question: q, spread_type: spreadType, mode: 'thread' });

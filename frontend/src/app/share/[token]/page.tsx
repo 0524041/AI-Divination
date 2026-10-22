@@ -12,15 +12,21 @@
  */
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Clock, Compass, Share2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { MarkdownRenderer } from '@/components/features/MarkdownRenderer';
 import { getAIProviderDisplayName } from '@/components/features/ModelSelector';
 import { secureApiRequest } from '@/lib/api-client';
+
+// Markdown 管線（streamdown）較重；分享內容抓回來後再載入。
+const MarkdownRenderer = dynamic(
+  () => import('@/components/features/MarkdownRenderer').then((m) => m.MarkdownRenderer),
+  { ssr: false, loading: () => <div className="h-24 animate-pulse rounded-lg bg-white/5" /> }
+);
 
 interface SharedCard {
   name: string;

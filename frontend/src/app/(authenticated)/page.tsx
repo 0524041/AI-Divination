@@ -1,12 +1,11 @@
 'use client';
 
 /**
- * 首頁（Ticket 15）— 墨與金風格，framer-motion 入場（尊重 useReducedMotion）
+ * 首頁（Ticket 15）— 墨與金風格，CSS 入場動畫（尊重 prefers-reduced-motion）
  */
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, useReducedMotion } from 'framer-motion';
 import { Compass, Sparkles, Star, CalendarDays, ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -55,7 +54,6 @@ const divinationTypes = [
 
 export default function HomePage() {
   const router = useRouter();
-  const reducedMotion = useReducedMotion();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
 
@@ -82,12 +80,7 @@ export default function HomePage() {
   return (
     <main className="flex w-full max-w-7xl flex-1 flex-col items-center mx-auto px-4 py-12 sm:px-6 md:py-20 lg:px-8">
       {/* Hero */}
-      <motion.div
-        className="mb-14 space-y-6 text-center md:mb-20"
-        initial={reducedMotion ? undefined : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={reducedMotion ? { duration: 0 } : { duration: 0.6, ease: 'easeOut' }}
-      >
+      <div className="mb-14 space-y-6 text-center md:mb-20 animate-fade-up">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-4 py-1.5 text-sm font-medium text-accent backdrop-blur-sm">
           <Sparkles size={14} aria-hidden />
           <span>AI 賦能的玄學智慧</span>
@@ -104,22 +97,17 @@ export default function HomePage() {
           在數位與靈性的交匯處，尋找生命的答案。<br className="hidden sm:block" />
           選擇一種占卜方式，開啟您的探索之旅。
         </p>
-      </motion.div>
+      </div>
 
       {/* Cards */}
       <div className="grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
         {divinationTypes.map((type, index) => {
           const IconComponent = type.icon;
           return (
-            <motion.div
+            <div
               key={type.id}
-              initial={reducedMotion ? undefined : { opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={
-                reducedMotion
-                  ? { duration: 0 }
-                  : { duration: 0.5, delay: 0.15 + index * 0.12, ease: 'easeOut' }
-              }
+              className="animate-fade-up"
+              style={{ animationDelay: `${0.15 + index * 0.12}s` }}
             >
               <Card
                 variant="glass"
@@ -175,7 +163,7 @@ export default function HomePage() {
                   </p>
                 </div>
               </Card>
-            </motion.div>
+            </div>
           );
         })}
       </div>

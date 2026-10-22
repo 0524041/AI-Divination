@@ -81,9 +81,11 @@ AI-Divination/
 | Organization | `org-dawn-boat-59522712`（見 `.neon`） |
 | Project | `bitter-wind-49153041` |
 | 正式分支 | `production` |
+| 區域 | `aws-ap-southeast-1`（Singapore） |
 
 - 本地／測試：SQLite（`DATABASE_URL=sqlite:///...`），零配置。
 - 正式：Neon Postgres；引擎由 `DATABASE_URL` 的 scheme 自動切換（`backend/app/core/database.py`）。
+- **後端 Vercel Function 必須與 Neon 同區**：`backend/vercel.json` 的 `regions: ["sin1"]`。改回預設 `iad1` 會讓每個 DB 查詢多約 200ms（登入／admin 歷史頁特別明顯）。
 - **`DATABASE_URL` 必須使用 Neon pooled 連線**（`-pooler`）；`DATABASE_URL_UNPOOLED` 只供遷移／管理用途。SSL 由連線字串的 `sslmode=require` 決定。
 - Serverless cold start **不跑啟動遷移**：後端 Vercel env 設 `SKIP_STARTUP_MIGRATIONS=1`，避免多實例重複建表／遷移。
 - Postgres schema 由 ORM／遷移腳本建立；SQLite 專用的 `run_migrations()` 在 Postgres 下自動跳過。
@@ -240,6 +242,8 @@ uv run python scripts/migrate_sqlite_to_neon.py --help  # 資料遷移
 - **Database**：雙引擎 — 本地 SQLite、正式 Neon Postgres；撰寫查詢時避免 SQLite 專有語法（`run_migrations` 等 SQLite 專用邏輯只在 SQLite 下啟用）。
 - **AI prompts** 位於 `backend/prompts/` — 修改時務必確認前後端對回應格式的共識。
 - **Security headers**：前端 CSP 在 `next.config.js`、後端在 `app/middleware/security.py`；不要為了讓套件跑起來而放寬到 `'unsafe-eval'`。
+- **字型**：內文用系統中文字型（PingFang TC／Microsoft JhengHei）；標題 `Noto Serif TC` 由 `next/font` 自架（weight 600）。不要改回 Google Fonts `<link>` 載入 Inter／Noto Sans TC（曾造成單頁 858KB 字型）。
+- **重 chunk 延後載入**：`streamdown`（Markdown）與 `framer-motion` 以 `next/dynamic` 切分；不要把 `DivinationChat`、`ThreadDialog` 或儀式元件改回靜態 import，否則首屏會多下載約 180KB gz。
 - **Vercel Analytics**：`<Analytics />` 只在 `src/app/layout.tsx` 掛一次。
 
 ## Important Notes

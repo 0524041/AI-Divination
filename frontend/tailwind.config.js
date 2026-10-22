@@ -47,10 +47,24 @@ module.exports = {
         },
       },
       fontFamily: {
-        serif: ['Noto Serif TC', 'Georgia', 'serif'],
-        sans: ['Inter', 'Noto Sans TC', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        heading: ['Noto Serif TC', 'Georgia', 'serif'],
-        body: ['Inter', 'Noto Sans TC', 'sans-serif'],
+        serif: ['var(--font-serif-tc)', '"Songti TC"', '"PMingLiU"', 'Georgia', 'serif'],
+        sans: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"PingFang TC"',
+          '"Microsoft JhengHei"',
+          '"Noto Sans TC"',
+          'sans-serif',
+        ],
+        heading: ['var(--font-serif-tc)', '"Songti TC"', '"PMingLiU"', 'Georgia', 'serif'],
+        body: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"PingFang TC"',
+          '"Microsoft JhengHei"',
+          '"Noto Sans TC"',
+          'sans-serif',
+        ],
       },
       animation: {
         'spin-slow': 'spin 3s linear infinite',

@@ -15,8 +15,8 @@ if (isDev) scriptSrc.push("'unsafe-eval'"); // 僅開發模式的 HMR 需要
 const csp = [
   "default-src 'self'",
   `script-src ${scriptSrc.join(' ')}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   "img-src 'self' data: blob:",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
