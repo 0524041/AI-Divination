@@ -45,7 +45,7 @@ AI-Divination/
 │   ├── prompts/                # AI system prompts（*.md）
 │   ├── tests/                  # pytest（測試 DB、假 OpenAI-compatible 伺服器）
 │   ├── vercel.json             # routes → api/index.py、maxDuration、ignoreCommand
-│   └── requirements.txt        # 由 uv.lock 匯出（Vercel 安裝用）
+│   └── requirements.txt        # 由 uv.lock 匯出的相容清單（Vercel 實際使用 uv.lock）
 ├── scripts/
 │   └── vercel-ignored-build-step.sh
 ├── .github/workflows/ci.yml    # CI（驗證用，不負責部署）
@@ -255,7 +255,7 @@ uv run python scripts/migrate_sqlite_to_neon.py --help  # 資料遷移
 5. `NEXT_PUBLIC_*` 是公開變數，會進瀏覽器 bundle。
 6. 正式環境的 DB 遷移請走 `backend/scripts/migrate_sqlite_to_neon.py`，並先在 Neon `dev` 分支彩排。
 7. 不要手動在 Vercel 上重新建立專案；本 repo 只對應 `ai-divination-frontend` 與 `ai-divination-backend` 兩個 Project。
-8. **依賴安全**：`requirements.txt` 由 `uv export --no-dev --format requirements-txt` 產生（含 hashes），Vercel 會以 hash 驗證套件。`certifi` 下限由 `backend/pyproject.toml` 的 `[tool.uv].constraint-dependencies` 鎖在 `>=2026.10.19`（2026-10 emSign CA 事件），不要移除。
+8. **依賴安全**：Vercel Python runtime 直接以 `uv.lock`（內含 hash）安裝；`requirements.txt` 只是相容匯出（`uv export --no-dev --no-hashes --format requirements-txt`），不需要手動加 hash。`certifi` 下限由 `backend/pyproject.toml` 的 `[tool.uv].constraint-dependencies` 鎖在 `>=2026.10.19`（2026-10 emSign CA 事件），不要移除。
 9. **本機工具鏈**：uv `>=0.13.4`、pip `>=26.2.2`、本機 Python `3.12.15`；CI 也使用 `3.12.15` 與 Vercel 的 `python3.12` 對齊。
 
 ## Agent skills
