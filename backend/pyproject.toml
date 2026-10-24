@@ -42,3 +42,8 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[tool.uv]
+# 2026-10 eMudhra/emSign CA incident：httpx/requests 會用 certifi 驗證 TLS，
+# 鎖定下限避免未來 lock 更新又降回受影響的 CA bundle。
+constraint-dependencies = ["certifi>=2026.10.19"]

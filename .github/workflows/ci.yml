@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v7
         with:
-          python-version: "3.10"
+          python-version: "3.12.15"
       - run: uv sync
       # 部署前先確認所有模組可成功編譯（import/語法層級）
       - name: Compile check

@@ -11,7 +11,7 @@ A full-stack web application combining traditional Chinese divination (I Ching /
 | Layer    | Technology                                                            |
 | -------- | --------------------------------------------------------------------- |
 | Frontend | Next.js 14 (App Router) + TypeScript + Tailwind CSS + Vercel Analytics |
-| Backend  | FastAPI + Python 3.10 + SQLAlchemy                                     |
+| Backend  | FastAPI + Python 3.12（本機 3.12.15） + SQLAlchemy                        |
 | Database | SQLite（本地開發／測試）／Neon Postgres（正式環境）                      |
 | AI       | OpenAI-compatible API（系統預設 Agnes；使用者可 BYOK 自訂端點）          |
 | Deploy   | Vercel（前後端各一專案）＋ Neon Postgres                                 |
@@ -255,6 +255,8 @@ uv run python scripts/migrate_sqlite_to_neon.py --help  # 資料遷移
 5. `NEXT_PUBLIC_*` 是公開變數，會進瀏覽器 bundle。
 6. 正式環境的 DB 遷移請走 `backend/scripts/migrate_sqlite_to_neon.py`，並先在 Neon `dev` 分支彩排。
 7. 不要手動在 Vercel 上重新建立專案；本 repo 只對應 `ai-divination-frontend` 與 `ai-divination-backend` 兩個 Project。
+8. **依賴安全**：`requirements.txt` 由 `uv export --no-dev --format requirements-txt` 產生（含 hashes），Vercel 會以 hash 驗證套件。`certifi` 下限由 `backend/pyproject.toml` 的 `[tool.uv].constraint-dependencies` 鎖在 `>=2026.10.19`（2026-10 emSign CA 事件），不要移除。
+9. **本機工具鏈**：uv `>=0.13.4`、pip `>=26.2.2`、本機 Python `3.12.15`；CI 也使用 `3.12.15` 與 Vercel 的 `python3.12` 對齊。
 
 ## Agent skills
 
